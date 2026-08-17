@@ -1,0 +1,65 @@
+services:
+  db:
+    container_name: pilos-db
+    image: mysql:8.0
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_allowed_packet=512M
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-pilos_root_pass}
+      MYSQL_DATABASE: ${DB_NAME:-pilos_v2}
+      MYSQL_USER: ${DB_USER:-pilos_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-pilos_password}
+      TZ: Asia/Seoul
+    ports:
+      - "${HOST_DB_PORT:-3307}:3306"
+    volumes:
+      - ateam_db_data:/var/lib/mysql
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_pass} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  web:
+    container_name: pilos-web
+    build:
+      context: ./pilos-sentiment-index
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./pilos-sentiment-index/.env
+    ports:
+      - "${HOST_WEB_PORT:-${WEB_PORT:-8080}}:5000"
+    volumes:
+      - ./pilos-sentiment-index/artifacts:/app/artifacts
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aiservice-network
+      - model_gateway_default
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/stocks', timeout=5)\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  ateam_db_data:
+    name: ateam_db_data
+
+networks:
+  aiservice-network:
+    name: aiservice-network
+    external: true
+  model_gateway_default:
+    name: model_gateway_default
+    external: true

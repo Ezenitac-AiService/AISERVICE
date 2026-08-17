@@ -1,0 +1,81 @@
+# ==============================================================================
+# AISERVICE Root Workspace .gitignore
+# ==============================================================================
+
+# Environment Secrets
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Large Database Dumps & Backups
+*.sql
+*.dump
+*.backup
+
+# Archives & Large Bundles
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.whl
+
+# Machine Learning Models & Heavy Binaries
+models/
+**/models/
+checkpoint-*/
+**/checkpoint-*/
+*.safetensors
+*.pt
+*.pth
+*.bin
+*.onnx*
+*.gguf
+*.weights
+
+# Raw Training Datasets & Heavy Corpora
+147.속성기반 감정분석 데이터/
+**/147.속성기반 감정분석 데이터/
+
+# Vector Stores & SQLite Databases
+*.sqlite3
+*.sqlite3-journal
+chroma_db_oliview/
+**/chroma_db_oliview/
+data/*.db*
+
+# Python Runtime & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# Logs & Process IDs
+logs/
+*.pid
+log.txt
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
