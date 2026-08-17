@@ -1,0 +1,166 @@
+openapi: 3.0.3
+info:
+  title: AISERVICE Model Gateway API Contract
+  version: 1.0.0
+  description: Unified OpenAI-compatible LLM, Embedding, and Rerank API served by vllm-serv-gateway on internal port 8081.
+servers:
+  - url: http://vllm-serv-gateway:8081/v1
+    description: Internal Docker Network Endpoint
+
+paths:
+  /chat/completions:
+    post:
+      summary: Generate Chat Completion (Fast or Synthesis Tier)
+      description: Dispatches prompt generation to either qwen3.5-2b (Fast) or qwen3.5-4b (Synthesis).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model
+                - messages
+              properties:
+                model:
+                  type: string
+                  enum: ["qwen3.5-2b", "qwen3.5-4b"]
+                  description: Target model tier (qwen3.5-2b for quick chat, qwen3.5-4b for deep RAG synthesis)
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - role
+                      - content
+                    properties:
+                      role:
+                        type: string
+                        enum: ["system", "user", "assistant"]
+                      content:
+                        type: string
+                temperature:
+                  type: number
+                  default: 0.7
+                max_tokens:
+                  type: integer
+                  default: 2048
+                  minimum: 1
+                  maximum: 4096
+                stream:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Successful completion or SSE stream
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  choices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message:
+                          type: object
+                          properties:
+                            role:
+                              type: string
+                            content:
+                              type: string
+                        finish_reason:
+                          type: string
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE chunks prefixed with data: {...}
+
+  /embeddings:
+    post:
+      summary: Generate Dense Vector Embeddings
+      description: Generates vector representations using bge-m3.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model
+                - input
+              properties:
+                model:
+                  type: string
+                  default: "bge-m3"
+                input:
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+      responses:
+        '200':
+          description: Embedding vectors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        embedding:
+                          type: array
+                          items:
+                            type: number
+
+  /rerank:
+    post:
+      summary: Cross-Encoder Rerank
+      description: Re-ranks retrieved document passages using bge-reranker-v2-m3.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model
+                - query
+                - documents
+              properties:
+                model:
+                  type: string
+                  default: "bge-reranker-v2-m3"
+                query:
+                  type: string
+                documents:
+                  type: array
+                  items:
+                    type: string
+                top_n:
+                  type: integer
+                  default: 5
+      responses:
+        '200':
+          description: Re-ranked passages with scores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        relevance_score:
+                          type: number

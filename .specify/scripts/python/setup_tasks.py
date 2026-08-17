@@ -29,7 +29,7 @@ except ImportError:  # pragma: no cover - direct execution from unusual cwd
 
 
 def _json_line(payload: object) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"
+    return json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n"
 
 
 def _help_text(argv0: str) -> str:

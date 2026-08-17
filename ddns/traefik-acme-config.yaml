@@ -1,0 +1,50 @@
+# Traefik ACME (Let's Encrypt) 설정을 위한 HelmChartConfig
+# K3s는 HelmChartConfig CRD를 통해 기본 Traefik Helm 차트의 values를 오버라이드합니다.
+#
+# Chart 버전 호환: traefik-37.1.1+up37.1.0 (Traefik 3.5.1)
+#   - v33+: certResolvers → certificatesResolvers
+#   - v34+: redirectTo → redirections.entryPoint
+#
+# 적용: kubectl apply -f traefik-acme-config.yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    # 인증서 저장을 위한 영구 볼륨
+    persistence:
+      enabled: true
+      size: 128Mi
+      path: /data
+      accessMode: ReadWriteOnce
+
+    # acme.json 권한 문제 해결을 위한 initContainer
+    deployment:
+      initContainers:
+        - name: volume-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "touch /data/acme.json; chmod -v 600 /data/acme.json"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+    # ACME (Let's Encrypt) 인증서 자동 발급 설정
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: "admin@ezenitac.duckdns.org"
+          storage: /data/acme.json
+          httpChallenge:
+            entryPoint: web
+
+    # Entrypoint 설정
+    ports:
+      web:
+        # HTTP → HTTPS 자동 리다이렉트 (v34+ 문법)
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+            permanent: true

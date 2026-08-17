@@ -14,8 +14,6 @@ services:
       MYSQL_USER: ${DB_USER:-pilos_user}
       MYSQL_PASSWORD: ${DB_PASSWORD:-pilos_password}
       TZ: Asia/Seoul
-    ports:
-      - "${HOST_DB_PORT:-3307}:3306"
     volumes:
       - ateam_db_data:/var/lib/mysql
     networks:
@@ -24,19 +22,22 @@ services:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_pass} || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 6
-      start_period: 30s
+      retries: 20
+      start_period: 60s
 
   web:
     container_name: pilos-web
     build:
       context: ./pilos-sentiment-index
       dockerfile: Dockerfile
+    image: pilos-web:latest
     restart: unless-stopped
     env_file:
       - ./pilos-sentiment-index/.env
-    ports:
-      - "${HOST_WEB_PORT:-${WEB_PORT:-8080}}:5000"
+    environment:
+      - LLM_BASE_URL=http://vllm-serv-gateway:8081
+      - FAST_LLM_MODEL=qwen3.5-2b
+      - SYNTHESIS_LLM_MODEL=qwen3.5-4b
     volumes:
       - ./pilos-sentiment-index/artifacts:/app/artifacts
     depends_on:
@@ -44,7 +45,6 @@ services:
         condition: service_healthy
     networks:
       - aiservice-network
-      - model_gateway_default
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/stocks', timeout=5)\" || exit 1"]
       interval: 15s
@@ -59,7 +59,4 @@ volumes:
 networks:
   aiservice-network:
     name: aiservice-network
-    external: true
-  model_gateway_default:
-    name: model_gateway_default
     external: true

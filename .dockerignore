@@ -1,0 +1,15 @@
+.git
+.gitignore
+.agents
+.specify
+specs
+**/*.pyc
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+**/*.pt
+**/*.safetensors
+**/*.tar.gz
+**/*.sql
+**/checkpoint-*

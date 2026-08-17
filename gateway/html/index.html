@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AISERVICE Unified Portal | 통합 AI 서비스 포털</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --card-hover-border: rgba(99, 102, 241, 0.6);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.35);
+      --badge-a: #10b981;
+      --badge-b: #ec4899;
+      --badge-chat: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2.5rem 1.5rem;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      max-width: 800px;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.9rem;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #818cf8;
+      margin-bottom: 1.2rem;
+      backdrop-filter: blur(8px);
+    }
+
+    h1 {
+      font-size: 2.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1rem;
+    }
+
+    p.subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.75rem;
+      max-width: 1200px;
+      width: 100%;
+      margin-bottom: 3rem;
+    }
+
+    .service-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1.25rem;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-decoration: none;
+      color: inherit;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .service-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: transparent;
+      transition: background 0.3s ease;
+    }
+
+    .service-card:hover {
+      transform: translateY(-6px);
+      border-color: var(--card-hover-border);
+      box-shadow: 0 20px 40px -10px var(--primary-glow);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+
+    .icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      border-radius: 0.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-a { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-b { background: rgba(236, 72, 153, 0.2); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.4); }
+    .badge-chat { background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.4); }
+
+    .card-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      color: #ffffff;
+    }
+
+    .card-desc {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+      flex-grow: 1;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .card-link-text {
+      font-weight: 600;
+      color: #818cf8;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .service-card:hover .card-link-text {
+      color: #a5b4fc;
+      transform: translateX(4px);
+      transition: transform 0.2s ease;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 2rem;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #10b981;
+      margin-top: 0.5rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background: #10b981;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #10b981;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-badge">
+      <span>🚀</span>
+      <span>AISERVICE UNIFIED PLATFORM</span>
+    </div>
+    <h1>통합 AI 서비스 게이트웨이 포털</h1>
+    <p class="subtitle">
+      A-Team 및 B-Team의 데이터 분석 대시보드와 대화형 AI 챗봇 서비스를 단일 플랫폼에서 경험하세요.
+    </p>
+  </header>
+
+  <main class="grid-container">
+
+    <!-- 1. B-Team Oliview Main -->
+    <a href="/bteam/oliview" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">💄</div>
+          <span class="badge badge-b">B-TEAM</span>
+        </div>
+        <h2 class="card-title">Oliview 메인 서비스</h2>
+        <p class="card-desc">
+          화장품 리뷰 감정 속성 분석, 키워드 트렌드 탐색 및 데이터 기반 상품 인사이트 대시보드입니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>React / Flask API</span>
+        <span class="card-link-text">입장하기 →</span>
+      </div>
+    </a>
+
+    <!-- 2. B-Team Oliview Chatbot A (올리챗) -->
+    <a href="/bteam/chata" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">🤖</div>
+          <span class="badge badge-chat">AI CHATBOT</span>
+        </div>
+        <h2 class="card-title">올리챗 (Oliview Chat A)</h2>
+        <p class="card-desc">
+          Streamlit 기반의 실시간 뷰티 상담 챗봇으로 Qwen3.5 2B/4B 및 BGE 임베딩 모델과 연동됩니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>Streamlit / RAG</span>
+        <span class="card-link-text">대화 시작 →</span>
+      </div>
+    </a>
+
+    <!-- 3. B-Team Oliview Chatbot B (올원챗) -->
+    <a href="/bteam/chatb" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">💬</div>
+          <span class="badge badge-chat">RAG AGENT</span>
+        </div>
+        <h2 class="card-title">올원챗 (Oliview Chat B)</h2>
+        <p class="card-desc">
+          FastAPI 기반의 고성능 하이브리드 RAG 질의응답 챗봇으로 4B 합성 모델을 통한 심층 분석을 제공합니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>FastAPI / Uvicorn</span>
+        <span class="card-link-text">상담 연결 →</span>
+      </div>
+    </a>
+
+    <!-- 4. A-Team Pilos Main -->
+    <a href="/ateam/pilos" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">📈</div>
+          <span class="badge badge-a">A-TEAM</span>
+        </div>
+        <h2 class="card-title">Pilos 감정지수 서비스</h2>
+        <p class="card-desc">
+          주식 종목별 뉴스·수급 감정 지수 분석 대시보드 및 AI 요약 리포트 내장 챗봇 서비스입니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>Flask / Gunicorn</span>
+        <span class="card-link-text">대시보드 보기 →</span>
+      </div>
+    </a>
+
+  </main>
+
+  <footer>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
+      <div class="status-bar">
+        <span class="status-dot"></span>
+        <span>Single Entry Gateway & Model Serving Online (Qwen3.5 Multi-tier)</span>
+      </div>
+      <p>© 2026 AISERVICE Project. All rights reserved.</p>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -79,3 +79,8 @@ Thumbs.db
 *.swp
 *.swo
 *.tmp
+
+# DuckDNS local secret/configuration and runtime logs
+ddns/duckdns-config.xml
+ddns/duckdns.log
+ddns/.env
