@@ -171,8 +171,9 @@ services:
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       STREAMLIT_SERVER_BASE_URL_PATH: bteam/chata
+      USE_LLM_METADATA_FILTER: "false"
     volumes:
-      - ./bteam/Oliview_chatbot_a/chroma_db_oliview:/app/chroma_db_oliview
+      - ./bteam/Oliview_chatbot_a:/app
     depends_on:
       bteam_db:
         condition: service_healthy
@@ -264,8 +265,22 @@ services:
       DB_USER: ${PILOS_DB_USER:-pilos_user}
       DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_PROVIDER: openai
+      LLM_API_KEY: EMPTY
       LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
       EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      EMBEDDING_API_KEY: EMPTY
+      EMBEDDING_MODEL: bge-m3
+      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_API_KEY: EMPTY
+      RERANK_MODEL: bge-reranker-v2-m3
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      REPORT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      SERVICE_KNOWLEDGE_VERSION: "1.0"
+      EMBEDDING_TIMEOUT_SECONDS: "300"
+      RERANK_TIMEOUT_SECONDS: "300"
+      CHAT_LLM_TIMEOUT_SECONDS: "300"
+      REPORT_LLM_TIMEOUT_SECONDS: "300"
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       FLASK_SECRET_KEY: pilos_sentiment_dev_secret_key_2026
@@ -296,9 +311,18 @@ services:
       DB_USER: ${PILOS_DB_USER:-pilos_user}
       DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_PROVIDER: openai
+      LLM_API_KEY: EMPTY
       LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
       EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      EMBEDDING_API_KEY: EMPTY
+      EMBEDDING_MODEL: bge-m3
+      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_API_KEY: EMPTY
+      RERANK_MODEL: bge-reranker-v2-m3
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       REPORT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      SERVICE_KNOWLEDGE_VERSION: "1.0"
       PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-600}
       SECRET_SALT: pilos_sentiment_salt_1
       SECRET_SALT2: pilos_sentiment_salt_2

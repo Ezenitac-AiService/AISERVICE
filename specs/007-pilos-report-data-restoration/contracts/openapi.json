@@ -1,0 +1,65 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pilos Stock Sentiment & LLM Report API",
+    "version": "2.0.0",
+    "description": "API contract for stock detail sentiment indexes and LLM commentary reports"
+  },
+  "paths": {
+    "/api/stocks/{stock_code}/llm-reports": {
+      "get": {
+        "summary": "Get LLM commentary report for a given stock and date",
+        "parameters": [
+          {
+            "name": "stock_code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "model_date",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report successfully retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ready" },
+                    "stock_code": { "type": "string", "example": "005380" },
+                    "model_date": { "type": "string", "example": "2026-08-11" },
+                    "supply_direction": { "type": "string", "example": "BUY" },
+                    "market_commentary": { "type": "string" },
+                    "conclusion": { "type": "string" },
+                    "comment_signal_score": { "type": "number" },
+                    "actual_supply_index": { "type": "number" }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Inference or generation pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "inference_pending" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
