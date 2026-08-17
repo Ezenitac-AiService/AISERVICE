@@ -2,7 +2,7 @@
 set -e
 
 echo "======================================================================"
-echo "          AISERVICE Unified Platform Orchestrator (Linux/macOS)       "
+echo "          AISERVICE Unified Platform Orchestrator (Linux/WSL)"
 echo "======================================================================"
 echo ""
 
@@ -17,38 +17,39 @@ fi
 
 ACTION="${1:-up}"
 
-case "$ACTION" in
-    up)
-        echo "[START] Starting all 9 containers in unified aiservice-network..."
-        docker compose up -d
-        echo ""
-        echo "======================================================================"
-        echo " [SUCCESS] All services are running!"
-        echo "======================================================================"
-        echo " - Unified Portal Landing: http://localhost:8080/"
-        echo " - B-Team Oliview:         http://localhost:8080/bteam/oliview"
-        echo " - B-Team OllyChat (A):    http://localhost:8080/bteam/chata"
-        echo " - B-Team OlwonChat (B):   http://localhost:8080/bteam/chatb"
-        echo " - A-Team Pilos Dashboard: http://localhost:8080/ateam/pilos"
-        echo "======================================================================"
-        ;;
-    build)
-        echo "[BUILD] Rebuilding and starting all containers..."
-        docker compose up -d --build
-        ;;
-    down)
-        echo "[STOP] Stopping and removing all containers..."
-        docker compose down
-        ;;
-    logs)
-        docker compose logs -f
-        ;;
-    status)
-        docker compose ps
-        ;;
-    *)
-        echo "Unknown command: $ACTION"
-        echo "Usage: $0 [up|build|down|logs|status]"
-        exit 1
-        ;;
-esac
+if [ "$ACTION" = "up" ]; then
+    echo "[START] Starting all 10 containers in unified aiservice-network..."
+    docker compose up -d
+    echo "[K8S] Applying Kubernetes Ingress & gateway-svc..."
+    kubectl apply -f ddns/ingress-ezenitac.yaml >/dev/null 2>&1 || true
+    echo ""
+    echo "======================================================================"
+    echo " [SUCCESS] All 10 services are running!"
+    echo "======================================================================"
+    echo " - Public HTTPS Portal:    https://ezenitac.duckdns.org/"
+    echo " - Local Portal Landing:   http://localhost:8080/ (or http://localhost:80/)"
+    echo " - B-Team Oliview:         https://ezenitac.duckdns.org/bteam/oliview"
+    echo " - B-Team OllyChat (A):    https://ezenitac.duckdns.org/bteam/chata"
+    echo " - B-Team OlwonChat (B):   https://ezenitac.duckdns.org/bteam/chatb"
+    echo " - A-Team Pilos Dashboard: https://ezenitac.duckdns.org/ateam/pilos"
+    echo " - A-Team Pipeline Worker: Background Scheduled Daemon (pilos-worker)"
+    echo "======================================================================"
+elif [ "$ACTION" = "build" ]; then
+    echo "[BUILD] Rebuilding and starting all 10 containers..."
+    docker compose up -d --build
+    kubectl apply -f ddns/ingress-ezenitac.yaml >/dev/null 2>&1 || true
+elif [ "$ACTION" = "down" ]; then
+    echo "[STOP] Stopping and removing all containers..."
+    docker compose down
+elif [ "$ACTION" = "logs" ]; then
+    docker compose logs -f
+elif [ "$ACTION" = "status" ]; then
+    docker compose ps
+    kubectl get ingress,svc -n default || true
+elif [ "$ACTION" = "trigger-worker" ]; then
+    echo "[TRIGGER] Running A-Team Pipeline manually inside pilos-worker..."
+    docker exec -it pilos-worker python -m pilos.jobs.run_service_pipeline
+else
+    echo "Unknown command: $ACTION"
+    echo "Usage: $0 [up|build|down|logs|status|trigger-worker]"
+fi

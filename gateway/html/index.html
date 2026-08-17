@@ -1,12 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AISERVICE Unified Portal | 통합 AI 서비스 포털</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 50%, #020617 100%);
@@ -81,11 +83,17 @@
 
     .grid-container {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 1.75rem;
-      max-width: 1200px;
+      max-width: 1000px;
       width: 100%;
       margin-bottom: 3rem;
+    }
+
+    @media (max-width: 768px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
     }
 
     .service-card {
@@ -150,9 +158,23 @@
       letter-spacing: 0.05em;
     }
 
-    .badge-a { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
-    .badge-b { background: rgba(236, 72, 153, 0.2); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.4); }
-    .badge-chat { background: rgba(139, 92, 246, 0.2); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.4); }
+    .badge-a {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .badge-b {
+      background: rgba(236, 72, 153, 0.2);
+      color: #f472b6;
+      border: 1px solid rgba(236, 72, 153, 0.4);
+    }
+
+    .badge-chat {
+      background: rgba(139, 92, 246, 0.2);
+      color: #a78bfa;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+    }
 
     .card-title {
       font-size: 1.4rem;
@@ -218,6 +240,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -233,61 +256,7 @@
 
   <main class="grid-container">
 
-    <!-- 1. B-Team Oliview Main -->
-    <a href="/bteam/oliview" class="service-card">
-      <div>
-        <div class="card-top">
-          <div class="icon-box">💄</div>
-          <span class="badge badge-b">B-TEAM</span>
-        </div>
-        <h2 class="card-title">Oliview 메인 서비스</h2>
-        <p class="card-desc">
-          화장품 리뷰 감정 속성 분석, 키워드 트렌드 탐색 및 데이터 기반 상품 인사이트 대시보드입니다.
-        </p>
-      </div>
-      <div class="card-meta">
-        <span>React / Flask API</span>
-        <span class="card-link-text">입장하기 →</span>
-      </div>
-    </a>
-
-    <!-- 2. B-Team Oliview Chatbot A (올리챗) -->
-    <a href="/bteam/chata" class="service-card">
-      <div>
-        <div class="card-top">
-          <div class="icon-box">🤖</div>
-          <span class="badge badge-chat">AI CHATBOT</span>
-        </div>
-        <h2 class="card-title">올리챗 (Oliview Chat A)</h2>
-        <p class="card-desc">
-          Streamlit 기반의 실시간 뷰티 상담 챗봇으로 Qwen3.5 2B/4B 및 BGE 임베딩 모델과 연동됩니다.
-        </p>
-      </div>
-      <div class="card-meta">
-        <span>Streamlit / RAG</span>
-        <span class="card-link-text">대화 시작 →</span>
-      </div>
-    </a>
-
-    <!-- 3. B-Team Oliview Chatbot B (올원챗) -->
-    <a href="/bteam/chatb" class="service-card">
-      <div>
-        <div class="card-top">
-          <div class="icon-box">💬</div>
-          <span class="badge badge-chat">RAG AGENT</span>
-        </div>
-        <h2 class="card-title">올원챗 (Oliview Chat B)</h2>
-        <p class="card-desc">
-          FastAPI 기반의 고성능 하이브리드 RAG 질의응답 챗봇으로 4B 합성 모델을 통한 심층 분석을 제공합니다.
-        </p>
-      </div>
-      <div class="card-meta">
-        <span>FastAPI / Uvicorn</span>
-        <span class="card-link-text">상담 연결 →</span>
-      </div>
-    </a>
-
-    <!-- 4. A-Team Pilos Main -->
+    <!-- 1. A-Team Pilos Main -->
     <a href="/ateam/pilos" class="service-card">
       <div>
         <div class="card-top">
@@ -305,6 +274,60 @@
       </div>
     </a>
 
+    <!-- 2. B-Team Oliview Main -->
+    <a href="/bteam/oliview" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">💄</div>
+          <span class="badge badge-b">B-TEAM</span>
+        </div>
+        <h2 class="card-title">Oliview 메인 서비스</h2>
+        <p class="card-desc">
+          화장품 리뷰 감정 속성 분석, 키워드 트렌드 탐색 및 데이터 기반 상품 인사이트 대시보드입니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>React / Flask API</span>
+        <span class="card-link-text">입장하기 →</span>
+      </div>
+    </a>
+
+    <!-- 3. B-Team Oliview Chatbot A (올리챗) -->
+    <a href="/bteam/chata" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">🤖</div>
+          <span class="badge badge-chat">AI CHATBOT</span>
+        </div>
+        <h2 class="card-title">올리챗 (Oliview Chat A)</h2>
+        <p class="card-desc">
+          Streamlit 기반의 실시간 뷰티 상담 챗봇으로 Qwen3.5 2B/4B 및 BGE 임베딩 모델과 연동됩니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>Streamlit / RAG</span>
+        <span class="card-link-text">대화 시작 →</span>
+      </div>
+    </a>
+
+    <!-- 4. B-Team Oliview Chatbot B (올원챗) -->
+    <a href="/bteam/chatb" class="service-card">
+      <div>
+        <div class="card-top">
+          <div class="icon-box">💬</div>
+          <span class="badge badge-chat">RAG AGENT</span>
+        </div>
+        <h2 class="card-title">올원챗 (Oliview Chat B)</h2>
+        <p class="card-desc">
+          FastAPI 기반의 고성능 하이브리드 RAG 질의응답 챗봇으로 4B 합성 모델을 통한 심층 분석을 제공합니다.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span>FastAPI / Uvicorn</span>
+        <span class="card-link-text">상담 연결 →</span>
+      </div>
+    </a>
+
   </main>
 
   <footer>
@@ -318,4 +341,5 @@
   </footer>
 
 </body>
+
 </html>

@@ -1,5 +1,3 @@
-version: "3.8"
-
 networks:
   aiservice-network:
     name: aiservice-network
@@ -7,7 +5,8 @@ networks:
 
 volumes:
   bteam_mysql_data:
-    name: bteam_mysql_data
+    external: true
+    name: bteam_bteam_mysql_data
   ateam_db_data:
     name: ateam_db_data
 
@@ -24,12 +23,17 @@ services:
     restart: unless-stopped
     ports:
       - "${GATEWAY_PORT:-80}:80"
-      - "8080:80"
+      - "${GATEWAY_ALT_PORT:-8080}:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/html:/usr/share/nginx/html:ro
     networks:
       - aiservice-network
     depends_on:
       - oliview_frontend
       - oliview_backend
+      - oliview_chatbot_a
+      - oliview_chatbot_b
       - pilos_web
 
   # ============================================================================
@@ -80,6 +84,7 @@ services:
       - --innodb_buffer_pool_size=1G
       - --innodb_log_file_size=256M
       - --innodb_flush_log_at_trx_commit=2
+      - --init-file=/docker-entrypoint-initdb.d/00_reset.sql
     environment:
       MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:-GP123!}
       MYSQL_DATABASE: ${BTEAM_DB_NAME:-cosmetic_db}
@@ -87,6 +92,7 @@ services:
       MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
     volumes:
       - bteam_mysql_data:/var/lib/mysql
+      - ./bteam/reset_pass.sql:/docker-entrypoint-initdb.d/00_reset.sql:ro
       - ./bteam/oliview_project_backup_0813.sql:/docker-entrypoint-initdb.d/01_backup.sql:ro
     networks:
       - aiservice-network
@@ -94,8 +100,8 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${BTEAM_DB_ROOT_PASSWORD:-GP123!}"]
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 60s
+      retries: 30
+      start_period: 120s
 
   # ============================================================================
   # 3. B-Team 메인 백엔드 API (Flask/Gunicorn - oliview_backend)
@@ -112,8 +118,12 @@ services:
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
-      DB_NAME: ${BTEAM_DB_NAME:-cosmetic_db}
-      DB_NAME3: ${BTEAM_DB_NAME:-cosmetic_db}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
+      DB_NAME3: ${BTEAM_DB_NAME:-oliview_project}
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
     depends_on:
       bteam_db:
         condition: service_healthy
@@ -153,7 +163,7 @@ services:
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
-      DB_NAME: ${BTEAM_DB_NAME:-cosmetic_db}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
       MAIN_PORT: 8081
       EMBEDDING_PORT: 8090
@@ -189,7 +199,7 @@ services:
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
-      DB_NAME: ${BTEAM_DB_NAME:-cosmetic_db}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
       MAIN_PORT: 8081
       EMBED_PORT: 8090
@@ -221,21 +231,22 @@ services:
       - --default-authentication-plugin=mysql_native_password
       - --max_allowed_packet=512M
     environment:
-      MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:-pilos_root_password}
-      MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos}
+      MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:-pilos_root_pass}
+      MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos_v2}
       MYSQL_USER: ${PILOS_DB_USER:-pilos_user}
       MYSQL_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
       TZ: Asia/Seoul
     volumes:
       - ateam_db_data:/var/lib/mysql
+      - ./ateam/pilos_v2.sql:/docker-entrypoint-initdb.d/01_pilos_v2.sql:ro
     networks:
       - aiservice-network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_password} || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_pass} || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 60s
+      retries: 30
+      start_period: 300s
 
   # ============================================================================
   # 8. A-Team 메인 웹 & 대시보드 (Flask/Gunicorn - pilos-web)
@@ -252,14 +263,52 @@ services:
       DB_PORT: 3306
       DB_USER: ${PILOS_DB_USER:-pilos_user}
       DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
-      DB_NAME: ${PILOS_DB_NAME:-pilos}
-      LLM_BASE_URL: http://vllm-serv-gateway:8081
+      DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      FLASK_SECRET_KEY: pilos_sentiment_dev_secret_key_2026
     volumes:
       - ./ateam/pilos-sentiment-index/artifacts:/app/artifacts
     depends_on:
       pilos_db:
         condition: service_healthy
+      vllm-serv:
+        condition: service_started
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 9. A-Team 수집·분석 파이프라인 워커 (pilos-worker)
+  # ============================================================================
+  pilos_worker:
+    build:
+      context: ./ateam/pilos-sentiment-index
+      dockerfile: Dockerfile
+    image: pilos-web:latest
+    container_name: pilos-worker
+    command: ["python", "-m", "pilos.jobs.worker_daemon"]
+    restart: unless-stopped
+    environment:
+      DB_HOST: pilos-db
+      DB_PORT: 3306
+      DB_USER: ${PILOS_DB_USER:-pilos_user}
+      DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      REPORT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-600}
+      SECRET_SALT: pilos_sentiment_salt_1
+      SECRET_SALT2: pilos_sentiment_salt_2
+    volumes:
+      - ./ateam/pilos-sentiment-index/artifacts:/app/artifacts
+      - ./ateam/pilos-sentiment-index/data:/app/data
+    depends_on:
+      pilos_db:
+        condition: service_healthy
+      vllm-serv:
+        condition: service_started
     networks:
       - aiservice-network
