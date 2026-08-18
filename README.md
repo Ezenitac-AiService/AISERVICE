@@ -39,8 +39,7 @@
                         │              ▼
                         │   ┌────────────────────────────────┐
                         └──►│ vllm-serv-gateway (vLLM Engine)│
-                            │ - Fast LLM: qwen3.5-2b         │
-                            │ - Synthesis: qwen3.5-4b        │
+                            │ - Resident LLM: qwen3.5-4b     │
                             │ - Embedding: bge-m3 (8090)     │
                             │ - Reranker: bge-reranker (8091)│
                             └────────────────────────────────┘

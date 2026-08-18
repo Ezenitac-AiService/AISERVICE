@@ -131,6 +131,8 @@ services:
     depends_on:
       bteam_db:
         condition: service_healthy
+    volumes:
+      - ./bteam/Oliview_Project/backend:/app
     networks:
       - aiservice-network
 
@@ -146,6 +148,9 @@ services:
     restart: unless-stopped
     depends_on:
       - oliview_backend
+    volumes:
+      - ./bteam/Oliview_Project/frontend:/app
+      - /app/node_modules
     networks:
       - aiservice-network
 
@@ -172,7 +177,7 @@ services:
       MAIN_PORT: 8081
       EMBEDDING_PORT: 8090
       RERANK_PORT: 8091
-      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       STREAMLIT_SERVER_BASE_URL_PATH: bteam/chata
       STREAMLIT_SERVER_FILE_WATCHER_TYPE: "none"
@@ -211,7 +216,7 @@ services:
       EMBED_PORT: 8090
       EMBEDDING_PORT: 8090
       RERANK_PORT: 8091
-      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       FASTAPI_ROOT_PATH: /bteam/chatb
     volumes:
