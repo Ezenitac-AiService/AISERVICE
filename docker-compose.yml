@@ -66,6 +66,10 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PYTHONUNBUFFERED=1
+    ports:
+      - "8081:8081"
+      - "8090:8090"
+      - "8091:8091"
     networks:
       - aiservice-network
 
