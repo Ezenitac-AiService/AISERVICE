@@ -175,6 +175,7 @@ services:
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       STREAMLIT_SERVER_BASE_URL_PATH: bteam/chata
+      STREAMLIT_SERVER_FILE_WATCHER_TYPE: "none"
       USE_LLM_METADATA_FILTER: "false"
     volumes:
       - ./bteam/Oliview_chatbot_a:/app
