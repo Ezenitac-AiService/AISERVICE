@@ -9,6 +9,8 @@ volumes:
     name: bteam_bteam_mysql_data
   ateam_db_data:
     name: ateam_db_data
+  redis_data:
+    name: aiservice_redis_data
 
 services:
   # ============================================================================
@@ -69,12 +71,34 @@ services:
       - FAST_LLM_MODEL=${FAST_LLM_MODEL:-qwen3.5-2b}
       - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
       - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-5000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     ports:
       - "8081:8081"
       - "8090:8090"
       - "8091:8091"
     networks:
       - aiservice-network
+
+  # ============================================================================
+  # 1.1 공통 Redis 인메모리 캐시 & 세션/큐 인프라 (Redis 7 - aiservice-redis)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aiservice-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", "900", "1", "--save", "300", "10", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ============================================================================
   # 2. B-Team 공통 데이터베이스 (MySQL 8.0 - bteam_db)
