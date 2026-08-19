@@ -281,6 +281,8 @@ services:
     volumes:
       - ateam_db_data:/var/lib/mysql
       - ./ateam/pilos_v2.sql:/docker-entrypoint-initdb.d/01_pilos_v2.sql:ro
+    ports:
+      - "3307:3306"
     networks:
       - aiservice-network
     healthcheck:
