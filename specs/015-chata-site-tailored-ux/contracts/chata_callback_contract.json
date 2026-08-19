@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChatA_StepCallback_Contract",
+  "type": "object",
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": ["INTENT_ANALYSIS", "HYBRID_SEARCH", "RERANKING", "LLM_SYNTHESIS", "COMPLETED", "ERROR"]
+    },
+    "label": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["running", "complete", "error", "warning"]
+    },
+    "elapsed_sec": { "type": "number" },
+    "progress_percent": { "type": "integer" },
+    "reference_reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rank": { "type": "integer" },
+          "product_name": { "type": "string" },
+          "brand_name": { "type": "string" },
+          "clean_product_name": { "type": "string" },
+          "oliveyoung_search_url": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["phase", "label", "status"]
+}

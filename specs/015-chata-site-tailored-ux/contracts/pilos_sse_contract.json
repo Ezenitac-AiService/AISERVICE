@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PILOS_SSE_Contract",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["step", "token", "complete", "error"]
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": ["IDENTIFY_STOCK", "SUPPLY_DEMAND_METRIC", "NEWS_SENTIMENT_VERIFICATION", "LLM_REPORT_SYNTHESIS", "COMPLETED", "ERROR"]
+        },
+        "token": { "type": "string" },
+        "stock_name": { "type": "string" },
+        "supply_demand_score": { "type": "number" },
+        "reference_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "publisher": { "type": "string" },
+              "external_url": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["event", "data"]
+}

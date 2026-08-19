@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChatB_SSE_Contract",
+  "type": "object",
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["step", "token", "complete", "error"]
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "phase": { "type": "string" },
+        "token": { "type": "string" },
+        "total_latency_sec": { "type": "number" },
+        "selected_review_count": { "type": "integer" },
+        "reference_reviews": { "type": "array" }
+      }
+    }
+  },
+  "required": ["event", "data"]
+}
