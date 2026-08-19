@@ -1,0 +1,12 @@
+{
+    "current_model": "qwen3.5-4b",
+    "current_n_ctx": 4096,
+    "available_presets": [
+        "gemma4-e2b",
+        "gemma4-e4b",
+        "gemma4-12b",
+        "qwen3.5-2b",
+        "qwen3.5-4b",
+        "qwen3.5-9b"
+    ]
+}

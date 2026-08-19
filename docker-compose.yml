@@ -171,6 +171,7 @@ services:
     tty: true
     restart: unless-stopped
     environment:
+      PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
@@ -187,6 +188,7 @@ services:
       USE_LLM_METADATA_FILTER: "false"
     volumes:
       - ./bteam/Oliview_chatbot_a:/app
+      - ./bteam/oliview_core:/app/oliview_core
     depends_on:
       bteam_db:
         condition: service_healthy
@@ -209,6 +211,7 @@ services:
     tty: true
     restart: unless-stopped
     environment:
+      PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
@@ -224,6 +227,7 @@ services:
       FASTAPI_ROOT_PATH: /bteam/chatb
     volumes:
       - ./bteam/Oliview_chatbot_b:/app
+      - ./bteam/oliview_core:/app/oliview_core
     depends_on:
       bteam_db:
         condition: service_healthy
