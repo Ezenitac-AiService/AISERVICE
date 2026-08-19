@@ -124,6 +124,30 @@ c:\AISERVICE/
 
 ---
 
+## Regression Testing Plan (전사 기존 기능 통합 회귀 테스트 계획)
+
+구현 완료 후 2-Tier 라우팅 및 CPU 오프로딩 적용으로 인해 기존 정상 서비스에 부작용이나 기능 퇴행(Regression)이 발생하지 않았는지 확인하기 위해 다음 4대 영역 12개 테스트 시나리오를 전수 수행합니다.
+
+### 1. A-Team (PILOS 감성 지표 서비스) 회귀 검증
+- [ ] **REG-A1 (10분 주기 파이프라인 자동화)**: `pilos_worker` 데몬이 중단 없이 정상 실행되며 `service_pipeline_run` 상태가 `completed`로 완료되는가?
+- [ ] **REG-A2 (10개 종목 시장 해설 보고서 생성)**: `GET /api/stocks/{code}/llm-reports?model_date=2026-08-19` 호출 시 10개 전 종목의 보고서가 `qwen3.5-2b`를 통해 누락 없이 정상 반환되는가?
+- [ ] **REG-A3 (실시간 단일 댓글 감성 분석)**: `POST /api/sentiment/single-comment` 호출 시 2B 모델을 통해 밀리초 단위로 긍정/부정 점수 및 키워드가 분석되는가?
+- [ ] **REG-A4 (PILOS 웹 대시보드 및 챗봇)**: `https://ezenitac.duckdns.org/ateam/pilos/` 웹 대시보드 상태 배너가 '정상 가동 중'이며, 챗봇 질의응답이 정상 동작하는가?
+
+### 2. B-Team (Oliview / OllyChat 화장품 분석 & 챗봇) 회귀 검증
+- [ ] **REG-B1 (제품 상세 및 리뷰 분석 라우팅)**: `https://ezenitac.duckdns.org/bteam/`에서 제품 목록 조회, 상세 페이지 이동 및 감성 분석 차트가 정상 렌더링되는가?
+- [ ] **REG-B2 (올리챗 메타데이터 추출)**: 사용자 질의(예: "지성 피부 진정 세럼") 입력 시 `qwen3.5-2b`가 0.5초 이내에 필터 조건을 정상 파싱하는가?
+- [ ] **REG-B3 (RAG 다중 리뷰 종합 합성)**: Chroma 벡터 검색 + BGE 리랭킹 후 5개 리뷰 기반으로 `qwen3.5-4b`가 고품질 종합 비교 답변을 생성하는가?
+- [ ] **REG-B4 (4B 장애 시 2B 무중단 Fallback)**: 4B 의도적 비가용 시에도 사용자 화면에 에러 없이 2B 모델로 대체 답변이 렌더링되는가?
+
+### 3. 공통 인프라 (Model Gateway & Nginx Reverse Proxy) 회귀 검증
+- [ ] **REG-G1 (CPU 임베딩 서버 8090)**: `POST http://vllm-serv-gateway:8090/embedding` 호출 시 `bge-m3` 임베딩 벡터(1024차원)가 정상 생성되며 GPU VRAM 점유가 0MB인가?
+- [ ] **REG-G2 (CPU 리랭커 서버 8091)**: `POST http://vllm-serv-gateway:8091/rerank` 호출 시 `bge-reranker-v2-m3` 관련도 스코어가 정상 반환되며 GPU VRAM 점유가 0MB인가?
+- [ ] **REG-G3 (실시간 VRAM 상한선 모니터링)**: `GET http://vllm-serv-gateway:8081/health/vram` 호출 시 `gpu_vram_used_mb <= 5000` 안전 기준을 상시 만족하는가?
+- [ ] **REG-G4 (통합 포털 2x2 그리드 게이트웨이)**: `https://ezenitac.duckdns.org/` 메인 포털에서 A팀(PILOS) 및 B팀(Oliview, OllyChat A/B) 4개 서비스 링크가 404 없이 모두 정상 연결되는가?
+
+---
+
 ## Complexity Tracking
 
 | 설계 항목 | 도입 사유 | 대안 기각 사유 |
