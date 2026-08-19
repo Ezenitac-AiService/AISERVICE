@@ -37,7 +37,7 @@ services:
     environment:
       - LLM_BASE_URL=http://vllm-serv-gateway:8081
       - FAST_LLM_MODEL=qwen3.5-2b
-      - SYNTHESIS_LLM_MODEL=qwen3.5-4b
+      - SYNTHESIS_LLM_MODEL=qwen3.5-2b
     volumes:
       - ./pilos-sentiment-index/artifacts:/app/artifacts
     depends_on:
