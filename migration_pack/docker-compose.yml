@@ -1,0 +1,391 @@
+networks:
+  aiservice-network:
+    name: aiservice-network
+    driver: bridge
+
+volumes:
+  bteam_mysql_data:
+    name: bteam_mysql_data
+  ateam_db_data:
+    name: ateam_db_data
+  redis_data:
+    name: aiservice_redis_data
+
+services:
+  # ============================================================================
+  # 0. 통합 Nginx 역방향 프록시 게이트웨이 (aiservice-gateway)
+  # ============================================================================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    image: aiservice-gateway:latest
+    container_name: aiservice-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-80}:80"
+      - "${GATEWAY_ALT_PORT:-8080}:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/html:/usr/share/nginx/html:ro
+    networks:
+      - aiservice-network
+    depends_on:
+      - oliview_frontend
+      - oliview_backend
+      - oliview_chatbot_a
+      - oliview_chatbot_b
+      - pilos_web
+
+  # ============================================================================
+  # 1. 공통 LLM/임베딩 서빙 게이트웨이 (vLLM - vllm-serv-gateway)
+  # ============================================================================
+  vllm-serv:
+    build:
+      context: ./model_gateway
+      dockerfile: Dockerfile
+    image: vllm-serv:latest
+    container_name: vllm-serv-gateway
+    command: ["bash", "-c", "python3 -m src.api.server < /dev/null"]
+    init: true
+    restart: unless-stopped
+    privileged: true
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./model_gateway/models:/app/models
+      - ./model_gateway/config:/app/config
+      - ./model_gateway/data:/app/data
+      - ./model_gateway/src:/app/src
+      - ./model_gateway/scripts:/app/scripts
+      - /usr/lib/wsl:/usr/lib/wsl:ro
+    devices:
+      - /dev/dxg:/dev/dxg
+    environment:
+      - PYTHONPATH=/app:/app/.venv/lib/python3.12/site-packages
+      - LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/lib/wsl/drivers:/usr/local/lib:/usr/lib/x86_64-linux-gnu
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - PYTHONUNBUFFERED=1
+      - FAST_LLM_MODEL=${FAST_LLM_MODEL:-qwen3.5-2b}
+      - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-5000}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "8081:8081"
+      - "8090:8090"
+      - "8091:8091"
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 1.1 공통 Redis 인메모리 캐시 & 세션/큐 인프라 (Redis 7 - aiservice-redis)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aiservice-redis
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--save", "900", "1", "--save", "300", "10", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # 2. B-Team 공통 데이터베이스 (MySQL 8.0 - bteam_db)
+  # ============================================================================
+  bteam_db:
+    image: mysql:8.0
+    container_name: bteam_db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_allowed_packet=512M
+      - --innodb_buffer_pool_size=1G
+      - --innodb_log_file_size=256M
+      - --innodb_flush_log_at_trx_commit=2
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:-GP123!}
+      MYSQL_DATABASE: ${BTEAM_DB_NAME:-oliview_project}
+      MYSQL_USER: ${BTEAM_DB_USER:-gp123}
+      MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+    volumes:
+      - bteam_mysql_data:/var/lib/mysql
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${BTEAM_DB_ROOT_PASSWORD:-GP123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ============================================================================
+  # 3. B-Team 메인 백엔드 API (Flask/Gunicorn - oliview_backend)
+  # ============================================================================
+  oliview_backend:
+    build:
+      context: ./bteam/Oliview_Project/backend
+      dockerfile: Dockerfile
+    image: oliview_backend:latest
+    container_name: oliview_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
+      DB_NAME3: ${BTEAM_DB_NAME:-oliview_project}
+      SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+    volumes:
+      - ./bteam/Oliview_Project/backend:/app
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 4. B-Team 메인 프론트엔드 UI (React Vite - oliview_frontend)
+  # ============================================================================
+  oliview_frontend:
+    build:
+      context: ./bteam/Oliview_Project/frontend
+      dockerfile: Dockerfile
+    image: oliview_frontend:latest
+    container_name: oliview_frontend
+    restart: unless-stopped
+    depends_on:
+      - oliview_backend
+    volumes:
+      - ./bteam/Oliview_Project/frontend:/app
+      - /app/node_modules
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 5. B-Team 올리챗 (Streamlit - oliview_chatbot_a)
+  # ============================================================================
+  oliview_chatbot_a:
+    build:
+      context: ./bteam/Oliview_chatbot_a
+      dockerfile: Dockerfile
+    image: oliview_chatbot_a:latest
+    container_name: oliview_chatbot_a
+    init: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app:/app/bteam:/bteam
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
+      SERVER_HOST: http://vllm-serv-gateway
+      MAIN_PORT: 8081
+      EMBEDDING_PORT: 8090
+      RERANK_PORT: 8091
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      STREAMLIT_SERVER_BASE_URL_PATH: bteam/chata
+      STREAMLIT_SERVER_FILE_WATCHER_TYPE: "none"
+      USE_LLM_METADATA_FILTER: "false"
+    volumes:
+      - ./bteam/Oliview_chatbot_a:/app
+      - ./bteam/oliview_core:/app/oliview_core
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+      vllm-serv:
+        condition: service_started
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 6. B-Team 올원챗 (FastAPI - oliview_chatbot_b)
+  # ============================================================================
+  oliview_chatbot_b:
+    build:
+      context: ./bteam/Oliview_chatbot_b
+      dockerfile: Dockerfile
+    image: oliview_chatbot_b:latest
+    container_name: oliview_chatbot_b
+    init: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app:/app/bteam:/bteam
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
+      SERVER_HOST: http://vllm-serv-gateway
+      MAIN_PORT: 8081
+      EMBED_PORT: 8090
+      EMBEDDING_PORT: 8090
+      RERANK_PORT: 8091
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      FASTAPI_ROOT_PATH: /bteam/chatb
+    volumes:
+      - ./bteam/Oliview_chatbot_b:/app
+      - ./bteam/oliview_core:/app/oliview_core
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+      vllm-serv:
+        condition: service_started
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 7. A-Team 데이터베이스 (MySQL 8.0 - pilos-db)
+  # ============================================================================
+  pilos_db:
+    image: mysql:8.0
+    container_name: pilos-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_allowed_packet=512M
+    environment:
+      MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:-pilos_root_pass}
+      MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos_v2}
+      MYSQL_USER: ${PILOS_DB_USER:-pilos_user}
+      MYSQL_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      TZ: Asia/Seoul
+    volumes:
+      - ateam_db_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_pass} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ============================================================================
+  # 8. A-Team 메인 웹 & 대시보드 (Flask/Gunicorn - pilos-web)
+  # ============================================================================
+  pilos_web:
+    build:
+      context: ./ateam/pilos-sentiment-index
+      dockerfile: Dockerfile
+    image: pilos-web:latest
+    container_name: pilos-web
+    restart: unless-stopped
+    environment:
+      DB_HOST: pilos-db
+      DB_PORT: 3306
+      DB_USER: ${PILOS_DB_USER:-pilos_user}
+      DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_PROVIDER: openai
+      LLM_API_KEY: EMPTY
+      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      EMBEDDING_API_KEY: EMPTY
+      EMBEDDING_MODEL: bge-m3
+      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_API_KEY: EMPTY
+      RERANK_MODEL: bge-reranker-v2-m3
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      REPORT_LLM_OUTPUT_MODE: ${REPORT_LLM_OUTPUT_MODE:-json_object}
+      SERVICE_KNOWLEDGE_VERSION: "1.0"
+      EMBEDDING_TIMEOUT_SECONDS: "300"
+      RERANK_TIMEOUT_SECONDS: "300"
+      CHAT_LLM_TIMEOUT_SECONDS: "300"
+      REPORT_LLM_TIMEOUT_SECONDS: "300"
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      KIWOOM_APP_KEY: ${KIWOOM_APP_KEY:-}
+      KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY:-}
+      KIWOOM_HOST: ${KIWOOM_HOST:-https://api.kiwoom.com}
+      SUPPLY_DEMAND_DB_WRITE_ENABLED: ${SUPPLY_DEMAND_DB_WRITE_ENABLED:-true}
+      FLASK_SECRET_KEY: pilos_sentiment_dev_secret_key_2026
+    volumes:
+      - ./ateam/pilos-sentiment-index/pilos:/app/pilos
+      - ./ateam/pilos-sentiment-index/tests:/app/tests
+      - ./ateam/pilos-sentiment-index/artifacts:/app/artifacts
+      - ./ateam/pilos-sentiment-index/data:/app/data
+    depends_on:
+      pilos_db:
+        condition: service_healthy
+      vllm-serv:
+        condition: service_started
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 9. A-Team 수집·분석 파이프라인 워커 (pilos-worker)
+  # ============================================================================
+  pilos_worker:
+    build:
+      context: ./ateam/pilos-sentiment-index
+      dockerfile: Dockerfile
+    image: pilos-web:latest
+    container_name: pilos-worker
+    command: ["python", "-m", "pilos.jobs.worker_daemon"]
+    restart: unless-stopped
+    environment:
+      DB_HOST: pilos-db
+      DB_PORT: 3306
+      DB_USER: ${PILOS_DB_USER:-pilos_user}
+      DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
+      LLM_PROVIDER: openai
+      LLM_API_KEY: EMPTY
+      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      EMBEDDING_API_KEY: EMPTY
+      EMBEDDING_MODEL: bge-m3
+      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_API_KEY: EMPTY
+      RERANK_MODEL: bge-reranker-v2-m3
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      REPORT_LLM_OUTPUT_MODE: ${REPORT_LLM_OUTPUT_MODE:-json_object}
+      SERVICE_KNOWLEDGE_VERSION: "1.0"
+      PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-600}
+      SECRET_SALT: pilos_sentiment_salt_1
+      SECRET_SALT2: pilos_sentiment_salt_2
+      KIWOOM_APP_KEY: ${KIWOOM_APP_KEY:-}
+      KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY:-}
+      KIWOOM_HOST: ${KIWOOM_HOST:-https://api.kiwoom.com}
+      SUPPLY_DEMAND_DB_WRITE_ENABLED: ${SUPPLY_DEMAND_DB_WRITE_ENABLED:-true}
+    volumes:
+      - ./ateam/pilos-sentiment-index/pilos:/app/pilos
+      - ./ateam/pilos-sentiment-index/tests:/app/tests
+      - ./ateam/pilos-sentiment-index/artifacts:/app/artifacts
+      - ./ateam/pilos-sentiment-index/data:/app/data
+    depends_on:
+      pilos_db:
+        condition: service_healthy
+      vllm-serv:
+        condition: service_started
+    networks:
+      - aiservice-network
