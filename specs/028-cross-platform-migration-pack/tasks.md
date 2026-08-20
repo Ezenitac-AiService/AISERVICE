@@ -87,6 +87,17 @@
 
 ---
 
+## Phase 8: Convergence - Master Migration Pack Generator Engine
+
+**Purpose**: 언제든 원클릭으로 최신 소스코드와 최신 DB 덤프를 결합하여 완전한 배포용 마이그레이션 팩 아카이브를 재생성하는 마스터 빌더 스크립트 구축
+
+- [X] T018 [US1] Implement master migration pack builder engine `make_migration_pack.py` at project root with clean source bundling and DB extraction
+- [X] T019 [US1] Implement Windows one-click wrapper `make_migration_pack.bat` and Linux wrapper `make_migration_pack.sh`
+- [X] T020 [US3] Ensure target restore unpacks and provisions full project codebase alongside databases seamlessly
+- [X] T021 [US1] Update `MIGRATION_GUIDE.md` to document the repeatable pack generator workflow
+
+---
+
 ## Dependencies & Execution Order
 
 ```mermaid
@@ -106,11 +117,8 @@ graph TD
     T009 --> T015[T015: export_offline_models]
     T014 & T015 --> T016[T016: MIGRATION_GUIDE.md]
     T016 --> T017[T017: Dry Run Verify]
+    T017 --> T018[T018: make_migration_pack.py]
+    T018 --> T019[T019: make_migration_pack.bat/.sh]
+    T019 --> T020[T020: Full Codebase Restore Engine]
+    T020 --> T021[T021: Update MIGRATION_GUIDE.md]
 ```
-
----
-
-## Implementation Strategy (MVP First)
-
-1. **MVP Scope (Phase 1 ~ Phase 3)**: `migration_pack/` 디렉터리 구축 + `pilos_v2` & `oliview_project` 무손실 DB 덤프(`export_databases.bat`) 실행 및 `checksums.sha256` 발행.
-2. **Incremental Delivery (Phase 4 ~ Phase 7)**: 복원 스크립트(`bootstrap_restore`), 오프라인 모델 번들러, 11개 엔드포인트 검증기(`verify_migration.py`) 및 `MIGRATION_GUIDE.md` 완결.

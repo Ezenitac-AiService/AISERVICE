@@ -43,40 +43,50 @@ migration_pack/
 
 ## 3. 🚀 마이그레이션 단계별 절차 (Step-by-Step)
 
-### [1단계] 소스 서버에서 마이그레이션 팩 생성
-이미 `migration_pack/database/`에 최신 덤프가 생성되어 있습니다. 최신 시점으로 갱신하려면 다음을 실행합니다:
+### [1단계] 소스 서버에서 마스터 마이그레이션 팩 생성 (반복 실행 가능)
+프로젝트 루트에서 **단일 명령어**를 실행하면 실시간 DB 덤프 추출, 소스코드 정제, 체크섬 발행, 단일 배포 아카이브(`dist/AISERVICE_Migration_Pack_*.zip` 또는 `.tar.gz`) 생성이 완전 자동화로 진행됩니다:
 
 ```bash
-# Windows 소스 호스트
-.\migration_pack\scripts\export_databases.bat
+# Windows 소스 호스트 (원클릭 마스터 빌더)
+.\make_migration_pack.bat
 
-# Linux / WSL2 소스 호스트
-./migration_pack/scripts/export_databases.sh
+# Linux / macOS / WSL2 소스 호스트 (원클릭 마스터 빌더)
+chmod +x make_migration_pack.sh
+./make_migration_pack.sh
+
+# 또는 Python 직접 실행
+python make_migration_pack.py
 ```
+
+- **옵션 안내**:
+  - `--skip-dump`: DB 덤프는 기존 것을 재사용하고 소스코드/설정만 즉시 패키징할 때 사용
+  - `--format <zip|tar.gz>`: 압축 포맷 선택
+  - `--no-archive`: 단일 압축 파일 대신 `dist/AISERVICE_Migration_Pack/` 폴더 형태로 생성
 
 ---
 
 ### [2단계] 타겟 서버로 전송 (Transfer to Target Server)
 
-#### 방법 A: 디렉터리 직접 동기화 (Rsync / SCP)
+`make_migration_pack` 실행 후 `dist/` 폴더에 생성된 압축 아카이브(또는 폴더)를 타겟 서버로 전송합니다.
+
 ```bash
-# 전체 폴더 전송 (Linux/WSL2 예시)
-rsync -avz --progress ./AISERVICE/ user@target-server-ip:/opt/aiservice/
+# 단일 압축본 전송 예시 (SCP)
+scp dist/AISERVICE_Migration_Pack_*.zip user@target-server-ip:/opt/
+# 또는 Linux tar.gz 전송
+scp dist/AISERVICE_Migration_Pack_*.tar.gz user@target-server-ip:/opt/
 ```
 
-#### 방법 B: 단일 아카이브 파일 생성 및 전송
+타겟 서버에서 압축을 해제합니다:
 ```bash
-# Windows에서 단일 zip 아카이브 생성
-.\migration_pack\scripts\pack_archive.bat
+# Linux 타겟 서버에서 압축 해제
+cd /opt
+tar -xzvf AISERVICE_Migration_Pack_*.tar.gz
+cd AISERVICE
 
-# Linux에서 단일 tar.gz 생성
-./migration_pack/scripts/pack_archive.sh
-
-# 타겟 서버로 SCP 전송
-scp aiservice_migration_pack_*.tar.gz user@target-server-ip:/opt/
+# Windows 타겟 서버에서 압축 해제
+Expand-Archive -Path .\dist\AISERVICE_Migration_Pack_*.zip -DestinationPath C:\
+cd C:\AISERVICE
 ```
-
----
 
 ### [3단계] 타겟 서버에서 원클릭 복원 및 자동 부트스트랩
 
