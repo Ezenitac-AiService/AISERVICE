@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PortalCurationSchema",
+  "description": "Schema for asynchronous portal landing curation payload",
+  "type": "object",
+  "properties": {
+    "stocks_highlight": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "sentiment_score": { "type": "number" },
+          "sentiment_label": { "type": "string" },
+          "target_url": { "type": "string" }
+        },
+        "required": ["code", "name", "target_url"]
+      }
+    },
+    "beauty_highlight": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "category": { "type": "string" },
+          "brand": { "type": "string" },
+          "positive_ratio": { "type": "number" },
+          "target_url": { "type": "string" }
+        },
+        "required": ["category", "brand", "target_url"]
+      }
+    }
+  },
+  "required": ["stocks_highlight", "beauty_highlight"]
+}

@@ -1,0 +1,256 @@
+{
+  "total_requests": 12847,
+  "time_range": {
+    "start": "19/Aug/2026:13:35:16 +0000",
+    "end": "24/Aug/2026:07:54:11 +0000"
+  },
+  "user_stats": {
+    "unique_users_estimated": 134,
+    "total_sessions_estimated": 281,
+    "avg_pv_per_session": 45.72,
+    "avg_session_duration_sec": 369.47
+  },
+  "traffic_by_date": {
+    "2026-08-19": 3656,
+    "2026-08-20": 5760,
+    "2026-08-21": 1232,
+    "2026-08-22": 344,
+    "2026-08-23": 687,
+    "2026-08-24": 1168
+  },
+  "traffic_by_hour": {
+    "0": 531,
+    "1": 2902,
+    "2": 312,
+    "3": 986,
+    "4": 124,
+    "5": 219,
+    "6": 1731,
+    "7": 826,
+    "8": 299,
+    "9": 124,
+    "10": 355,
+    "11": 10,
+    "12": 388,
+    "13": 165,
+    "14": 1145,
+    "15": 1380,
+    "16": 558,
+    "17": 33,
+    "18": 11,
+    "19": 10,
+    "20": 14,
+    "21": 26,
+    "22": 312,
+    "23": 386
+  },
+  "devices": {
+    "Desktop": 8424,
+    "Mobile": 3472,
+    "Bot/Crawler": 823,
+    "Unknown": 128
+  },
+  "os": {
+    "Windows 10/11": 7172,
+    "Other": 1067,
+    "Android 15": 1036,
+    "macOS": 953,
+    "iOS 18.7": 821,
+    "Android 16": 812,
+    "Android 12": 393,
+    "Android 10": 225,
+    "iOS 26.6.0": 168,
+    "Unknown": 128
+  },
+  "browsers": {
+    "Chrome": 8123,
+    "KakaoTalk In-App": 2481,
+    "Other": 1101,
+    "Edge": 530,
+    "Safari": 350,
+    "Unknown": 128,
+    "API Tool (curl/python)": 91,
+    "Firefox": 43
+  },
+  "inapp_browsers": {
+    "KakaoTalk": 2481
+  },
+  "service_shares": {
+    "A-Team Pilos 웹/API": 3788,
+    "B-Team 올리챗 A (Streamlit)": 3262,
+    "기타/직접 호출": 2383,
+    "B-Team Oliview 웹": 1626,
+    "B-Team Oliview API": 1027,
+    "통합 포털 랜딩 (/)": 309,
+    "B-Team 올원챗 B (FastAPI RAG)": 218,
+    "정적 메타 리소스": 147,
+    "공통 API": 87
+  },
+  "top_endpoints": {
+    "/api/pipeline/status": 1673,
+    "/": 309,
+    "/bteam/oliview/api/brands/68/products": 167,
+    "/bteam/oliview/api/user/status": 165,
+    "/bteam/oliview/": 164,
+    "/ateam/pilos/": 147,
+    "/favicon.ico": 141,
+    "/api/stocks/000660/llm-reports": 138,
+    "/bteam/chata/_stcore/health": 131,
+    "/ateam/pilos/static/css/index.css": 131,
+    "/ateam/pilos/static/js/chat.js": 128,
+    "/bteam/chata/_stcore/host-config": 127,
+    "/ateam/pilos/static/js/common.js": 127,
+    "/ateam/pilos/static/css/chat.css": 126,
+    "/static/images/stock-logos/000660.png": 116,
+    "/bteam/oliview/api/brands/68/categories": 115,
+    "/bteam/chata/": 114,
+    "/api/stocks/005490/llm-reports": 108,
+    "/api/stocks": 106,
+    "/static/images/stock-logos/005930.png": 106
+  },
+  "status_codes": {
+    "200": 8213,
+    "404": 2608,
+    "304": 1512,
+    "301": 200,
+    "101": 132,
+    "400": 111,
+    "500": 44,
+    "202": 15,
+    "405": 9,
+    "401": 2,
+    "422": 1
+  },
+  "errors_404_top": {
+    "/favicon.ico": 141,
+    "/static/images/stock-logos/000660.png": 116,
+    "/static/images/stock-logos/005930.png": 106,
+    "/static/images/stock-logos/247540.png": 106,
+    "/static/images/stock-logos/005490.png": 104,
+    "/static/images/stock-logos/005380.png": 103,
+    "/static/images/stock-logos/068270.png": 103,
+    "/static/images/stock-logos/034020.png": 102,
+    "/static/images/stock-logos/035720.png": 102,
+    "/static/images/stock-logos/035420.png": 102
+  },
+  "errors_500_top": {
+    "/bteam/oliview/api/brands/68/products": 24,
+    "/bteam/oliview/api/brands/68/categories": 18,
+    "/bteam/oliview/api/brands/2884/products": 2
+  },
+  "latency_stats": {
+    "avg": 8.9559,
+    "p50": 0.008,
+    "p90": 0.166,
+    "p95": 0.232,
+    "p99": 7.328,
+    "max": 53225.222
+  },
+  "slow_endpoints_top": [
+    {
+      "uri": "/bteam/oliview/",
+      "count": 164,
+      "avg_latency": 549.1420243902439,
+      "p95_latency": 862.319,
+      "max_latency": 53225.222
+    },
+    {
+      "uri": "/bteam/chata/_stcore/stream",
+      "count": 72,
+      "avg_latency": 328.557875,
+      "p95_latency": 1598.068,
+      "max_latency": 5453.017
+    },
+    {
+      "uri": "/bteam/chatb/api/v1/search/stream",
+      "count": 47,
+      "avg_latency": 14.415446808510639,
+      "p95_latency": 43.808,
+      "max_latency": 180.979
+    },
+    {
+      "uri": "",
+      "count": 104,
+      "avg_latency": 0.9515865384615385,
+      "p95_latency": 5.004,
+      "max_latency": 7.961
+    },
+    {
+      "uri": "/bteam/chatb/api/v1/search",
+      "count": 42,
+      "avg_latency": 0.7432142857142857,
+      "p95_latency": 1.285,
+      "max_latency": 18.454
+    },
+    {
+      "uri": "/bteam/chata/static/js/es2015.Dcfr10Z6.js",
+      "count": 20,
+      "avg_latency": 0.2283,
+      "p95_latency": 0.375,
+      "max_latency": 0.375
+    },
+    {
+      "uri": "/bteam/chata/static/js/useWindowDimensionsContext.HIxtcWyF.js",
+      "count": 20,
+      "avg_latency": 0.227,
+      "p95_latency": 0.366,
+      "max_latency": 0.366
+    },
+    {
+      "uri": "/bteam/chata/static/js/useOverlayDismissal.DB4_ko2H.js",
+      "count": 20,
+      "avg_latency": 0.2262,
+      "p95_latency": 0.343,
+      "max_latency": 0.343
+    },
+    {
+      "uri": "/bteam/chata/static/js/extends.SdklyJLW.js",
+      "count": 20,
+      "avg_latency": 0.22545,
+      "p95_latency": 0.366,
+      "max_latency": 0.366
+    },
+    {
+      "uri": "/bteam/chata/static/js/useScrollbarGutterSize.B_VG1Wad.js",
+      "count": 20,
+      "avg_latency": 0.22435,
+      "p95_latency": 0.371,
+      "max_latency": 0.371
+    },
+    {
+      "uri": "/bteam/chata/static/js/v4.DDdyfk2q.js",
+      "count": 20,
+      "avg_latency": 0.2239,
+      "p95_latency": 0.333,
+      "max_latency": 0.333
+    },
+    {
+      "uri": "/bteam/chata/static/js/query-string.aaJx2e0Y.js",
+      "count": 20,
+      "avg_latency": 0.22365,
+      "p95_latency": 0.369,
+      "max_latency": 0.369
+    },
+    {
+      "uri": "/bteam/chata/static/js/ErrorHandling.H5STbbYb.js",
+      "count": 20,
+      "avg_latency": 0.22275,
+      "p95_latency": 0.343,
+      "max_latency": 0.343
+    },
+    {
+      "uri": "/bteam/chata/static/js/ResizeObserver.es.CdkJ1I5V.js",
+      "count": 20,
+      "avg_latency": 0.2223,
+      "p95_latency": 0.35,
+      "max_latency": 0.35
+    },
+    {
+      "uri": "/bteam/chata/static/js/tslib.es6.DWZnz9P1.js",
+      "count": 20,
+      "avg_latency": 0.22125,
+      "p95_latency": 0.35,
+      "max_latency": 0.35
+    }
+  ]
+}
