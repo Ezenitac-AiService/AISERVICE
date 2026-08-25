@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SubStepEvent",
+  "description": "실시간 계층형 서브스텝 UI SSE 이벤트 스키마",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "event_type",
+    "step_id",
+    "step_name",
+    "status",
+    "timestamp"
+  ],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "event_type": { "type": "string", "enum": ["step_update", "token", "complete", "fallback_alert"] },
+    "step_id": { "type": "string", "enum": ["INTENT", "SEARCH", "RERANK", "SYNTHESIS"] },
+    "step_name": { "type": "string" },
+    "sub_step": {
+      "type": ["object", "null"],
+      "properties": {
+        "target_index": { "type": "integer" },
+        "total_targets": { "type": "integer" },
+        "target_id": { "type": "string" },
+        "target_name": { "type": "string" },
+        "action": { "type": "string", "enum": ["START", "SEARCHING", "SEARCH_DONE", "RERANK_DONE", "ERROR_SKIPPED"] },
+        "count": { "type": "integer" },
+        "message": { "type": "string" }
+      }
+    },
+    "status": { "type": "string", "enum": ["pending", "running", "complete", "fallback"] },
+    "fallback_info": {
+      "type": ["object", "null"],
+      "properties": {
+        "triggered": { "type": "boolean" },
+        "label": { "type": "string", "default": "⚡ 신속 분석 모드 (실시간 기본 검색)" },
+        "reason": { "type": "string" }
+      }
+    },
+    "elapsed_ms": { "type": "number" },
+    "timestamp": { "type": "number" }
+  }
+}

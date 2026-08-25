@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RagGraphState",
+  "description": "LangGraph StateGraph 전역 상태 스키마",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "query",
+    "pattern_type",
+    "target_entities",
+    "search_pools",
+    "reranked_contexts",
+    "context_text",
+    "metrics",
+    "is_fallback",
+    "error_log"
+  ],
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "요청별 고유 분산 추적 식별자 (예: req_a1b2c3d4)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "멀티턴 대화 세션 식별자"
+    },
+    "query": {
+      "type": "string",
+      "description": "사용자 원본 입력 질문"
+    },
+    "normalized_query": {
+      "type": "string",
+      "description": "별칭 사전 및 공백 정규화가 적용된 질문"
+    },
+    "pattern_type": {
+      "type": "string",
+      "enum": [
+        "PATTERN_EXPLICIT_COMPARE",
+        "PATTERN_FEATURE_DISCOVERY",
+        "PATTERN_ASPECT_PROS_CONS",
+        "PATTERN_SINGLE_TARGET"
+      ],
+      "description": "분류된 RAG 라우팅 패턴"
+    },
+    "target_entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["target_id", "target_name", "target_type"],
+        "properties": {
+          "target_id": { "type": "string" },
+          "target_name": { "type": "string" },
+          "brand_name": { "type": ["string", "null"] },
+          "product_name": { "type": ["string", "null"] },
+          "target_type": { "type": "string", "enum": ["PRODUCT", "BRAND", "ATTRIBUTE", "SENTIMENT"] },
+          "attribute_query": { "type": ["string", "null"] },
+          "spec_header": {
+            "type": ["object", "null"],
+            "properties": {
+              "price": { "type": ["integer", "null"] },
+              "volume": { "type": ["string", "null"] },
+              "key_ingredients": { "type": ["string", "null"] },
+              "skin_type": { "type": ["string", "null"] }
+            }
+          }
+        }
+      },
+      "description": "검증된 분석 대상 엔티티 목록 (최대 3개)"
+    },
+    "search_pools": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["doc_id", "review_text", "first_stage_score"],
+          "properties": {
+            "doc_id": { "type": "string" },
+            "review_text": { "type": "string" },
+            "first_stage_score": { "type": "number" },
+            "rating": { "type": ["number", "null"] },
+            "skin_type": { "type": ["string", "null"] }
+          }
+        }
+      },
+      "description": "타겟 ID별 1차 검색된 후보 리뷰 컬렉션 (타겟당 최대 10건)"
+    },
+    "reranked_contexts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["doc_id", "review_text", "rerank_score", "rank"],
+          "properties": {
+            "doc_id": { "type": "string" },
+            "review_text": { "type": "string" },
+            "rerank_score": { "type": "number" },
+            "rank": { "type": "integer" }
+          }
+        }
+      },
+      "description": "타겟 ID별 쿼터 파티셔닝 선별 리뷰 목록 (타겟당 2~3건)"
+    },
+    "context_text": {
+      "type": "string",
+      "description": "16K LLM에 주입될 최종 XML 샌드박스 주입 컨텍스트 (최대 6,000토큰)"
+    },
+    "canary_token": {
+      "type": "string",
+      "description": "Tier 3/4 가드레일 난수 카나리아 토큰"
+    },
+    "is_fallback": {
+      "type": "boolean",
+      "description": "5.0초 타임아웃 또는 리랭커 장애로 1차 유사도 폴백 발동 여부"
+    },
+    "fallback_reason": {
+      "type": ["string", "null"],
+      "description": "폴백 발생 원인 상세"
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "intent_latency_ms": { "type": "number" },
+        "search_latency_ms": { "type": "number" },
+        "rerank_latency_ms": { "type": "number" },
+        "generation_latency_ms": { "type": "number" },
+        "total_latency_ms": { "type": "number" },
+        "cache_hits": {
+          "type": "object",
+          "properties": {
+            "l1_pool": { "type": "boolean" },
+            "l2_embedding": { "type": "boolean" },
+            "l3_rerank": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "error_log": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
