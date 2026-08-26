@@ -1,4 +1,4 @@
-# Implementation Plan: Audit, Zero-Hardcoding, and Hardware-Tiered Dynamic Context OOM Hardening
+# Implementation Plan: Audit, Zero-Hardcoding, and 5-Tier GPU Architecture OOM Hardening
 
 **Branch**: `034-audit-config-oom-guards` | **Date**: 2026-08-26 | **Spec**: [spec.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/spec.md)
 
@@ -8,29 +8,26 @@
 
 ## 1. Summary
 
-본 계획서는 전사 코드베이스(`model_gateway`, `bteam/oliview_core`, `ateam/pilos`, `tests/`)에 산재한 레거시 하드코딩과 설정 덮어쓰기를 전수 제거하고, **물리 VRAM 실측에 기반한 동적 컨텍스트 윈도우 사이징 엔진(16K $\rightarrow$ 32K $\rightarrow$ 64K $\rightarrow$ 128K)** 및 **하드웨어 인식 FlashAttention/Pascal Q8 KV 최적화**, **11GB/12GB 4B 준비 및 8GB 2B 안전 상주 듀얼 아키텍처**를 완벽하게 구축하는 기술 구현 계획을 수립합니다.
+본 계획서는 5대 타겟 GPU 세대(GTX 1070 8GB, GTX 1080Ti 11GB, RTX 2080 8GB, RTX 3060 12GB, RTX 4080 16GB)별 불변 하드웨어 특성 룩업 테이블(`GPU_ARCHITECTURE_SPEC_TABLE`)을 구축하고, Host CPU(Intel i7 930)의 AVX 미지원 특성을 고려한 **100% GPU VRAM 상주 (`-ngl 999`) 원칙**과 **물리 VRAM 실측 기반 동적 컨텍스트 사이징 엔진(16K $\rightarrow$ 32K $\rightarrow$ 64K $\rightarrow$ 128K)**을 완성합니다.  
+동시에 전사 코드베이스(`model_gateway`, `bteam/oliview_core`, `ateam/pilos`, `tests/`)에 산재한 레거시 하드코딩을 `ConfigManager`로 완전 일원화합니다.
 
 ---
 
 ## 2. Technical Context
 
-* **언어 및 런타임**: Python 3.11 / 3.12, FastAPI, llama.cpp Python C-API (llama-server), CUDA 12.x
-* **핵심 의존성**: `pynvml`, `httpx`, `pydantic v2`, `starlette`, `redis`
-* **타겟 하드웨어**: NVIDIA GTX 1070 (8GB VRAM, Compute Capability 6.1, Pascal) + 11GB(1080Ti)/12GB(3060) 확장 대비
-* **핵심 제약사항**:
-  - Windows OS/데스크톱 UI 점유(~3.7GB)를 감안하여 전체 Gateway GPU 점유량을 **3.7GB 이하**로 통제.
-  - Pascal SM 6.1 특성에 맞춰 `--flash_attn` 옵션은 생략하고 **Q8_0 KV Cache 양자화**로 VRAM 50% 절감.
-  - 전사 회귀 테스트 스위트 100% 통과 유지.
+* **호스트 CPU**: Intel Core i7 930 (1세대 Nehalem, SSE4.2 지원, **AVX/AVX2/AVX-512 미지원**) $\rightarrow$ 모든 신경망 연산 100% GPU VRAM Offload 필수.
+* **5대 GPU 타겟**:
+  - **Pascal (SM 6.1)**: GTX 1070 (8GB), GTX 1080Ti (11GB) $\rightarrow$ FlashAttn 생략, Q8_0 KV Cache 필수.
+  - **Turing (SM 7.5)**: RTX 2080 (8GB) $\rightarrow$ FP16 텐서 코어, Q8_0 KV Cache.
+  - **Ampere (SM 8.6)**: RTX 3060 (12GB) $\rightarrow$ BF16 / FlashAttention-2/3 완전 지원, 4B @ 64K.
+  - **Ada Lovelace (SM 8.9)**: RTX 4080 (16GB) $\rightarrow$ FP8 Transformer Engine / FlashAttention-3 완전 지원, 4B @ 128K / 9B @ 32K.
+* **소프트웨어 스택**: Python 3.11 / 3.12, FastAPI, llama.cpp Python C-API, CUDA 12.x, PyNVML, Pydantic v2.
 
 ---
 
 ## 3. Constitution Check
 
-* **Principle I (언어 정책)**: 모든 기술 계획, 명세서, 주석, 가이드는 한국어로 작성 (통과 ✅).
-* **Principle II (TDD 및 테스트 우선주의)**: 계약 및 단위 테스트 코드 선행 작성 후 구현 (통과 ✅).
-* **Principle III (서비스 모듈화 및 격리)**: Model Gateway, A-Team, B-Team의 런타임 환경과 의존성 격리 유지 (통과 ✅).
-* **Principle IV (관측 가능성 및 로깅)**: `GET /v1/profile` 및 구조화된 JSON 로깅 완비 (통과 ✅).
-* **Principle V (단순성 및 점진적 진화 - YAGNI)**: 복잡한 외부 오케스트레이터 없이 단일 진실 소스(`ConfigManager`)와 수식 기반 자율 프로파일링 채택 (통과 ✅).
+* **Principle I ~ V 100% 충족**: 한국어 문서화, TDD 선행, 서비스 모듈화, 구조화 로깅, YAGNI 원칙 준수.
 
 ---
 
@@ -45,21 +42,21 @@
 
 ## 5. Technical Implementation Steps
 
-### Step 1: `gpu_detector.py` 및 동적 사이징 엔진 구축
-* Compute Capability 조회 및 `supports_flash_attn` 불리언 반환 로직 탑재.
-* VRAM 기반 동적 컨텍스트 윈도우 수식 구현 (`calculate_dynamic_context_window()`).
+### Step 1: 5대 GPU 세대별 불변 스펙 룩업 테이블 및 감지 엔진 구축
+* `gpu_detector.py`에 `GPU_ARCHITECTURE_SPEC_TABLE` 정의 및 `detect_gpu_capabilities()` 구현.
+* VRAM 물리 수식 기반 `calculate_dynamic_context_window(vram_total_mb)` 구현.
 
-### Step 2: `llama_manager.py` 및 `process_manager.py` 하드코딩 제거 & Pascal Q8 최적화
-* SM < 8.0 환경에서 `--flash_attn` 옵션 자동 생략 및 `--cache-type-k q8_0 --cache-type-v q8_0` 주입.
-* `LOADING` 상태 보호 및 `SIGTERM -> SIGKILL` 소켓 반환 검증 가드 탑재.
+### Step 2: `process_manager.py` 세대별 최적 플래그 자동 주입
+* SM 6.1/7.5: `--flash_attn` 생략, `--cache-type-k q8_0 --cache-type-v q8_0` 주입.
+* SM 8.6/8.9: `--flash_attn True`, FP8/Q8 KV 자동 주입.
+* 모든 모델에 `-ngl 999` 강제 적용 (i7 930 CPU 오프로드 방지).
 
-### Step 3: `inference_api.py` 및 `ConfigManager` 단일 진실 소스화
-* `/v1/profile` 엔드포인트에 `hardware` 및 `dynamic_n_ctx_max` 필드 추가.
-* 하드코딩된 fallback 문자열(`qwen3.5-4b`)을 `ConfigManager.get_default_model()`로 일원화.
+### Step 3: `llama_manager.py` 및 `inference_api.py` 전사 하드코딩 제거
+* `ConfigManager`로 레거시 fallback 문자열(`qwen3.5-4b`) 전수 교체.
+* `GET /v1/profile`에 `architecture` 및 `features` 메타데이터 노출.
 
-### Step 4: A-Team (`ateam/pilos`) 및 B-Team (`bteam/oliview_core`) 설정 동기화
-* `ateam/scripts/test_llm_connection.py` 및 레거시 계약 테스트 파일 전수 수정.
-* `bteam/oliview_core/client.py` 및 `synthesis_node.py`의 동적 프로파일 바인딩 검증.
+### Step 4: `ateam/pilos` 및 전사 테스트 스위트 동기화
+* `ateam/scripts/test_llm_connection.py` 및 레거시 계약 테스트 파일 전수 교체.
 
 ### Step 5: 전사 5대 종합 회귀 테스트 및 검증
 * `bteam/tests/run_all_regression_tests.py` 100% 통과 확인.
