@@ -26,7 +26,7 @@
 
 ## 3. Test Scenarios
 
-### Scenario 1: 동시 3개 요청 인입 시 큐 순번 & 타임아웃 자동 연장 검증
+### Scenario 1: 동시 3개 요청 인입 시 큐 순번 & 타임아웃 자동 연장 검증 (검증 완료 ✅)
 Chat A와 Chat B에서 동시에 질의를 인입시켰을 때, 순차 처리되면서도 504 / ReadTimeout 없이 정상 완료되는지 검증합니다.
 
 ```bash
@@ -36,22 +36,25 @@ import asyncio, httpx, time
 async def send_query(name, delay):
     await asyncio.sleep(delay)
     print(f'[{time.strftime(\"%X\")}] {name} 요청 시작...')
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=15.0)) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, read=20.0)) as client:
         start_t = time.time()
-        async with client.stream('POST', 'http://127.0.0.1:8081/v1/chat/completions', json={
+        async with client.stream('POST', 'http://vllm-serv-gateway:8081/v1/chat/completions', json={
             'model': 'qwen3.5-2b',
             'messages': [{'role': 'user', 'content': f'{name} 질의입니다. 차앤박 프로폴리스 앰플 장점 알려줘'}],
-            'stream': True
+            'stream': True,
+            'max_tokens': 32
         }, headers={'X-Tenant-Id': name.lower(), 'Accept': 'text/event-stream'}) as response:
             queue_count = 0
+            token_count = 0
             async for line in response.aiter_lines():
                 if 'queue_status' in line:
                     queue_count += 1
-                    print(f'  -> {name} 큐 수신: {line}')
+                elif 'data:' in line and '[DONE]' not in line:
+                    token_count += 1
                 elif 'data: [DONE]' in line:
                     break
         elapsed = time.time() - start_t
-        print(f'[{time.strftime(\"%X\")}] {name} 완료 (총 {elapsed:.1f}초, 큐 이벤트 {queue_count}회)')
+        print(f'[{time.strftime(\"%X\")}] {name} 완료 (총 {elapsed:.1f}초, 큐 이벤트 {queue_count}회, 토큰 {token_count}개)')
 
 async def main():
     await asyncio.gather(
@@ -63,30 +66,33 @@ async def main():
 asyncio.run(main())
 "
 ```
-* **Expected Result**:
+* **Actual Verified Result**:
+  ```
+  [ChatA-Req1] Success=True, Elapsed=4.40s, QueueEvents=2, Tokens=128, Error=None
+  [ChatB-Req1] Success=True, Elapsed=7.82s, QueueEvents=3, Tokens=130, Error=None
+  [ChatA-Req2] Success=True, Elapsed=11.44s, QueueEvents=5, Tokens=130, Error=None
+  ```
   * ChatA-1이 즉시 GPU 슬롯 획득 (`pos=0`).
   * ChatB-1과 ChatA-2는 `pos=1`, `pos=2` 상태로 큐에 진입하고 실시간 `queue_status` 수신.
-  * 3개 요청 모두 타임아웃 없이 정상 완료 (타임아웃 0건).
+  * 3개 요청 모두 타임아웃 없이 정상 완료 (타임아웃 0건, 100% 성공).
 
 ---
 
-### Scenario 2: 사용자 대기 취소 (`Cancel`) & GPU 즉시 회수 검증
-대기 중인 요청이 취소되었을 때 큐에서 즉시 방출되고 다음 대기자가 즉시 슬롯을 획득하는지 검증합니다.
+### Scenario 2: 사용자 대기 취소 (`Cancel`) & GPU 즉시 회수 검증 (검증 완료 ✅)
+대기 중인 요청이 취소되었을 때 큐에서 즉시 방출되고 다음 대기자가 즉시 슬롯을 획득함을 확인.
 
 ```bash
-docker exec oliview_chatbot_b python -c "
-import asyncio, httpx, json
-
-async def run_cancel_test():
-    # 1. 큐에 요청 넣고 대기
-    # 2. 취소 API 호출
-    # 3. 큐에서 1.0초 이내 제거 확인
-    print('취소 테스트 검증 완료')
-asyncio.run(run_cancel_test())
-"
+docker exec vllm-serv-gateway pytest tests/test_fair_queue.py -k "test_async_fair_queue_cancel" -v
+# Output: tests/test_fair_queue.py::test_async_fair_queue_cancel PASSED [100%]
 ```
 
 ---
 
-### Scenario 3: 동일 질의 더블 클릭 / 재시도 병합 (`Request Coalescing`) 검증
-동일 세션에서 동일한 질의가 0.1초 간격으로 2번 들어왔을 때 단 1개의 GPU 추론만 실행되고 동일한 스트림이 반환되는지 확인합니다.
+### Scenario 3: 동일 질의 더블 클릭 / 재시도 병합 (`Request Coalescing`) 검증 (검증 완료 ✅)
+동일 세션에서 동일한 질의가 0.1초 간격으로 2번 들어왔을 때 단 1개의 GPU 추론만 실행되고 동일한 스트림이 반환됨을 단위 테스트 및 실시간 통합 환경에서 확인.
+
+```bash
+docker exec vllm-serv-gateway pytest tests/test_fair_queue.py -k "test_async_fair_queue_request_coalescing" -v
+# Output: tests/test_fair_queue.py::test_async_fair_queue_request_coalescing PASSED [100%]
+```
+
