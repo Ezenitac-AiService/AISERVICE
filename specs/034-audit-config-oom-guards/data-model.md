@@ -1,4 +1,4 @@
-# Data Model: 6-Tier CPU-GPU Hardware Topology & Capability Specs
+# Data Model: Decoupled CPU-GPU Architecture Specs & Dynamic Profiling
 
 **Feature**: `034-audit-config-oom-guards`  
 **Date**: 2026-08-26  
@@ -6,7 +6,7 @@
 
 ---
 
-## 1. 6대 CPU-GPU 세대 및 아키텍처 특성 스키마 (Pydantic v2)
+## 1. 독립적 CPU-GPU 아키텍처 스키마 (Pydantic v2)
 
 ```python
 from enum import Enum
@@ -24,16 +24,16 @@ class GpuArchitectureEnum(str, Enum):
 
 
 class CpuArchitectureFeatures(BaseModel):
-    """CPU 명령어 세트 및 아키텍처 특성"""
+    """독립적 CPU 명령어 세트 특성"""
     cpu_model_name: str = Field(..., description="CPU 모델명 (예: Intel Core i7 930)")
     has_avx: bool = Field(default=False, description="AVX 지원 여부")
     has_avx2: bool = Field(default=False, description="AVX2 지원 여부")
     has_fma: bool = Field(default=False, description="FMA3 지원 여부")
-    requires_gpu_only: bool = Field(default=False, description="AVX 미지원으로 100% GPU VRAM 상주 강제 여부")
+    requires_gpu_only: bool = Field(default=False, description="AVX 미지원으로 100% GPU VRAM 상주(-ngl 999) 강제 여부")
 
 
 class GpuArchitectureFeatures(BaseModel):
-    """GPU 아키텍처 세대별 불변 하드웨어 특성 스펙"""
+    """독립적 GPU 아키텍처 세대별 불변 하드웨어 특성"""
     architecture_name: str = Field(..., description="아키텍처명 (Pascal, Turing, Ampere, Ada, Blackwell)")
     compute_capability: float = Field(..., description="CUDA Compute Capability (6.1, 7.5, 8.6, 8.9, 12.0)")
     has_tensor_cores: bool = Field(..., description="텐서 코어 탑재 여부")
@@ -46,7 +46,7 @@ class GpuArchitectureFeatures(BaseModel):
 
 
 class DynamicHardwareProfile(BaseModel):
-    """실시간 물리 CPU-GPU 하드웨어 실측 기반 프로파일"""
+    """실시간 물리 CPU-GPU 독립 실측 합성 프로파일"""
     device_name: str = Field(..., description="GPU 장치명 (예: NVIDIA GeForce GTX 1070)")
     compute_capability: float = Field(..., description="CUDA Compute Capability")
     gpu_features: GpuArchitectureFeatures = Field(..., description="GPU 아키텍처 세부 스펙")
