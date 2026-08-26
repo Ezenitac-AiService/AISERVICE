@@ -9,6 +9,11 @@
 
 ## 1. 개요 및 배경 (Context & Problem Statement)
 
+## Clarifications
+
+### Session 2026-08-26
+- Q: 2B 모델로 4B 수준의 RAG 심층 합성을 커버하기 위해 컨텍스트 윈도우 크기 축소를 방지하고 대용량 컨텍스트를 보장할 때, 기본 목표 컨텍스트 윈도우 크기는 몇으로 설정해야 합니까? → A: 16K (16,384 tokens) 보장 (2B 모델이 4B 업무를 커버하도록 컨텍스트 윈도우 축소를 금지하고 대용량 RAG 컨텍스트를 완전 수용)
+
 ### 1.1 현상 분석 (Why 4B was called)
 1. **과거 다중 계층 라우팅(Spec 013)의 잔재**:
    - 과거 아키텍처(Spec 013)에서 단순 질의는 `qwen3.5-2b`, RAG 심층 합성은 `qwen3.5-4b`로 분리 호출하도록 설계되었습니다.
@@ -85,15 +90,17 @@
 - **FR-005**: 모델 게이트웨이의 `reverse_proxy`는 `SINGLE_MODEL_MODE=true`일 때 요청된 `model` 필드가 비상주 모델이더라도 상주 모델로 안전하게 재매핑하고 `model` 파라미터를 교체하여 전달해야 한다.
 - **FR-006**: 동적 모델 탐색 결과는 인메모리에 캐싱(TTL 60초)되어 매 요청마다 불필요한 HTTP 오버헤드를 발생시키지 않아야 한다.
 - **FR-007**: 모든 모델 동기화 및 라우팅 이벤트는 구조화된 로그(`logger.info`)로 기록되어 모델 해석 과정을 추적할 수 있어야 한다.
+- **FR-008**: 2B 모델이 4B 수준의 RAG 심층 비교 및 합성을 완벽히 수행할 수 있도록 기본 컨텍스트 윈도우 크기(`current_n_ctx`)를 **16K (16,384 tokens)**로 상주 보장해야 하며 임의 축소를 금지한다.
 
 ---
 
 ## 4. Success Criteria *(mandatory)*
 
 1. **설정 불일치 제거**: 시스템 내 `qwen3.5-4b` 호출로 인한 불필요한 모델 스와핑, OOM 킬, 500 에러 발생 건수 **0건 달성**.
-2. **동적 탐색 자동화**: 게이트웨이 `server_config.json`의 기본 모델 변경 시, 클라이언트 재배포나 코드 수정 없이 60초 이내에 클라이언트가 새 모델명을 동적으로 반영.
-3. **호환성 보장**: 레거시 `qwen3.5-4b` 요청에 대한 게이트웨이 응답 성공률 **100% (200 OK)** 유지.
-4. **회귀 테스트 무결점**: 전사 5대 종합 회귀 테스트 스위트 100% 통과 유지.
+2. **대용량 16K 컨텍스트 안정 상주**: `qwen3.5-2b` 모델이 `n_ctx=16384`로 상주하여 10~20개 제품 리뷰 컨텍스트를 주입받더라도 OOM 없이 실시간 토큰 생성을 완료.
+3. **동적 탐색 자동화**: 게이트웨이 `server_config.json`의 기본 모델 변경 시, 클라이언트 재배포나 코드 수정 없이 60초 이내에 클라이언트가 새 모델명을 동적으로 반영.
+4. **호환성 보장**: 레거시 `qwen3.5-4b` 요청에 대한 게이트웨이 응답 성공률 **100% (200 OK)** 유지.
+5. **회귀 테스트 무결점**: 전사 5대 종합 회귀 테스트 스위트 100% 통과 유지.
 
 ---
 
@@ -101,7 +108,7 @@
 
 | 구성 요소 | 위치 | 역할 | 최적값 / 동적 반영 방식 |
 | :--- | :--- | :--- | :--- |
-| **Gateway Config** | `model_gateway/config/server_config.json` | 서빙 모델 및 포트 마스터 설정 | `"default_model": "qwen3.5-2b"`, `"current_n_ctx": 4096` |
+| **Gateway Config** | `model_gateway/config/server_config.json` | 서빙 모델 및 포트 마스터 설정 | `"default_model": "qwen3.5-2b"`, `"current_n_ctx": 16384` |
 | **Gateway API** | `model_gateway/src/api/routes/inference_api.py` | 모델 카탈로그 및 프록시 라우팅 | `GET /v1/models`에 `is_active` 제공 & 비상주 모델 투명 재매핑 |
 | **Client Config** | `bteam/oliview_core/config.py` | 챗봇 코어 설정 규격 | `discover_active_model()` 연동 및 `qwen3.5-2b` 안전 기본값 |
 | **Client Gateway** | `bteam/oliview_core/client.py` | HTTP LLM 호출 클라이언트 | 모델 동적 탐색 캐시(TTL 60s) 및 RAG 페이로드 조립 |
