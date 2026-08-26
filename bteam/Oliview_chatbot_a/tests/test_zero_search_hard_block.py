@@ -32,7 +32,7 @@ def test_zero_search_hard_block_sync():
         assert not mock_client.return_value.generate_stream.called
 
     response_text = result.get("response_text", "")
-    assert "리뷰 데이터를 찾을 수 없습니다" in response_text or "등록된 실제 구매자 리뷰가 없습니다" in response_text
+    assert "실제 구매자 리뷰를 찾을 수 없습니다" in response_text or "실제 구매자 리뷰 데이터가 없습니다" in response_text
     assert "[리뷰" not in response_text
 
 
@@ -51,5 +51,6 @@ def test_zero_search_hard_block_stream():
     tokens = list(get_token_stream(state))
     full_text = "".join(tokens)
 
-    assert "리뷰 데이터를 찾을 수 없습니다" in full_text or "등록된 실제 구매자 리뷰가 없습니다" in full_text
+    assert "실제 구매자 리뷰를 찾을 수 없습니다" in full_text or "실제 구매자 리뷰 데이터가 없습니다" in full_text
     assert "[리뷰" not in full_text
+
