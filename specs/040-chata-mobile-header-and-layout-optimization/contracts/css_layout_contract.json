@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChatAMobileLayoutContract",
+  "type": "object",
+  "description": "Design token and responsive layout contract for Oliview ChatA Streamlit application",
+  "properties": {
+    "breakpoints": {
+      "type": "object",
+      "properties": {
+        "mobile_max_width_px": { "type": "integer", "const": 768 },
+        "narrow_mobile_max_width_px": { "type": "integer", "const": 360 },
+        "desktop_min_width_px": { "type": "integer", "const": 769 }
+      },
+      "required": ["mobile_max_width_px", "desktop_min_width_px"]
+    },
+    "mobile_header": {
+      "type": "object",
+      "properties": {
+        "st_header_display": { "type": "string", "const": "hidden" },
+        "block_container_top_padding": { "type": "string", "const": "max(3.0rem, env(safe-area-inset-top) + 1.2rem)" },
+        "title_font_size_mobile_px": { "type": "integer", "default": 26 },
+        "subtitle_font_size_mobile_px": { "type": "integer", "default": 13 }
+      },
+      "required": ["st_header_display", "block_container_top_padding"]
+    },
+    "category_grid": {
+      "type": "object",
+      "properties": {
+        "columns_per_row_mobile": { "type": "integer", "const": 3 },
+        "rows_count_mobile": { "type": "integer", "const": 2 },
+        "total_buttons": { "type": "integer", "const": 6 },
+        "button_min_height_px": { "type": "integer", "minimum": 40, "default": 42 },
+        "button_font_size_px": { "type": "integer", "default": 13 }
+      },
+      "required": ["columns_per_row_mobile", "rows_count_mobile", "total_buttons"]
+    },
+    "review_accordion": {
+      "type": "object",
+      "properties": {
+        "mobile_max_height_px": { "type": "integer", "const": 240 },
+        "overflow_y": { "type": "string", "const": "auto" },
+        "momentum_scrolling": { "type": "string", "const": "touch" }
+      },
+      "required": ["mobile_max_height_px", "overflow_y"]
+    }
+  },
+  "required": ["breakpoints", "mobile_header", "category_grid", "review_accordion"]
+}

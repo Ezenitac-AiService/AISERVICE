@@ -47,26 +47,40 @@ st.markdown(
         font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
     }
 
-    /* Main Container Padding */
+    /* Streamlit Default Header Neutralization (Prevent Mobile Title Clipping) */
+    header[data-testid="stHeader"],
+    [data-testid="stHeader"] {
+        background: transparent !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        pointer-events: none !important;
+        z-index: 0 !important;
+        visibility: hidden !important;
+    }
+
+    /* Main Container Padding with Dynamic Top Safe-Area */
     .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 5rem !important;
+        padding-top: max(3.0rem, env(safe-area-inset-top) + 1.2rem) !important;
+        padding-bottom: max(5.0rem, env(safe-area-inset-bottom) + 3.5rem) !important;
         max-width: 1200px !important;
         margin: 0 auto !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
 
-    /* Spec 020: Bottom Fixed Wrapper Styling & Backdrop Blur */
+    /* Spec 020 / Spec 040: Bottom Fixed Wrapper Styling & Backdrop Blur with Safe Area */
     [data-testid="stBottom"],
     div[data-testid="stBottom"] {
         background: rgba(255, 255, 255, 0.88) !important;
         backdrop-filter: blur(12px) !important;
         -webkit-backdrop-filter: blur(12px) !important;
         border-top: 1px solid rgba(220, 232, 224, 0.6) !important;
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
     }
 
-    /* Spec 020: Bottom Block Container (Input Box Container) Max-Width & Center Alignment */
+    /* Spec 020: Bottom Block Container Max-Width & Center Alignment */
     [data-testid="stBottomBlockContainer"],
     .stBottomBlockContainer,
     div[data-testid="stBottom"] > div {
@@ -84,21 +98,6 @@ st.markdown(
     .stChatInput {
         max-width: 1200px !important;
         margin: 0 auto !important;
-    }
-
-    /* Spec 020: Mobile & Tablet Responsive Optimization */
-    @media (max-width: 768px) {
-        .block-container {
-            padding-top: 1rem !important;
-            padding-bottom: 4.5rem !important;
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
-        [data-testid="stBottomBlockContainer"],
-        .stBottomBlockContainer {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
     }
 
     /* Title Section */
@@ -218,9 +217,111 @@ st.markdown(
         padding: 6px 0 !important;
     }
 
-    /* Accordion Customization */
+    /* Accordion Customization & Mobile Momentum Scroll */
     .stAccordion {
         margin-top: 10px !important;
+    }
+    .stAccordion [data-testid="stExpanderDetails"] {
+        max-height: 240px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        padding: 8px !important;
+        background: #fbfdfb !important;
+        border-radius: 8px !important;
+    }
+
+    /* Spec 040: Mobile & Tablet Responsive Optimization (<= 768px) */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: max(3.2rem, env(safe-area-inset-top) + 1.5rem) !important;
+            padding-bottom: max(4.5rem, env(safe-area-inset-bottom) + 3.0rem) !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        [data-testid="stBottomBlockContainer"],
+        .stBottomBlockContainer {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+
+        /* Header Slimming */
+        .app-header {
+            margin-bottom: 14px !important;
+        }
+        .app-title {
+            font-size: 26px !important;
+        }
+        .app-subtitle {
+            font-size: 13px !important;
+        }
+
+        /* Category Selection 3x2 Compact Responsive Grid Override */
+        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+            margin-bottom: 6px !important;
+        }
+        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+            width: auto !important;
+        }
+        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] .stButton > button {
+            font-size: 13px !important;
+            padding: 8px 4px !important;
+            min-height: 42px !important;
+            touch-action: manipulation !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            border-radius: 8px !important;
+        }
+
+        /* Brand & Attribute Slimming */
+        .panel-title {
+            font-size: 15px !important;
+            margin-bottom: 8px !important;
+        }
+        .section-label {
+            font-size: 11px !important;
+            margin-top: 6px !important;
+            margin-bottom: 4px !important;
+        }
+        .brand-box {
+            gap: 5px !important;
+            margin-bottom: 10px !important;
+        }
+        .brand-chip {
+            padding: 4px 10px !important;
+            font-size: 11px !important;
+        }
+        .attribute-card {
+            padding: 8px 10px !important;
+            margin-top: 8px !important;
+        }
+        .attribute-card-title {
+            font-size: 12px !important;
+            margin-bottom: 6px !important;
+        }
+        .attribute-box {
+            gap: 5px !important;
+        }
+        .attribute-chip {
+            padding: 3px 8px !important;
+            font-size: 11px !important;
+        }
+
+        /* 1-Click Example Button Mobile Slimming */
+        div[data-testid="column"]:nth-of-type(2) .stButton > button {
+            min-height: 42px !important;
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            line-height: 1.3 !important;
+            margin-bottom: 4px !important;
+            touch-action: manipulation !important;
+        }
     }
     </style>
     """,
@@ -412,7 +513,7 @@ for message in st.session_state.chat_history:
                         )
 
 # [9] Handle User Input or Pending Query
-user_input = st.chat_input("브랜드명, 상품명, 궁금한 속성을 입력하여 질문해주세요. (예: 컬러그램 탕후루 탱글 꿀로스 발림성 어때?)")
+user_input = st.chat_input("브랜드, 제품, 속성을 입력해주세요 (예: 컬러그램 꿀로스 발림성 어때?)")
 
 question_to_process = None
 if st.session_state.pending_query:
