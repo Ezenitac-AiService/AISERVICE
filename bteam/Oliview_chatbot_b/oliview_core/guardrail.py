@@ -787,3 +787,36 @@ class PreFlightContextGuard:
         )
         return truncated, True
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cosmetic Negative Aspect Distortion Guardrail (Spec 038 FR-002, US2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def sanitize_negative_aspect_distortions(text: str) -> str:
+    """
+    LLM 생성 답변에서 화장품 부정 속성어(각질부각, 요철부각, 다크닝 등)가 긍정적 효과로 왜곡된 표현을 정정합니다.
+    예: '각질부각 효과: 각질을 부드럽게 해준다' -> '각질 부각 여부: 각질을 부드럽게 해준다'
+    """
+    if not text:
+        return text
+
+    # 1. '{부정속성} 효과' -> '{부정속성} 여부' 또는 '{부정속성} 완화/케어'
+    patterns = [
+        (r"각질부각\s*효과", "각질 부각 여부"),
+        (r"요철부각\s*효과", "요철 부각 여부"),
+        (r"다크닝\s*효과", "다크닝 발생 여부"),
+        (r"들뜸\s*효과", "들뜸 현상 여부"),
+        (r"밀림\s*효과", "밀림 현상 여부"),
+        (r"뭉침\s*효과", "뭉침 현상 여부"),
+        (r"가루날림\s*효과", "가루날림 여부"),
+        (r"건조함\s*효과", "건조함 및 당김 여부"),
+        (r"번짐\s*효과", "번짐 발생 여부"),
+    ]
+
+    sanitized = text
+    for pattern, replacement in patterns:
+        sanitized = re.sub(pattern, replacement, sanitized)
+
+    return sanitized
+
+

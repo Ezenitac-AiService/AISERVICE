@@ -48,7 +48,9 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
         normalized_query, detected_brands = normalize_query_brands(query)
 
         # 2. 패턴 분류
-        if norm_result.is_discovery:
+        if norm_result.is_series_query and norm_result.series_candidates:
+            pattern_type = PatternType.EXPLICIT_COMPARE
+        elif norm_result.is_discovery:
             pattern_type = PatternType.FEATURE_DISCOVERY
         elif norm_result.intent.value == "COMPARISON" or len(detected_brands) >= 2:
             pattern_type = PatternType.EXPLICIT_COMPARE
@@ -57,10 +59,23 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
         else:
             pattern_type = PatternType.SINGLE_TARGET
 
-        # 3. 타겟 엔티티 추출 및 Discovery 자동 발굴 (Spec 037 FR-002)
+        # 3. 타겟 엔티티 추출 및 Discovery/Series 자동 발굴 (Spec 038 FR-001)
         target_entities: List[TargetEntity] = []
 
-        if pattern_type == PatternType.FEATURE_DISCOVERY:
+        if norm_result.is_series_query and norm_result.series_candidates:
+            # 시리즈/라인명 매칭된 실존 하위 상품 2~3종을 타겟 엔티티로 자동 확장
+            for idx, c in enumerate(norm_result.series_candidates[:settings.max_targets]):
+                target_entities.append(TargetEntity(
+                    target_id=f"target_{idx + 1}",
+                    target_name=c["product_name"],
+                    brand_name=c.get("brand_name") or norm_result.extracted_brand,
+                    product_name=c["product_name"],
+                    target_type=TargetType.PRODUCT,
+                    attribute_query=" ".join(norm_result.extracted_aspects) or None,
+                    spec_header=None,
+                ))
+
+        elif pattern_type == PatternType.FEATURE_DISCOVERY:
             # 카테고리/속성 기반 올리브영 DB 실존 인기 상품 3~5개 자동 발굴
             search_cat = norm_result.extracted_category or query
             candidates = tool_search_catalog(query=search_cat, category=norm_result.extracted_category, limit=settings.max_targets)
@@ -111,6 +126,7 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
                 attribute_query=" ".join(norm_result.extracted_aspects) or None,
                 spec_header=None,
             ))
+
 
         logger.info(
             f"의도 분류 완료: {pattern_type.value}, 타겟 {len(target_entities)}건 ({[t['target_name'] for t in target_entities]})",

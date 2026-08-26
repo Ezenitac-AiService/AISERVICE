@@ -61,16 +61,25 @@ PROS_CONS_PROMPT = """아래 제공된 올리브영 실제 리뷰 데이터를 �
 
 사용자 질문: {query}"""
 
-ZERO_SEARCH_PROMPT = """사용자가 질문한 화장품 또는 카테고리에 대한 실제 구매자 리뷰를 현재 올리브영 데이터베이스에서 찾을 수 없습니다.
+from ..models.aspect_lexicon import get_aspect_guard_instruction, is_negative_aspect
+from ..guardrail import sanitize_negative_aspect_distortions
 
-[응답 가이드]
-1. 현재 등록된 실제 구매자 리뷰 데이터가 없음을 정직하고 친절하게 안내하세요.
-2. 절대로 임의의 가짜 후기나 창작된 문장(예: "안녕하세요? 순하고...", "사용자들은 만족했습니다" 등)을 지어내지 마세요.
-3. 아래 제공된 기본 스펙 정보가 있다면 해당 스펙(가격, 용량, 성분 등)만 담백하게 안내하고, 다른 올리브영 추천 제품을 문의해 주시길 권장하세요.
+ZERO_SEARCH_TEMPLATE = """죄송합니다. 현재 올리브영 데이터베이스에 질문하신 상품/라인에 대한 실제 구매자 리뷰 데이터를 찾을 수 없습니다.
 
-{context}
+💡 **안내 사항**:
+- 현재 등록된 실제 구매자 리뷰가 없습니다.
+- 정확한 상품명(예: '헤라 센슈얼 누드 밤', '차앤박 프로폴리스 에너지 액티브 앰플')으로 다시 질문해 주시거나, 추천을 원하시는 카테고리(예: '촉촉한 립밤 추천해줘')를 문의해 주시면 최적의 제품을 안내해 드리겠습니다. 🌿"""
 
-사용자 질문: {query}"""
+# 하위 호환성용 별칭
+ZERO_SEARCH_PROMPT = ZERO_SEARCH_TEMPLATE
+
+
+
+def is_zero_review_state(state: RagGraphState) -> bool:
+    """리뷰 0건 상태인지 판별."""
+    doc_ids = _extract_doc_ids(state)
+    return len(doc_ids) == 0
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -179,11 +188,17 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
 
     state["is_cached"] = False
 
-    # Zero-Search Guard: 선별된 리뷰가 0건일 때 제로 서치 프롬프트로 강제 분기
-    if len(doc_ids) == 0:
-        logger.info(f"[{trace_id}] Zero-Search Guard 발동: 리뷰 0건 -> ZERO_SEARCH_PROMPT 적용")
-        user_prompt = ZERO_SEARCH_PROMPT.format(context=context_text, query=query)
-    elif pattern_type in (PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY,
+    # Zero-Search Hard Block (Spec 038 FR-005, US2): 선별된 리뷰가 0건일 때 LLM 호출 차단 및 확정 템플릿 즉시 반환
+    if is_zero_review_state(state):
+        logger.info(f"[{trace_id}] Zero-Search Hard Block 발동: 리뷰 0건 -> ZERO_SEARCH_TEMPLATE 즉시 반환")
+        return {
+            "response_text": ZERO_SEARCH_TEMPLATE,
+            "metrics": {"generation_latency_ms": 1.0, "is_cached": False},
+            "is_cached": False,
+        }
+
+    # 프롬프트 패턴 매핑
+    if pattern_type in (PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY,
                          PatternType.EXPLICIT_COMPARE.value, PatternType.FEATURE_DISCOVERY.value):
         user_prompt = COMPARE_PROMPT.format(context=context_text, query=query)
     elif pattern_type in (PatternType.ASPECT_PROS_CONS, PatternType.ASPECT_PROS_CONS.value):
@@ -194,6 +209,14 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
     if is_fallback:
         user_prompt += f"\n\n참고: {FALLBACK_LABEL}"
 
+    # 부정 속성 가드라인 프롬프트 주입 (Spec 038 FR-002)
+    aspect_list = []
+    for t in state.get("target_entities", []):
+        if t.get("attribute_query"):
+            aspect_list.extend(t["attribute_query"].split())
+    aspect_guard = get_aspect_guard_instruction(aspect_list or query.split())
+    system_prompt_to_use = SYSTEM_PROMPT_BASE + aspect_guard
+
     client = AiGatewayClient()
     full_response = []
     canary_leaked = False
@@ -201,7 +224,7 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
     with StepTimer("SYNTHESIS", trace_id=trace_id) as timer:
         for raw_token in client.generate_stream(
             prompt=user_prompt,
-            system_prompt=SYSTEM_PROMPT_BASE,
+            system_prompt=system_prompt_to_use,
             max_tokens=max_tokens,
             trace_id=trace_id,
         ):
@@ -214,8 +237,9 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
                 full_response.append(cleaned)
 
     response_text = "".join(full_response)
-    # Python 인용 태그 정규화 가드레일: [1] -> [리뷰 1]
+    # Python 인용 태그 정규화 및 부정 속성 왜곡 방지 후처리
     response_text = re.sub(r"\[(\d+)\]", r"[리뷰 \1]", response_text)
+    response_text = sanitize_negative_aspect_distortions(response_text)
 
     if canary_leaked:
         response_text = (
@@ -255,7 +279,7 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
 
 def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]:
     """
-    외부 스트리밍 어댑터용 토큰 제너레이터 (Spec 037 제로 서치 가드 & 인라인 인용).
+    외부 스트리밍 어댑터용 토큰 제너레이터 (Spec 038 제로 서치 하드 블록 & 인라인 인용).
     """
     query = state.get("query", "")
     context_text = state.get("context_text", "")
@@ -269,6 +293,14 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     settings = get_settings()
 
     doc_ids = _extract_doc_ids(state)
+
+    # Zero-Search Hard Block (Spec 038 FR-005): 리뷰 0건 시 LLM 호출 전면 차단
+    if is_zero_review_state(state):
+        logger.info(f"[{trace_id}] Zero-Search Hard Block 발동 (Streaming): 리뷰 0건 -> ZERO_SEARCH_TEMPLATE 토큰 스트리밍")
+        for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+            yield line + "\n"
+        return
+
     rewritten_q = state.get("rewritten_query") or state.get("normalized_query") or query
     bypass_cache = state.get("bypass_cache", False) or state.get("no_cache", False)
     l5_key = build_l5_key(
@@ -309,11 +341,7 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
                         yield chunk
                     return
 
-    # Zero-Search Guard: 리뷰 0건 시 가짜 리뷰 창작 차단
-    if len(doc_ids) == 0:
-        logger.info(f"[{trace_id}] Zero-Search Guard 발동 (Streaming): 리뷰 0건 -> ZERO_SEARCH_PROMPT")
-        user_prompt = ZERO_SEARCH_PROMPT.format(context=context_text, query=query)
-    elif pattern_type in (PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY,
+    if pattern_type in (PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY,
                          PatternType.EXPLICIT_COMPARE.value, PatternType.FEATURE_DISCOVERY.value):
         user_prompt = COMPARE_PROMPT.format(context=context_text, query=query)
     elif pattern_type in (PatternType.ASPECT_PROS_CONS, PatternType.ASPECT_PROS_CONS.value):
@@ -324,6 +352,14 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     if is_fallback:
         user_prompt += f"\n\n참고: {FALLBACK_LABEL}"
 
+    # 부정 속성 가드라인 프롬프트 주입
+    aspect_list = []
+    for t in state.get("target_entities", []):
+        if t.get("attribute_query"):
+            aspect_list.extend(t["attribute_query"].split())
+    aspect_guard = get_aspect_guard_instruction(aspect_list or query.split())
+    system_prompt_to_use = SYSTEM_PROMPT_BASE + aspect_guard
+
     client = AiGatewayClient()
     full_tokens = []
     canary_leaked = False
@@ -331,7 +367,7 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     try:
         for raw_token in client.generate_stream(
             prompt=user_prompt,
-            system_prompt=SYSTEM_PROMPT_BASE,
+            system_prompt=system_prompt_to_use,
             max_tokens=max_tokens,
             trace_id=trace_id,
             tenant_id=tenant_id,
@@ -346,6 +382,7 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
             if cleaned:
                 full_tokens.append(cleaned)
                 yield cleaned
+
 
         if not canary_leaked and full_tokens and settings.enable_l5_cache and not bypass_cache and len(doc_ids) > 0:
             full_text = "".join(full_tokens)

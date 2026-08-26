@@ -70,6 +70,76 @@ def tool_search_catalog(query: str, category: Optional[str] = None, limit: int =
         return []
 
 
+def tool_search_series_candidates(
+    series_keyword: str,
+    brand: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 3,
+) -> List[Dict[str, Any]]:
+    """시리즈/라인명(예: '센슈얼', '프로폴리스') 및 브랜드명을 기반으로 카탈로그에서 하위 실존 상품 후보 2~3종을 자동 발굴합니다.
+
+    Args:
+        series_keyword: 시리즈/라인명 핵심 키워드 (예: '센슈얼', '쥬시', '프로폴리스')
+        brand: 브랜드명 필터 (예: '헤라', '차앤박', '롬앤')
+        category: 카테고리 필터 (선택)
+        limit: 최대 반환 후보 상품 수 (기본: 3)
+
+    Returns:
+        List of candidate product dictionaries with metadata.
+    """
+    retriever = get_retriever()
+    try:
+        matching_products: Dict[str, Dict[str, Any]] = {}
+        clean_keyword = series_keyword.strip().lower()
+        clean_brand = (brand or "").strip().lower()
+
+        for doc, meta in zip(retriever.all_documents, retriever.all_metadatas):
+            p_name = meta.get("product_name") or meta.get("name")
+            if not p_name:
+                continue
+
+            p_name_lower = p_name.lower()
+            p_brand_lower = (meta.get("brand_name") or "").lower()
+            p_cat = meta.get("category", "")
+
+            # 1) 브랜드 조건 검사
+            if clean_brand and (clean_brand not in p_brand_lower and clean_brand not in p_name_lower):
+                continue
+
+            # 2) 카테고리 필터 검사
+            if category and category not in p_cat and category not in p_name:
+                continue
+
+            # 3) 시리즈 키워드 서브스트링 매칭
+            keyword_tokens = clean_keyword.split()
+            matches_series = any(token in p_name_lower for token in keyword_tokens if len(token) >= 2)
+
+            if matches_series:
+                if p_name not in matching_products:
+                    matching_products[p_name] = {
+                        "product_id": meta.get("product_id", str(hash(p_name))),
+                        "product_name": p_name,
+                        "brand_name": meta.get("brand_name") or brand or "",
+                        "category_name": p_cat,
+                        "avg_rating": float(meta.get("rating", 4.5)),
+                        "review_sample_count": 1,
+                        "product_url": meta.get("product_url", ""),
+                    }
+                else:
+                    matching_products[p_name]["review_sample_count"] += 1
+
+        sorted_products = sorted(
+            matching_products.values(),
+            key=lambda x: (x["review_sample_count"], x["avg_rating"]),
+            reverse=True,
+        )
+        return sorted_products[:limit]
+
+    except Exception as e:
+        logger.warning(f"tool_search_series_candidates failed: {e}")
+        return []
+
+
 def tool_get_reviews(
     product_name: str,
     aspects: Optional[List[str]] = None,
@@ -104,3 +174,4 @@ def tool_get_reviews(
     except Exception as e:
         logger.warning(f"tool_get_reviews failed: {e}")
         return []
+

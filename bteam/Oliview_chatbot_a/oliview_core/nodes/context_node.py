@@ -65,7 +65,8 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
             token_budget = harness.tokens_per_target
             used_tokens = 0
 
-            for review in reviews:
+            is_multi_target = len(reranked_contexts) > 1
+            for idx, review in enumerate(reviews, start=1):
                 review_text = review.get("review_text", "")
                 estimated_tokens = int(len(review_text) * 1.45)
 
@@ -79,9 +80,10 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
 
                 escaped_text = escape_review_xml(review_text)
                 score = review.get("rerank_score", 0.0)
-                rank = review.get("rank", 0)
+                rank = review.get("rank", idx)
+                citation_tag = f"[{target_name} 리뷰 {idx}]" if is_multi_target else f"[리뷰 {idx}]"
                 context_parts.append(
-                    f'      <review rank="{rank}" score="{score:.3f}">'
+                    f'      <review rank="{rank}" score="{score:.3f}" citation="{citation_tag}">'
                     f'{escaped_text}'
                     f'</review>'
                 )
@@ -89,6 +91,7 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
 
             context_parts.append("    </reviews>")
             context_parts.append("  </target>")
+
 
         if is_fallback:
             fallback_reason = state.get("fallback_reason", "리랭커 타임아웃")

@@ -1,0 +1,174 @@
+/* ==============================================================================
+   Oliview ChatA - 2026 Mobile Responsive Design & Bottom Sheet (Spec 038 US4)
+   Thumb-Zone, Horizontal Swipe Chips, Slide-up Bottom Sheet Drawer, Safe-Area
+   ============================================================================== */
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 1rem 0.75rem 5.5rem 0.75rem;
+  }
+
+  .app-title {
+    font-size: 24px;
+  }
+
+  .app-subtitle {
+    font-size: 12.5px;
+  }
+
+  /* Top Panel: Compact 1-Column Carousel */
+  .top-panel {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  /* Horizontal Scrollable Brand & Category Bars */
+  .brand-box,
+  .category-pills,
+  .attribute-box {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .brand-box::-webkit-scrollbar,
+  .category-pills::-webkit-scrollbar,
+  .attribute-box::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  .brand-chip,
+  .cat-pill,
+  .attribute-chip {
+    flex-shrink: 0;
+  }
+
+  .example-queries {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .btn-example {
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+  }
+
+  /* Chat Messages Full Width */
+  .message-bubble {
+    max-width: 90%;
+    font-size: 13.5px;
+    padding: 12px 14px;
+  }
+
+  .avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  /* Bottom Bar Safe Area for iPhone / Android Home Indicator */
+  .bottom-bar-wrapper {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .bottom-bar-container {
+    padding: 0 0.5rem;
+  }
+}
+
+/* ==============================================================================
+   5. Slide-up Bottom Sheet Drawer (Mobile Review Preview)
+   ============================================================================== */
+.bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.bottom-sheet-overlay.open {
+  display: block;
+  opacity: 1;
+}
+
+.bottom-sheet-drawer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #ffffff;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  max-height: 80vh;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-sheet-overlay.open .bottom-sheet-drawer {
+  transform: translateY(0);
+}
+
+.bottom-sheet-handle-bar {
+  width: 100%;
+  padding: 10px 0 6px 0;
+  display: flex;
+  justify-content: center;
+  cursor: grab;
+}
+
+.bottom-sheet-handle {
+  width: 36px;
+  height: 4.5px;
+  border-radius: 3px;
+  background: #D0D7DE;
+}
+
+.bottom-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 18px 12px 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bottom-sheet-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bottom-sheet-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+.bottom-sheet-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(80vh - 80px);
+}

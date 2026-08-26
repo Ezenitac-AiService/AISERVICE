@@ -10,15 +10,25 @@ import json
 import logging
 from typing import Optional, List, Dict, Any, Tuple
 from ..models.citation_models import NormalizedQueryEntity, QueryIntentEnum
+from ..models.aspect_lexicon import NEGATIVE_ASPECT_TERMS, NEGATIVE_ASPECT_LEXICON
 from ..alias_dictionary import BRAND_ALIAS_MAP
+from ..tools.search_tools import tool_search_series_candidates
 
 logger = logging.getLogger(__name__)
 
-# 공통 뷰티 속성 키워드
+# 공통 뷰티 속성 키워드 (부정 속성 사전 포함)
 BEAUTY_ASPECT_KEYWORDS = [
     "발림성", "지속력", "수분감", "장단점", "커버력", "밀착력", "트러블", 
     "붉은기", "진정", "쿨링감", "촉촉함", "유분기", "다크닝", "각질부각",
+    "요철부각", "들뜸", "밀림", "뭉침", "가루날림", "건조함", "번짐",
     "향", "자극", "가성비", "순함", "모공", "피지", "미백", "주름"
+]
+
+# 대표적 화장품 라인/시리즈 키워드
+BEAUTY_SERIES_KEYWORDS = [
+    "센슈얼", "프로폴리스", "쥬시", "글래스팅", "비벨벳", "블랙쿠션", "레드쿠션",
+    "클린잇제로", "그린티", "자작나무", "시카플라스트", "워터뱅크", "하이드라",
+    "세라마이딘", "더마", "어드밴스드", "비타민c", "레티놀", "골든카밍"
 ]
 
 # 공통 뷰티 카테고리 키워드
@@ -26,6 +36,7 @@ BEAUTY_CATEGORY_KEYWORDS = {
     "쿠션팩트": ["쿠션팩트", "쿠션", "팩트", "쿠션파데"],
     "립틴트": ["립틴트", "틴트", "워터틴트", "벨벳틴트", "글로시틴트"],
     "립글로스": ["립글로스", "꿀로스", "글로스", "립오일", "플럼퍼"],
+    "립스틱": ["립스틱", "립밤", "컬러립밤", "누드밤"],
     "선크림": ["선크림", "선블록", "선스크린", "선로션", "자외선차단제"],
     "토너": ["토너", "스킨", "토너패드", "패드"],
     "앰플": ["앰플", "세럼", "에센스"],
@@ -34,13 +45,15 @@ BEAUTY_CATEGORY_KEYWORDS = {
     "마스크팩": ["마스크팩", "시트마스크", "팩"]
 }
 
+
 # 후방 서술어 및 요청구 제거 정규식 패턴 (Greedy Backward Stripping)
 TRAILING_CONVERSATIONAL_PATTERNS = [
-    r"(?:의\s*)?(?:발림성|지속력|수분감|장단점|커버력|밀착력|효과|부작용|가격|후기|성분|색상|특징)\s*(?:장단점|어때|추천해줘|분석해줘|알려줘|있나요|좋아\??|어떤가요|비교해줘|평가해줘|후기\s*알려줘).*",
+    r"(?:의\s*)?(?:발림성|지속력|수분감|장단점|커버력|밀착력|효과|부작용|가격|후기|성분|색상|특징|촉촉함|각질부각|요철부각|들뜸|밀림|다크닝|뭉침|가루날림|건조함|번짐)\s*(?:장단점|어때|추천해줘|분석해줘|알려줘|있나요|좋아\??|어떤가요|비교해줘|평가해줘|후기\s*알려줘).*",
     r"\s*(?:장단점\s*)?(?:분석해줘|추천해줘|알려줘|어때\??|있나요\??|어떤가요\??|비교해줘|평가해줘|어떻습니까\??|골라줘|써보신분|어떤게\s*좋아\??).*",
-    r"(?:의\s*)?(?:장단점|발림성|지속력|수분감|커버력|밀착력|순함|효과)\s*$",
+    r"(?:의\s*)?(?:장단점|발림성|지속력|수분감|커버력|밀착력|순함|효과|촉촉함|각질부각)\s*$",
     r"\s*(?:에\s*대해|에\s*관해|관련해서|대해서)\s*.*$"
 ]
+
 
 
 class HybridEntityNormalizer:
@@ -147,6 +160,42 @@ class HybridEntityNormalizer:
             is_discovery = True
             intent = QueryIntentEnum.FEATURE_DISCOVERY
 
+        # 6.5) 시리즈/라인명 퍼지 매칭 검사 (Spec 038 FR-001)
+        is_series_query = False
+        series_keyword = None
+        series_candidates: List[Dict[str, Any]] = []
+
+        # 시리즈 키워드 탐지
+        detected_series_token = None
+        for sk in BEAUTY_SERIES_KEYWORDS:
+            if sk in query:
+                detected_series_token = sk
+                break
+
+        if not detected_series_token and target_candidate and extracted_brand:
+            # 브랜드명을 제외한 나머지 단어가 시리즈명일 가능성 검사
+            rem = target_candidate.replace(extracted_brand, "").strip()
+            # 카테고리 단어 제거 (예: "센슈얼 립" -> "센슈얼")
+            for cat_aliases in BEAUTY_CATEGORY_KEYWORDS.values():
+                for alias in cat_aliases:
+                    if rem.endswith(alias) or rem.startswith(alias):
+                        rem = rem.replace(alias, "").strip()
+            if len(rem) >= 2:
+                detected_series_token = rem
+
+        if detected_series_token:
+            candidates = tool_search_series_candidates(
+                series_keyword=detected_series_token,
+                brand=extracted_brand,
+                category=extracted_category,
+                limit=3,
+            )
+            if len(candidates) >= 2:
+                is_series_query = True
+                series_keyword = detected_series_token
+                series_candidates = candidates
+                intent = QueryIntentEnum.COMPARISON
+
         # 7) 축약 식별명(Short Target Name) 생성
         short_name = None
         if target_candidate:
@@ -158,7 +207,7 @@ class HybridEntityNormalizer:
                 short_name = target_candidate
 
         confidence = 0.90 if target_candidate and len(target_candidate) >= 3 else 0.60
-        if is_discovery:
+        if is_discovery or is_series_query:
             confidence = 0.95
 
         return NormalizedQueryEntity(
@@ -170,9 +219,13 @@ class HybridEntityNormalizer:
             short_target_name=short_name,
             intent=intent,
             is_discovery=is_discovery,
+            is_series_query=is_series_query,
+            series_keyword=series_keyword,
+            series_candidates=series_candidates,
             parsing_source="KIWI_FAST_PATH",
             catalog_confidence=confidence,
         )
+
 
     def _slm_fallback_normalize(self, query: str, fast_result: NormalizedQueryEntity) -> Optional[NormalizedQueryEntity]:
         """Stage 2: Qwen 2B SLM 구조화 파싱 Fallback (<60ms)."""

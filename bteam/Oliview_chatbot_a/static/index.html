@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Oliview - 올리브영 화장품 리뷰 분석 챗봇</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/mobile.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Section -->
+    <header class="app-header">
+      <h1 class="app-title">🌿 Oliview</h1>
+      <p class="app-subtitle">올리브영 실제 구매자 리뷰 기반 AI 화장품 분석 어시스턴트</p>
+    </header>
+
+    <!-- Top Configuration & 1-Click Panel (Desktop 2-Column [1.6 : 1.4] / Mobile Horizontal Carousel) -->
+    <section class="top-panel" id="topPanel">
+      <div class="panel-column left-panel">
+        <div class="panel-title">
+          <span>🎯 분석 가이드 & 지원 범위</span>
+        </div>
+
+        <div class="section-label">🌿 지원 브랜드</div>
+        <div class="brand-box">
+          <span class="brand-chip" data-brand="차앤박">차앤박</span>
+          <span class="brand-chip" data-brand="식물나라">식물나라</span>
+          <span class="brand-chip" data-brand="브링그린">브링그린</span>
+          <span class="brand-chip" data-brand="헤라">헤라</span>
+          <span class="brand-chip" data-brand="롬앤">롬앤</span>
+          <span class="brand-chip" data-brand="컬러그램">컬러그램</span>
+        </div>
+
+        <div class="section-label">🏷️ 카테고리 선택</div>
+        <div class="category-pills" id="categoryPills">
+          <button class="cat-pill active" data-cat="스킨케어">스킨케어</button>
+          <button class="cat-pill" data-cat="클렌징">클렌징</button>
+          <button class="cat-pill" data-cat="선케어">선케어</button>
+          <button class="cat-pill" data-cat="립메이크업">립메이크업</button>
+          <button class="cat-pill" data-cat="베이스메이크업">베이스메이크업</button>
+        </div>
+
+        <div class="attribute-card" id="attributeCard">
+          <div class="attribute-card-title" id="attributeCardTitle">스킨케어 주요 분석 속성</div>
+          <div class="attribute-box" id="attributeBox">
+            <!-- Dynamic attribute chips -->
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-column right-panel">
+        <div class="panel-title">
+          <span>💡 질문 예시 (1-Click 실행)</span>
+        </div>
+        <div class="example-queries" id="exampleQueries">
+          <!-- Dynamic 1-Click Example Query Buttons -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Chat Messages Container -->
+    <main class="chat-container" id="chatContainer">
+      <div class="chat-messages" id="chatMessages">
+        <!-- Initial Welcome Message -->
+        <div class="message-wrapper assistant-wrapper">
+          <div class="avatar assistant-avatar">🌿</div>
+          <div class="message-bubble assistant-bubble">
+            <p>안녕하세요! 올리브영 실제 리뷰 분석 AI <strong>올리뷰</strong>입니다. 💚</p>
+            <p>화장품의 발림성, 촉촉함, 각질부각, 지속력 등 실제 구매자 후기가 궁금한 제품이나 시리즈를 질문해 주세요!</p>
+            <p class="welcome-tip">💡 예: <em>"헤라 센슈얼 립 촉촉함과 각질부각 분석해줘"</em> 또는 <em>"차앤박 프로폴리스 앰플 장단점 알려줘"</em></p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Fixed Input Bar (Backdrop Blur, 1200px max-width, Thumb-Zone Safe Area) -->
+    <footer class="bottom-bar-wrapper">
+      <div class="bottom-bar-container">
+        <form class="chat-input-form" id="chatForm">
+          <textarea
+            id="chatInput"
+            class="chat-input"
+            rows="1"
+            placeholder="화장품 질문을 입력하세요 (예: 헤라 센슈얼 립 촉촉함과 각질부각 분석해줘)"
+            autocomplete="off"
+          ></textarea>
+          <div class="action-buttons">
+            <button type="button" id="stopBtn" class="btn-stop hidden" title="생성 중단">⏹️</button>
+            <button type="submit" id="sendBtn" class="btn-send" title="전송">전송 🚀</button>
+          </div>
+        </form>
+      </div>
+    </footer>
+
+    <!-- Mobile Bottom Sheet Drawer (Spec 038 2026 Mobile UX) -->
+    <div class="bottom-sheet-overlay" id="bottomSheetOverlay">
+      <div class="bottom-sheet-drawer" id="bottomSheetDrawer">
+        <div class="bottom-sheet-handle-bar">
+          <div class="bottom-sheet-handle"></div>
+        </div>
+        <div class="bottom-sheet-header">
+          <h3 class="bottom-sheet-title" id="bottomSheetTitle">📚 참조 리뷰 상세</h3>
+          <button class="bottom-sheet-close" id="bottomSheetClose">✕</button>
+        </div>
+        <div class="bottom-sheet-body" id="bottomSheetBody">
+          <!-- Dynamic Review Details & Olive Young Link -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/chat_ui.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
