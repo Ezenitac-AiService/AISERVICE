@@ -31,6 +31,8 @@
   **A**: **Option A 채택** — 백엔드 연결 끊김 자동 감지(`request.is_disconnected()`)와 함께 UI 상태창에 명시적 `[대기 취소]` 버튼을 제공하여, 취소 즉시 게이트웨이 대기 큐에서 안전하게 방출하고 GPU 자원을 즉시 회수한다.
 - **Q**: 동일한 클라이언트/세션에서 중복 요청(동일 질의 재시도/더블 클릭)이 연속 인입될 때 게이트웨이는 어떻게 처리할 것인가요?  
   **A**: **Option A 채택 (Request Coalescing & Idempotency)** — 동일 세션/동일 질의(`session_id` + `prompt_hash` 또는 `Idempotency-Key`)가 큐 대기 또는 추론 중일 때, 신규 GPU 슬롯을 중복 할당하지 않고 기존 큐 티켓 스트림에 멀티플렉싱 재연결(Coalescing)하여 단일 GPU 자원 낭비를 원천 차단한다.
+- **Q**: 단일 GPU 환경(8~11GB VRAM)에서 모델 게이트웨이의 최대 동시 LLM 추론 슬롯(`max_concurrent_slots`) 기본값을 어떻게 설정할 것인가요?  
+  **A**: **가변 슬롯(Variable-Slot) 아키텍처 + 현재 단일 슬롯(`active_slots=1`) 기본 운영** — 향후 고사양 GPU/멀티 GPU 확장을 고려하여 큐 스케줄러 자체는 가변 슬롯 구조로 설계하되, 현재 하드웨어(단일 GPU) 및 VRAM 프로필 환경에서는 기본값을 `active_slots=1`로 운영하여 안정성(OOM 0%)을 확보하고 환경변수(`MAX_GPU_CONCURRENT_SLOTS`) 및 VRAM 프로필에 따라 동적으로 확장 가능하도록 구성한다.
 
 ---
 
@@ -76,6 +78,7 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 - **클라이언트 중도 이탈(Disconnect)**: 큐에 대기 중이던 클라이언트가 브라우저 탭을 닫으면, 게이트웨이가 `request.is_disconnected()`를 감지하여 즉시 큐에서 제거하고 GPU 자원 낭비를 방지한다.
 - **예상치 못한 GPU 크래시/OOM**: 큐 대기 중 백엔드 엔진이 비정상 종료될 경우, 게이트웨이가 재기동(Self-healing) 상태를 클라이언트에 알리고 대기 시간을 보정한다.
 - **최대 큐 용량 초과**: 큐 대기 수가 안전 한계치(예: 30개)를 초과할 경우, 무한 대기 대신 HTTP 429 (Retry-After)로 안전하게 차단한다.
+- **네트워크 재시도/더블 클릭**: 동일 질의가 동시 인입될 때 Request Coalescing으로 기존 스트림에 단일 병합.
 
 ---
 
@@ -83,7 +86,7 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 
 ### Functional Requirements
 
-* **FR-001 (Gateway Queue Controller)**: 모델 게이트웨이(`model_gateway`)는 단일 GPU 동시 처리 한도(기본 `active_slots=1~2`)를 초과하는 요청에 대해 비동기 우선순위 대기 큐(`AsyncFairQueue`)를 운영해야 한다.
+* **FR-001 (Gateway Variable-Slot Queue Controller)**: 모델 게이트웨이(`model_gateway`)는 가변 슬롯(Variable Slots) 확장이 가능한 비동기 우선순위 대기 큐(`AsyncFairQueue`)를 구축해야 하며, 현재 단일 GPU 환경에서는 OOM 0% 안전성을 위해 기본 동시 처리 한도를 `active_slots=1`로 설정하고 환경변수(`MAX_GPU_CONCURRENT_SLOTS`) 또는 VRAM 프로필에 따라 동적으로 슬롯 확장이 가능해야 한다.
 * **FR-002 (SSE Keep-Alive & Queue Update)**: 게이트웨이는 요청이 큐에 진입한 즉시 HTTP 200 SSE 스트림을 오픈하고, 순번 변동 시 즉시(Event-Driven) 또는 최대 3~5초 간격으로 `event: queue_status`를 전송하며, 대기 중 무응답 방지를 위해 15초 주기로 `: keepalive\n\n` 하트비트를 클라이언트에 지속 전송해야 한다.
 * **FR-003 (Queue Status Payload)**: `queue_status` 이벤트는 `queue_position`(대기 순번, 정수), `estimated_wait_sec`(예상 대기 초, 실수), `active_requests`(현재 연산 중인 요청 수), `timestamp` 필드를 포함해야 한다.
 * **FR-004 (Client Sliding Inactivity Timeout)**: 챗봇 코어 클라이언트(`AiGatewayClient`)는 고정 타이머 대신 **마지막 패킷 수신 기준 무응답(Inactivity) 타임아웃(15초)**을 적용하여, 하트비트나 큐 이벤트가 수신되는 동안에는 총 대기 시간이 길어지더라도 타임아웃 없이 대기 리스를 자동 연장해야 한다.
