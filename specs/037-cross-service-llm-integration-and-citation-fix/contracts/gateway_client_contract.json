@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GatewayClientContract",
+  "description": "Standardized contract for A-Team and B-Team client requests to Model Gateway",
+  "type": "object",
+  "required": ["model", "messages", "stream"],
+  "properties": {
+    "model": {
+      "type": "string",
+      "enum": ["qwen3.5-2b", "qwen3.5-4b"],
+      "description": "Target serving model (2B 64K resident or 4B 32K batch)"
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["system", "user", "assistant"]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "max_tokens": {
+      "type": "integer",
+      "default": 4096,
+      "minimum": 1,
+      "maximum": 8192
+    },
+    "temperature": {
+      "type": "number",
+      "default": 0.3,
+      "minimum": 0.0,
+      "maximum": 2.0
+    },
+    "top_p": {
+      "type": "number",
+      "default": 0.85,
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Nucleus sampling cumulative probability mass"
+    },
+    "repetition_penalty": {
+      "type": "number",
+      "default": 1.05,
+      "minimum": 1.0,
+      "maximum": 2.0
+    },
+    "stream": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

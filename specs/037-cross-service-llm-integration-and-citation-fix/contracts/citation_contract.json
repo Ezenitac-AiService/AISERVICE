@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReviewCitationContract",
+  "description": "Schema for structured review citations and UI accordion metadata",
+  "type": "object",
+  "required": ["citation_tag", "target_product_name", "review_id", "rating", "snippet", "rerank_score"],
+  "properties": {
+    "citation_tag": {
+      "type": "string",
+      "pattern": "^\\[([^\\]]+)\\]$",
+      "description": "Inline markdown bracket citation, e.g. [리뷰 1], [컬러그램 꿀로스 리뷰 2], [Turn 1 리뷰 1]"
+    },
+    "target_product_name": {
+      "type": "string"
+    },
+    "turn_index": {
+      "type": ["integer", "null"],
+      "default": null
+    },
+    "review_id": {
+      "type": "string"
+    },
+    "rating": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "product_option": {
+      "type": "string"
+    },
+    "snippet": {
+      "type": "string"
+    },
+    "rerank_score": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    }
+  }
+}

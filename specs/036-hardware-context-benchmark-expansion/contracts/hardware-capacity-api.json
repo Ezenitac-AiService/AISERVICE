@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HardwareCapacityProfileResponse",
+  "description": "API Schema for GET /v1/hardware/capacity and /v1/profile",
+  "type": "object",
+  "required": [
+    "tier",
+    "device_name",
+    "total_vram_mb",
+    "free_vram_mb",
+    "resident_model",
+    "batch_model",
+    "resident_standard_n_ctx",
+    "resident_ultra_n_ctx",
+    "batch_standard_n_ctx",
+    "measured_resident_tps",
+    "measured_resident_ttft_ms"
+  ],
+  "properties": {
+    "tier": {
+      "type": "string",
+      "enum": ["BASELINE_8GB", "MID_16GB_24GB", "HIGH_48GB_PLUS"]
+    },
+    "device_name": {
+      "type": "string",
+      "example": "NVIDIA GeForce GTX 1070"
+    },
+    "compute_capability": {
+      "type": "number",
+      "example": 6.1
+    },
+    "total_vram_mb": {
+      "type": "integer",
+      "example": 8192
+    },
+    "free_vram_mb": {
+      "type": "integer",
+      "example": 6855
+    },
+    "resident_model": {
+      "type": "string",
+      "example": "qwen3.5-2b"
+    },
+    "batch_model": {
+      "type": "string",
+      "example": "qwen3.5-4b"
+    },
+    "resident_standard_n_ctx": {
+      "type": "integer",
+      "example": 65536
+    },
+    "resident_ultra_n_ctx": {
+      "type": "integer",
+      "example": 131072
+    },
+    "batch_standard_n_ctx": {
+      "type": "integer",
+      "example": 32768
+    },
+    "measured_resident_tps": {
+      "type": "number",
+      "example": 53.98
+    },
+    "measured_resident_ttft_ms": {
+      "type": "number",
+      "example": 189.8
+    }
+  }
+}
