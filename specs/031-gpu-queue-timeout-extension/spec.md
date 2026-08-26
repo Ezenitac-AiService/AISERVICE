@@ -24,6 +24,12 @@
 3. **Tenant-Aware Fair Queuing (공정 큐잉 - DRR / Fair-Share)**:
    * 단순 FIFO 대신 서비스 테넌트(Chat A, Chat B) 간 가중치 공정 큐잉을 적용하여, 한 서비스의 대량 요청이 다른 서비스의 단일 요청을 독점 차단(Starvation)하지 않도록 보장합니다.
 
+## Clarifications
+
+### Session 2026-08-26
+- **Q**: GPU 대기 큐에서 대기 중인 사용자가 요청을 중도 포기할 때, 클라이언트 UI 및 게이트웨이의 취소 처리 방식을 어떻게 구성할 것인가요?  
+  **A**: **Option A 채택** — 백엔드 연결 끊김 자동 감지(`request.is_disconnected()`)와 함께 UI 상태창에 명시적 `[대기 취소]` 버튼을 제공하여, 취소 즉시 게이트웨이 대기 큐에서 안전하게 방출하고 GPU 자원을 즉시 회수한다.
+
 ---
 
 ## 2. User Scenarios & Testing *(mandatory)*
@@ -79,10 +85,10 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 * **FR-002 (SSE Keep-Alive & Queue Update)**: 게이트웨이는 요청이 큐에 진입한 즉시 HTTP 200 SSE 스트림을 오픈하고, 순번 변동 시 즉시(Event-Driven) 또는 최대 3~5초 간격으로 `event: queue_status`를 전송하며, 대기 중 무응답 방지를 위해 15초 주기로 `: keepalive\n\n` 하트비트를 클라이언트에 지속 전송해야 한다.
 * **FR-003 (Queue Status Payload)**: `queue_status` 이벤트는 `queue_position`(대기 순번, 정수), `estimated_wait_sec`(예상 대기 초, 실수), `active_requests`(현재 연산 중인 요청 수), `timestamp` 필드를 포함해야 한다.
 * **FR-004 (Client Sliding Inactivity Timeout)**: 챗봇 코어 클라이언트(`AiGatewayClient`)는 고정 타이머 대신 **마지막 패킷 수신 기준 무응답(Inactivity) 타임아웃(15초)**을 적용하여, 하트비트나 큐 이벤트가 수신되는 동안에는 총 대기 시간이 길어지더라도 타임아웃 없이 대기 리스를 자동 연장해야 한다.
-* **FR-005 (Chat A Streamlit Queue UX)**: `StreamlitGraphAdapter` 및 `06.02.app.py`는 `queue_status` 수신 시 `st.status()` 상태 라벨을 `⏳ GPU 대기 중 (순번 N번, 약 T초 예상)`으로 실시간 업데이트해야 한다.
-* **FR-006 (Chat B Web UI Queue UX)**: `project_ragapi.py` 및 `index.html`은 `queue_status` 수신 시 타임라인 상단 뱃지를 `⏳ 대기 순번: N번 (예상 T초)`으로 실시간 변경하고 대기 애니메이션을 유지해야 한다.
+* **FR-005 (Chat A Streamlit Queue UX & Cancel)**: `StreamlitGraphAdapter` 및 `06.02.app.py`는 `queue_status` 수신 시 `st.status()` 상태 라벨을 `⏳ GPU 대기 중 (순번 N번, 약 T초 예상)`으로 실시간 업데이트하며, 사용자가 즉시 대기를 중단할 수 있는 취소 인터랙션을 제공해야 한다.
+* **FR-006 (Chat B Web UI Queue UX & Cancel)**: `project_ragapi.py` 및 `index.html`은 `queue_status` 수신 시 타임라인 상단 뱃지를 `⏳ 대기 순번: N번 (예상 T초)`으로 실시간 변경하고 `[대기 취소]` 버튼을 제공해야 한다.
 * **FR-007 (Tenant Fair Scheduling)**: 게이트웨이 스케줄러는 요청 헤더(`X-Tenant-Id` 또는 클라이언트 식별자)를 기반으로 Deficit Round Robin(DRR) 공정 큐잉을 적용하여 서비스 간 기아를 방지해야 한다.
-* **FR-008 (Client Disconnect Purge)**: 큐에 대기 중인 요청의 클라이언트 연결이 끊어지면, 게이트웨이는 해당 요청을 큐에서 즉시 제거(Purge)해야 한다.
+* **FR-008 (Client Disconnect & Manual Cancel Purge)**: 큐에 대기 중인 요청의 클라이언트 연결이 끊어지거나 사용자가 취소 버튼을 클릭하면, 게이트웨이는 `request.is_disconnected()` 또는 취소 신호를 감지하여 해당 요청을 큐에서 1.0초 이내에 즉시 제거(Purge)하고 GPU 자원을 회수해야 한다.
 * **FR-009 (Max Queue Capacity Guard)**: 큐 크기가 임계치(기본 30건)를 초과할 경우 즉시 HTTP 429(Too Many Requests)와 `Retry-After: 5`를 반환해야 한다.
 * **FR-010 (Hot-Swap / Non-Streaming Compatibility)**: 비스트리밍 단일 요청(`stream=false`)의 경우에도 큐 진입 시 `X-Queue-Position` 헤더 또는 폴링/SSE 업그레이드 지원을 통해 타임아웃을 안전하게 관리해야 한다.
 
