@@ -1,4 +1,4 @@
-# Research: Unified CPU & GPU Hardware Evaluation Checklist (Pascal to Blackwell)
+# Research: 3-Axis Decoupled Hardware Evaluation Engine (Architecture vs VRAM vs CPU)
 
 **Feature**: `034-audit-config-oom-guards`  
 **Date**: 2026-08-26  
@@ -6,46 +6,53 @@
 
 ---
 
-## 1. 통합 CPU & GPU 하드웨어 평가 체크리스트 (Unified Hardware Checklist)
+## 1. 3대 직교 독립 하드웨어 결정 축 (3-Axis Decoupled Evaluation Engine)
 
-실제 배포 환경에서 시스템은 CPU와 GPU를 각각 단편적으로 보지 않고, **CPU 명령어 지원(AVX/AVX2)과 GPU 아키텍처(Pascal~Blackwell, VRAM, Tensor Core)를 종합 평가하는 통합 체크리스트**를 통해 최적의 런타임/빌드 구성을 도출합니다.
+GPU 모델명이나 고정된 번들은 예시일 뿐이며, 실제 시스템은 **(1) GPU 아키텍처 세대(SM)**, **(2) 물리 VRAM 용량**, **(3) CPU 명령어 세트**라는 3개의 독립 변수를 런타임에 각각 실측하여 최적 서빙 파라미터를 수학적으로 합성합니다.
 
 ```text
 ======================================================================================================================================================
-[평가 축 1] GPU 아키텍처 및 VRAM 평가 (GPU Evaluation Matrix)
+[축 1] GPU 아키텍처 세대 평가 (CUDA Compute Capability 기반 - VRAM 용량과 완전 독립)
 ======================================================================================================================================================
-GPU 모델 (대표)       아키텍처          CUDA SM    VRAM 용량   Tensor Cores   FP16/BF16/FP8/FP4   FlashAttn-3/4   KV 양자화 권장   권장 모델 & 동적 컨텍스트
+CUDA SM    대표 아키텍처         Tensor Cores     네이티브 데이터 타입     FlashAttention    권장 KV Cache 양자화 타입
 ------------------------------------------------------------------------------------------------------------------------------------------------------
-GTX 1070 (노말)       Pascal           SM 6.1     8 GB        없음 (None)    FP32 표준           ❌ 미지원        Q8_0 KV Cache   Qwen 3.5 2B @ 16K ~ 32K
-GTX 1080 Ti          Pascal           SM 6.1     11 GB       없음 (None)    FP32 표준           ❌ 미지원        Q8_0 KV Cache   Qwen 3.5 4B @ 32K ~ 48K
-RTX 2080 (노말)       Turing           SM 7.5     8 GB        1세대 텐서     FP16 네이티브       ⚠️ 생략권장      Q8_0 KV Cache   Qwen 3.5 2B @ 32K
-RTX 3060 12GB        Ampere           SM 8.6     12 GB       2세대 텐서     FP16/BF16/TF32      ✅ 완전지원      Q8_0 or FP16    Qwen 3.5 4B @ 64K (초장문)
-RTX 4080 (노말)       Ada Lovelace     SM 8.9     16 GB       3세대 텐서     FP16/BF16/FP8       ✅ 완전지원      FP8 / Q8_0      Qwen 3.5 4B @ 128K / 9B @ 32K
-RTX 5060Ti (16GB)    Blackwell        SM 12.0    16 GB       4/5세대 텐서   FP16/BF16/FP8/FP4   ✅ FA-3/4 (TMA)  FP4 / FP8 / Q8  Qwen 3.5 4B @ 128K / 9B @ 64K
-RTX 5080 (16/24G)    Blackwell        SM 12.0    16~24 GB    4/5세대 텐서   FP16/BF16/FP8/FP4   ✅ FA-3/4 (TMA)  FP4 / FP8 / Q8  Qwen 3.5 9B @ 128K (플래그십)
+SM 6.1     Pascal (GTX 10xx)     없음 (None)      FP32 표준 (FP16 느림)   ❌ 미지원 (생략)   Q8_0 KV Cache (50% 절감)
+SM 7.5     Turing (RTX 20xx)     1세대 텐서 코어  FP16 네이티브 (1:1)     ⚠️ 생략권장        Q8_0 KV Cache
+SM 8.6     Ampere (RTX 30xx)     2세대 텐서 코어  FP16/BF16/TF32          ✅ FA-2/3 완전지원 Q8_0 or FP16 KV Cache
+SM 8.9     Ada (RTX 40xx)        3세대 텐서 코어  FP16/BF16/FP8 (TE)      ✅ FA-3 완전지원   FP8 KV Cache (50% 절감)
+SM 12.0    Blackwell (RTX 50xx)  4/5세대 텐서     FP16/BF16/FP8/FP4(TMA)  ✅ FA-3/4 (TMA)    FP4 / FP8 KV Cache (75% 절감)
 ======================================================================================================================================================
-* BGE 임베딩(706MB) + BGE 리랭커(706MB) = 1.4GB는 전 플랫폼에서 100% GPU VRAM 상주 고정.
 
 ======================================================================================================================================================
-[평가 축 2] CPU 명령어 세트 평가 (CPU Evaluation Rules)
+[축 2] 물리 VRAM 예산 및 동적 모델/컨텍스트 사이징 (물리 VRAM MB 기반 - 아키텍처와 독립)
+* 수식: V_KV_Budget = V_Total - V_OS(3.7G) - V_BGE(1.4G) - V_Margin - W_Model
 ======================================================================================================================================================
-CPU 명령어 세트 분류     대표 CPU 예시                           통합 체크리스트 평가 및 런타임 정책
+물리 VRAM 용량      권장 기본 상주 모델     [축 1] KV 양자화 타입별 동적 컨텍스트 윈도우 (n_ctx)
 ------------------------------------------------------------------------------------------------------------------------------------------------------
-1. AVX 미지원 CPU        Intel Core i7 930 (1세대 Nehalem 등)    - CPU 신경망 연산 극심한 병목 방지
-                                                                 - 정책: 100% GPU VRAM 상주 (-ngl 999) 강제, CPU BLAS 연산 차단
-2. AVX2 지원 CPU         Intel Core i7 7th~14th, Core Ultra 등   - 고속 토큰 직렬화 및 PCIe DMA 버퍼 전송 가속 활성화
+8 GB (4060, 5060 등) Qwen 3.5 2B             Q8_0: 16K ~ 32K  |  FP8: 32K ~ 48K  |  FP4: 64K ~ 128K
+11 GB (1080Ti 등)    Qwen 3.5 4B             Q8_0: 32K ~ 48K
+12 GB (3060 등)      Qwen 3.5 4B             Q8_0: 64K (초장문) |  FP16: 32K ~ 48K
+16 GB (4080, 5060Ti) Qwen 3.5 4B / 9B        FP8: 4B @ 128K / 9B @ 32K  |  FP4: 9B @ 64K ~ 128K
+24 GB+ (5080/4090)   Qwen 3.5 9B (플래그십)  FP8/FP4: 9B @ 128K (초대용량 컨텍스트)
+======================================================================================================================================================
+* BGE 2종(1.4GB)은 8GB~24GB 전 플랫폼에서 100% GPU VRAM 상주 고정.
+
+======================================================================================================================================================
+[축 3] CPU 명령어 세트 평가 (AVX/AVX2 유무 - GPU와 독립)
+======================================================================================================================================================
+1. AVX 미지원 CPU (i7 930 등): 100% GPU VRAM 상주 (-ngl 999) 강제, CPU BLAS 연산 배제.
+2. AVX2 지원 CPU (최신 Intel/AMD): 고속 토큰 직렬화 및 PCIe DMA 버퍼 전송 가속 활성화.
 ======================================================================================================================================================
 ```
 
 ---
 
-## 2. 통합 하드웨어 프로파일링 합성 엔진 (Integrated Profiling Engine)
+## 2. 하드웨어 조합 합성 사례 (Arbitrary Combination Synthesis)
 
-1. **CPU & GPU 동시 감지 (`detect_hardware_capabilities()`)**:
-   - `cpuinfo`를 통해 CPU의 `avx`, `avx2`, `fma` 지원 여부를 검사.
-   - `pynvml`을 통해 GPU의 `compute_capability`, `total_vram_mb`, `free_vram_mb`를 검사.
-2. **최적화 플래그 및 모델/컨텍스트 자동 결정**:
-   - `use_flash_attn = (gpu.compute_capability >= 8.0)`
-   - `force_all_gpu_layers = (not cpu.has_avx2)` (AVX 미지원 시 `-ngl 999` 강제)
-   - `kv_cache_type = "fp4"` (Blackwell) / `"fp8"` (Ada) / `"q8_0"` (Pascal/Turing/Ampere)
-   - `dynamic_n_ctx = calculate_dynamic_context_window(gpu.total_vram_mb, kv_cache_type)`
+* **사례 A: RTX 4060 (Ada SM 8.9, 3세대 텐서, 8GB VRAM) + 최신 i5 CPU**:
+  - 축 1: `FlashAttention-3 = True`, `KV_Type = FP8`
+  - 축 2: 8GB 예산 $\rightarrow$ 2B 모델 선정, FP8 KV 캐시 적용으로 **2B @ 48K** 컨텍스트 확보!
+  - 축 3: AVX2 활성화.
+* **사례 B: RTX 5060 (Blackwell SM 12.0, 5세대 텐서, 8GB VRAM) + i7 CPU**:
+  - 축 1: `FlashAttention-4 = True`, `KV_Type = FP4`
+  - 축 2: 8GB 예산이지만 FP4 KV 캐시(75% 절감) 덕분에 **2B @ 128K** 또는 **4B @ 16K** 확보!
