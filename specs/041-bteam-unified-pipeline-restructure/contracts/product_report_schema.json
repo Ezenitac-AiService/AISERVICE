@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProductReportSchema",
+  "type": "object",
+  "description": "Structured JSON & Markdown schema for generated LLM executive improvement reports",
+  "properties": {
+    "report_id": { "type": "integer" },
+    "product_id": { "type": "string" },
+    "product_name": { "type": "string" },
+    "brand_name": { "type": "string" },
+    "category": { "type": "string" },
+    "total_reviews_analyzed": { "type": "integer" },
+    "aspect_summary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "positive_count": { "type": "integer" },
+          "negative_count": { "type": "integer" },
+          "neutral_count": { "type": "integer" },
+          "positive_ratio": { "type": "number" }
+        },
+        "required": ["positive_count", "negative_count", "positive_ratio"]
+      }
+    },
+    "key_complaints": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "key_praises": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "improvement_suggestions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "markdown_report": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "product_id",
+    "product_name",
+    "total_reviews_analyzed",
+    "aspect_summary",
+    "improvement_suggestions",
+    "markdown_report"
+  ]
+}

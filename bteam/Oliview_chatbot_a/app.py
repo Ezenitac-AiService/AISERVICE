@@ -212,6 +212,42 @@ st.markdown(
         transform: translateY(-1px) !important;
     }
 
+    /* Category Selection 3x2 Grid: Universal Flex Rule for all viewports */
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"],
+    div[data-testid="stHorizontalBlock"]:has(button[key*="cat_btn"]) {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        margin-bottom: 6px !important;
+        width: 100% !important;
+    }
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] > div,
+    div[data-testid="stHorizontalBlock"]:has(button[key*="cat_btn"]) > div {
+        min-width: 0 !important;
+        width: calc(33.333% - 4px) !important;
+        max-width: calc(33.333% - 4px) !important;
+        flex: 1 1 0% !important;
+    }
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] .stButton,
+    div[data-testid="stHorizontalBlock"]:has(button[key*="cat_btn"]) .stButton {
+        width: 100% !important;
+    }
+    div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] .stButton > button,
+    div[data-testid="stHorizontalBlock"]:has(button[key*="cat_btn"]) .stButton > button {
+        width: 100% !important;
+        min-height: 42px !important;
+        height: auto !important;
+        padding: 8px 2px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        touch-action: manipulation !important;
+        border-radius: 8px !important;
+    }
+
     /* Chat Messages */
     [data-testid="stChatMessage"] {
         padding: 6px 0 !important;
@@ -256,21 +292,39 @@ st.markdown(
         }
 
         /* Category Selection 3x2 Compact Responsive Grid Override */
+        div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"],
+        div[data-testid*="HorizontalBlock"] div[data-testid*="HorizontalBlock"],
+        div[data-testid*="HorizontalBlock"]:has(button[key*="cat_btn"]),
         div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             gap: 6px !important;
             margin-bottom: 6px !important;
+            width: 100% !important;
         }
-        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            flex: 1 1 0% !important;
+        div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"] > div,
+        div[data-testid*="HorizontalBlock"] div[data-testid*="HorizontalBlock"] > div,
+        div[data-testid*="HorizontalBlock"]:has(button[key*="cat_btn"]) > div,
+        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] > div {
             min-width: 0 !important;
-            width: auto !important;
+            width: calc(33.333% - 4px) !important;
+            max-width: calc(33.333% - 4px) !important;
+            flex: 1 1 0% !important;
         }
+        div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"] .stButton,
+        div[data-testid*="HorizontalBlock"] div[data-testid*="HorizontalBlock"] .stButton,
+        div[data-testid*="HorizontalBlock"]:has(button[key*="cat_btn"]) .stButton,
+        div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] .stButton {
+            width: 100% !important;
+        }
+        div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"] .stButton > button,
+        div[data-testid*="HorizontalBlock"] div[data-testid*="HorizontalBlock"] .stButton > button,
+        div[data-testid*="HorizontalBlock"]:has(button[key*="cat_btn"]) .stButton > button,
         div[data-testid="column"]:nth-of-type(1) div[data-testid="stHorizontalBlock"] .stButton > button {
+            width: 100% !important;
             font-size: 13px !important;
-            padding: 8px 4px !important;
+            padding: 8px 2px !important;
             min-height: 42px !important;
             touch-action: manipulation !important;
             white-space: nowrap !important;

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PipelineRunnerContract",
+  "type": "object",
+  "description": "CLI parameters and execution contract for unified data & AI pipeline runner",
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "description": "Target OliveYoung product goodsNo (or 'all' for full catalog batch)",
+      "default": "all"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["crawl", "split", "sentiment", "report", "index", "all"]
+      },
+      "default": ["all"]
+    },
+    "batch_size": {
+      "type": "integer",
+      "description": "DB transaction chunk size",
+      "default": 500,
+      "minimum": 10,
+      "maximum": 5000
+    },
+    "interval_hours": {
+      "type": "number",
+      "description": "Periodic background run interval in hours (0 for single run)",
+      "default": 0
+    },
+    "resume_on_failure": {
+      "type": "boolean",
+      "description": "Resume execution from last failed step checkpoint",
+      "default": true
+    }
+  },
+  "required": ["steps"]
+}
