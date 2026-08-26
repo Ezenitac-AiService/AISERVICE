@@ -1,4 +1,4 @@
-# Tasks: Audit, Zero-Hardcoding, and 6-Tier GPU Architecture (Pascal to Blackwell) OOM Hardening
+# Tasks: Audit, Zero-Hardcoding, and 6-Tier CPU-GPU Paired Architecture OOM Hardening
 
 **Input**: Design documents from `specs/034-audit-config-oom-guards/`  
 **Prerequisites**: [plan.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/plan.md), [spec.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/spec.md), [data-model.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/data-model.md), [research.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/research.md), [contracts/audit_integrity_contract.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/contracts/audit_integrity_contract.md)
@@ -9,40 +9,40 @@
 
 ---
 
-## Phase 1: Setup & 6-Tier GPU Architecture Specs Setup
+## Phase 1: Setup & 6-Tier CPU-GPU Architecture Specs Setup
 
-**Purpose**: 6대 타겟 GPU 세대(GTX 1070, GTX 1080Ti, RTX 2080, RTX 3060, RTX 4080, RTX 5060Ti/5080) 불변 스펙 룩업 테이블 및 정적 감사 스크립트 구축
+**Purpose**: 6대 타겟 CPU-GPU 플랫폼(Tier 1 i7 930+GTX 1070부터 Tier 6 최신 Intel+RTX 5000) 불변 스펙 룩업 테이블 및 정적 감사 스크립트 구축
 
 - [ ] T001 전사 소스코드 및 테스트 파일 대상 하드코딩 패턴(`qwen3.5-4b`, 포트, VRAM 상수) 정적 스캔 스크립트 작성 in `model_gateway/scripts/scan_hardcoding.py`
-- [ ] T002 [P] 6대 GPU 세대별(Pascal~Blackwell) 불변 스펙 룩업 테이블(`GPU_ARCHITECTURE_SPEC_TABLE`) 및 Pydantic v2 데이터 모델 정의 in `model_gateway/src/core/gpu_detector.py`
+- [ ] T002 [P] 6대 CPU-GPU 하드웨어 페어링 불변 스펙 룩업 테이블 및 Pydantic v2 데이터 모델 정의 in `model_gateway/src/core/gpu_detector.py`
 - [ ] T003 [P] `model_gateway/config/server_config.json` 및 `model_context_profiles.json`에 동적 VRAM 사이징 프로파일 스키마 동기화 in `model_gateway/config/server_config.json`
 
 ---
 
 ## Phase 2: Foundational & TDD Contract Tests
 
-**Purpose**: 6대 GPU 아키텍처 자동 감지, FlashAttn/Q8/FP8/FP4 플래그 주입, Anti-Shadowing TDD 단위 테스트 선행 작성
+**Purpose**: 6대 CPU-GPU 아키텍처 자동 감지, i7 930 `-ngl 999` 강제, FlashAttn/Q8/FP8 플래그 주입 TDD 단위 테스트 선행 작성
 
-- [ ] T004 [P] 6대 GPU(GTX 1070, 1080Ti, RTX 2080, 3060, 4080, 5060Ti/5080) 모의 주입 시 아키텍처 매칭 및 VRAM 사이징 단위 테스트 작성 in `model_gateway/tests/test_gpu_architecture_specs.py`
-- [ ] T005 [P] Compute Capability에 따른 FlashAttention 생략(SM 6.1/7.5) 및 자동 활성화(SM 8.6/8.9/12.0) 단위 테스트 작성 in `model_gateway/tests/test_hardware_aware_flags.py`
+- [ ] T004 [P] 6대 CPU-GPU 조합 모의 주입 시 아키텍처 매칭 및 VRAM 사이징 단위 테스트 작성 in `model_gateway/tests/test_gpu_architecture_specs.py`
+- [ ] T005 [P] i7 930(AVX 없음) 감지 시 `-ngl 999` 강제 및 FlashAttention 생략/활성화 단위 테스트 작성 in `model_gateway/tests/test_hardware_aware_flags.py`
 - [ ] T006 [P] 전사 설정 단일 진실 소스(`ConfigManager`) 반환값 일관성 및 Anti-Shadowing 단위 테스트 작성 in `model_gateway/tests/test_config_hierarchy.py`
 
 **Checkpoint**: Foundational TDD 테스트 구축 완료 ➔ 사용자 스토리 구현 착수
 
 ---
 
-## Phase 3: User Story 1 (Priority: P1) - 6대 GPU 세대별 자율 하드웨어 감지 & 최적 서빙 엔진 🎯 MVP
+## Phase 3: User Story 1 (Priority: P1) - 6대 CPU-GPU 페어링 자율 하드웨어 감지 & 최적 서빙 엔진 🎯 MVP
 
-**Goal**: GPU Compute Capability와 물리 VRAM을 실측하여 6대 세대별 불변 체크리스트에 따라 플래그, 모델, 컨텍스트 크기를 100% 자동 구성
+**Goal**: CPU 명령어 세트(AVX 유무)와 GPU Compute Capability 및 물리 VRAM을 실측하여 6대 세대별 불변 체크리스트에 따라 플래그, 모델, 컨텍스트 크기를 100% 자동 구성
 
-**Independent Test**: 모의 GPU 스펙(SM 6.1, SM 7.5, SM 8.6, SM 8.9, SM 12.0)을 주입하여 `detect_gpu_capabilities()`가 반환하는 플래그와 모델이 6대 매트릭스와 정확히 일치하는지 검증
+**Independent Test**: 모의 하드웨어 스펙(i7 930+GTX 1070, i7+GTX 1080Ti, i7+RTX 3060, Ultra+RTX 5080)을 주입하여 `detect_hardware_capabilities()`가 반환하는 플래그와 모델이 6대 매트릭스와 정확히 일치하는지 검증
 
-- [ ] T007 [P] [US1] `gpu_detector.py`에 PyNVML 기반 Compute Capability 실측 및 `detect_gpu_capabilities()` 룩업 매칭 로직 구현 in `model_gateway/src/core/gpu_detector.py`
+- [ ] T007 [P] [US1] `gpu_detector.py`에 CPU AVX 실측 및 GPU Compute Capability/VRAM 실측 기반 `detect_hardware_capabilities()` 룩업 매칭 로직 구현 in `model_gateway/src/core/gpu_detector.py`
 - [ ] T008 [US1] `ConfigManager`에 VRAM 예산 수식 기반 `calculate_dynamic_context_window()` 및 동적 프로파일링 메서드 구현 in `model_gateway/src/core/config_manager.py`
-- [ ] T009 [US1] `process_manager.py`의 `build_server_command`에서 세대별 최적 플래그(SM 6.1 Q8 KV, SM 8.6+ FlashAttn, SM 12.0 FP4/FP8, `-ngl 999`) 자동 주입 구현 in `model_gateway/src/core/process_manager.py`
-- [ ] T010 [US1] `GET /v1/profile` 엔드포인트에 `architecture`, `features`, `dynamic_n_ctx_max` 필드 연동 in `model_gateway/src/api/routes/inference_api.py`
+- [ ] T009 [US1] `process_manager.py`의 `build_server_command`에서 세대별 최적 플래그(i7 930 `-ngl 999`, SM 6.1 Q8 KV, SM 8.6+ FlashAttn, SM 12.0 FP4/FP8) 자동 주입 구현 in `model_gateway/src/core/process_manager.py`
+- [ ] T010 [US1] `GET /v1/profile` 엔드포인트에 `gpu_features`, `cpu_features`, `dynamic_n_ctx_max` 필드 연동 in `model_gateway/src/api/routes/inference_api.py`
 
-**Checkpoint**: User Story 1 (MVP) 완결 ➔ 6대 GPU 세대별 자율 서빙 엔진 정상 작동
+**Checkpoint**: User Story 1 (MVP) 완결 ➔ 6대 CPU-GPU 자율 서빙 엔진 정상 작동
 
 ---
 
@@ -81,7 +81,7 @@
 
 - [ ] T018 [P] Model Gateway 신규 단위/계약 테스트 전체 실행 및 100% 통과 확인 in `model_gateway/tests/`
 - [ ] T019 전사 5대 종합 회귀 테스트 스위트([run_all_regression_tests.py](file:///c:/AISERVICE/bteam/tests/run_all_regression_tests.py)) 실행 및 100% 통과 확인 in `bteam/tests/run_all_regression_tests.py`
-- [ ] T020 [quickstart.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/quickstart.md)에 실시간 실행 로그 및 6대 GPU 아키텍처 실측 지표 기록 완료 in `specs/034-audit-config-oom-guards/quickstart.md`
+- [ ] T020 [quickstart.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/quickstart.md)에 실시간 실행 로그 및 6대 CPU-GPU 하드웨어 실측 지표 기록 완료 in `specs/034-audit-config-oom-guards/quickstart.md`
 
 ---
 
@@ -89,8 +89,8 @@
 
 ```mermaid
 flowchart TD
-    Setup[Phase 1: Setup & 6-Tier GPU Specs Setup] --> Foundational[Phase 2: Foundational & TDD Tests]
-    Foundational --> US1[Phase 3: US1 - 6대 GPU 세대별 자율 서빙 엔진 (MVP)]
+    Setup[Phase 1: Setup & 6-Tier Hardware Specs Setup] --> Foundational[Phase 2: Foundational & TDD Tests]
+    Foundational --> US1[Phase 3: US1 - 6대 CPU-GPU 자율 서빙 엔진 (MVP)]
     US1 --> US2[Phase 4: US2 - 전사 레거시 하드코딩 제거]
     US2 --> US3[Phase 5: US3 - Anti-Shadowing & OOM 방어]
     US3 --> Polish[Phase 6: 전사 5대 회귀 테스트 & 검증 완결]
