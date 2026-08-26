@@ -1,30 +1,30 @@
-# Feature Specification: Audit, Zero-Hardcoding, and Decoupled Hardware Architecture (Pascal to Blackwell) OOM Hardening
+# Feature Specification: Audit, Zero-Hardcoding, and Unified CPU-GPU Hardware Evaluation Checklist OOM Hardening
 
 **Feature Branch**: `034-audit-config-oom-guards`  
 **Created**: 2026-08-26  
 **Status**: Ready for Planning  
-**Input**: User description: "방금 케이스 같은 부분이 분명히 또 있을거야 이번 리펙토링 주제는 방금의 이슈를 중점으로 검토해서 스펙을 작성하자, 1. 하드코딩 되어있는 부분은 없는가? 2. 환경변수나, 벤치마킹등으로 설정된 설정값이 로직중에 덮어씌워지거나 무시되는 부분이 있는가? 3. 기타 oom을 유발할만한 요인이 있는가? 우리 대상 플렛폼 gpu는 gtx 1070 노말, gtx 1080ti, rtx 2080 노말, rtx 3060 12gb, rtx 4080 노말, 5천번대(5060ti 16gb, 5080)야. cpu와 gpu 조합은 고정이 아니며, i7 930 같은 구형 cpu나 현대적 intel cpu가 임의의 gpu와 조합될 수 있어. gpu 세대간 지원되는 기술과 데이터 타입, cpu 명령어 세트를 각각 독립적으로 체크리스트로 만들고 자율 구축 운영하도록 고도화 반영해줘"
+**Input**: User description: "방금 케이스 같은 부분이 분명히 또 있을거야 이번 리펙토링 주제는 방금의 이슈를 중점으로 검토해서 스펙을 작성하자, 1. 하드코딩 되어있는 부분은 없는가? 2. 환경변수나, 벤치마킹등으로 설정된 설정값이 로직중에 덮어씌워지거나 무시되는 부분이 있는가? 3. 기타 oom을 유발할만한 요인이 있는가? 우리 대상 플렛폼 gpu는 gtx 1070 노말, gtx 1080ti, rtx 2080 노말, rtx 3060 12gb, rtx 4080 노말, 5천번대(5060ti 16gb, 5080)야. 극단적으로 i7 930과 rtx 5080이 조합되는 경우는 없지만, 셋트로 고정 구성되지 않으니 체크리스트가 cpu와 gpu 모두 고려해야 한다는걸 의미해. 세대별 스펙을 리서치해서 체크리스트를 만들고 이걸 기준으로 구축 운영하도록 고도화 반영해줘"
 
 ---
 
 ## 1. 개요 및 배경 (Context & Problem Statement)
 
 ### 1.1 현상 및 배경 (Background)
-* **독립적 CPU-GPU 하드웨어 구조**: CPU와 GPU의 조합은 고정되어 있지 않으며, 임의의 호스트 CPU(예: AVX가 없는 i7 930, 또는 AVX2를 지원하는 최신 Intel CPU)와 임의의 GPU(GTX 1070부터 RTX 5000번대까지)가 조합될 수 있습니다.
-* **직교적 하드웨어 감지 및 자율 적응 원칙**:
-  - **GPU 감지**: Compute Capability(SM 6.1~12.0) 및 물리 VRAM에 따라 FlashAttention, KV Cache 양자화(Q8/FP16/FP8/FP4), 모델 선택, 동적 컨텍스트 크기($n_{\text{ctx}}$: 16K~128K)를 자율 결정.
-  - **CPU 감지**: AVX/AVX2 명령어 지원 여부를 감지하여, AVX 미지원 CPU(예: i7 930) 감지 시 모든 신경망 레이어를 **100% GPU VRAM 상주 (`-ngl 999`)**로 강제하여 CPU 연산 병목을 원천 차단.
+* **CPU와 GPU의 통합 평가 필요성**: 플랫폼 환경은 고정된 단일 세트가 아니므로, 체크리스트는 **CPU(명령어 세트/AVX 유무)와 GPU(아키텍처/VRAM/텐서 코어)를 모두 통합적으로 평가**하여 최적의 빌드 옵션과 서빙 파라미터를 자율 결정해야 합니다.
+* **하드웨어 평가 2대 축**:
+  - **GPU 평가 축 (Pascal $\rightarrow$ Blackwell)**: Compute Capability(SM 6.1~12.0) 및 물리 VRAM을 실측하여 FlashAttention, KV Cache 양자화 타입(Q8/FP16/FP8/FP4), 모델 크기(2B/4B/9B), 동적 컨텍스트 크기($n_{\text{ctx}}$: 16K~128K)를 결정.
+  - **CPU 평가 축 (AVX/AVX2 명령어)**: 구형 CPU(i7 930 등 AVX 미지원) 감지 시 모든 신경망 레이어를 **100% GPU VRAM 상주 (`-ngl 999`)**로 강제하여 CPU 병목을 방지하고, 최신 CPU(AVX2 지원) 감지 시 호스트-디바이스 고속 전송 파이프라인을 활성화.
 
 ---
 
-## 2. 하드웨어 스펙 체크리스트 (Decoupled Hardware Matrices)
-
-### 2.1 GPU 아키텍처 세대별 불변 스펙 체크리스트 (GPU Matrix)
+## 2. 통합 CPU & GPU 하드웨어 평가 체크리스트 (Unified Hardware Checklist)
 
 ```text
 ======================================================================================================================================================
-GPU 모델 (대표)       아키텍처          CUDA SM    VRAM 용량   Tensor Cores   FP16/BF16/FP8/FP4   FlashAttn-3/4   KV 양자화 권장   권장 모델 & 동적 컨텍스트
+[평가 축 1] GPU 아키텍처 및 VRAM 평가 (GPU Evaluation Matrix)
 ======================================================================================================================================================
+GPU 모델 (대표)       아키텍처          CUDA SM    VRAM 용량   Tensor Cores   FP16/BF16/FP8/FP4   FlashAttn-3/4   KV 양자화 권장   권장 모델 & 동적 컨텍스트
+------------------------------------------------------------------------------------------------------------------------------------------------------
 GTX 1070 (노말)       Pascal           SM 6.1     8 GB        없음 (None)    FP32 표준           ❌ 미지원        Q8_0 KV Cache   Qwen 3.5 2B @ 16K ~ 32K
 GTX 1080 Ti          Pascal           SM 6.1     11 GB       없음 (None)    FP32 표준           ❌ 미지원        Q8_0 KV Cache   Qwen 3.5 4B @ 32K ~ 48K
 RTX 2080 (노말)       Turing           SM 7.5     8 GB        1세대 텐서     FP16 네이티브       ⚠️ 생략권장      Q8_0 KV Cache   Qwen 3.5 2B @ 32K
@@ -33,20 +33,16 @@ RTX 4080 (노말)       Ada Lovelace     SM 8.9     16 GB       3세대 텐서  
 RTX 5060Ti (16GB)    Blackwell        SM 12.0    16 GB       4/5세대 텐서   FP16/BF16/FP8/FP4   ✅ FA-3/4 (TMA)  FP4 / FP8 / Q8  Qwen 3.5 4B @ 128K / 9B @ 64K
 RTX 5080 (16/24G)    Blackwell        SM 12.0    16~24 GB    4/5세대 텐서   FP16/BF16/FP8/FP4   ✅ FA-3/4 (TMA)  FP4 / FP8 / Q8  Qwen 3.5 9B @ 128K (플래그십)
 ======================================================================================================================================================
-* 공통 고정: BGE 임베딩(706MB) + BGE 리랭커(706MB) = 1.4GB는 모든 GPU에서 100% GPU VRAM 상주 고정.
-```
+* BGE 임베딩(706MB) + BGE 리랭커(706MB) = 1.4GB는 전 플랫폼에서 100% GPU VRAM 상주 고정.
 
-### 2.2 CPU 명령어 세트 감지 및 최적화 규칙 (CPU Rules)
-
-```text
 ======================================================================================================================================================
-CPU 명령어 세트 분류     대표 CPU 예시                           동작 정책 및 최적화 규칙
+[평가 축 2] CPU 명령어 세트 평가 (CPU Evaluation Rules)
 ======================================================================================================================================================
-1. AVX 미지원 CPU        Intel Core i7 930 (1세대 Nehalem 등)    - AVX/AVX2 부재로 CPU 신경망 연산 시 극심한 지연 발생
-                                                                 - 정책: 100% GPU VRAM 상주 (-ngl 999) 강제, CPU BLAS 연산 배제
+CPU 명령어 세트 분류     대표 CPU 예시                           통합 체크리스트 평가 및 런타임 정책
 ------------------------------------------------------------------------------------------------------------------------------------------------------
-2. AVX2 지원 CPU         Intel Core i7 7th~14th, Core Ultra 등   - AVX2 / FMA3 / PCIe 4.0/5.0 고속 DMA 지원
-                                                                 - 정책: 고속 프롬프트 토큰 전처리 및 스트리밍 직렬화 가속
+1. AVX 미지원 CPU        Intel Core i7 930 (1세대 Nehalem 등)    - CPU 신경망 연산 병목 방지
+                                                                 - 정책: 100% GPU VRAM 상주 (-ngl 999) 강제, CPU BLAS 연산 배제
+2. AVX2 지원 CPU         Intel Core i7 7th~14th, Core Ultra 등   - 고속 토큰 직렬화 및 PCIe DMA 버퍼 전송 가속 활성화
 ======================================================================================================================================================
 ```
 
@@ -54,13 +50,13 @@ CPU 명령어 세트 분류     대표 CPU 예시                           동�
 
 ## 3. User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - 직교적 CPU-GPU 자율 하드웨어 감지 & 최적 서빙 (Priority: P1) 🎯 MVP
+### User Story 1 - 통합 CPU & GPU 하드웨어 감지 & 최적 서빙 (Priority: P1) 🎯 MVP
 
-운영자가 임의의 CPU(i7 930, i7 최신 등)와 임의의 GPU(GTX 1070부터 RTX 5080까지) 조합에서 시스템을 기동하면, 게이트웨이는 CPU 명령어 세트(AVX 유무)와 GPU Compute Capability 및 VRAM을 각각 독립적으로 실측하여 세대별 불변 체크리스트에 따라 최적 플래그, 모델, 컨텍스트 크기를 100% 자동 구성하여 서빙한다.
+운영자가 임의의 CPU(i7 930, 최신 Intel)와 GPU(GTX 1070부터 RTX 5080까지) 환경에서 시스템을 기동하면, 게이트웨이는 CPU 명령어 세트와 GPU 아키텍처/VRAM을 통합 평가하여 체크리스트에 따라 최적 플래그, 모델, 컨텍스트 크기를 100% 자동 구성하여 서빙한다.
 
-**Why this priority**: CPU-GPU 조합이 가변적인 환경에서도 하드웨어 병목을 원천 방지하고 단일 바이너리로 각 환경에 최적화된 최대 성능을 발휘합니다.
+**Why this priority**: CPU와 GPU 하드웨어 스펙을 종합적으로 고려하여 시스템 병목과 OOM을 원천 방지하고 최적 성능을 발휘합니다.
 
-**Independent Test**: 다양한 CPU-GPU 조합(i7 930+GTX 1070, i7 930+RTX 3060, 최신 Intel+GTX 1070, 최신 Intel+RTX 5080)을 모의 주입하여 `detect_hardware_capabilities()`가 반환하는 플래그와 모델이 체크리스트와 정확히 일치하는지 검증.
+**Independent Test**: 모의 하드웨어 스펙을 주입하여 `detect_hardware_capabilities()`가 반환하는 플래그와 모델이 통합 체크리스트와 정확히 일치하는지 검증.
 
 **Acceptance Scenarios**:
 1. **Given** AVX 미지원 CPU(i7 930) + GTX 1070일 때, **When** 시스템이 기동되면, **Then** `-ngl 999`로 100% GPU VRAM 상주를 강제하고 FlashAttention은 생략되며 Q8_0 KV Cache가 적용된다.
@@ -101,7 +97,7 @@ CPU 명령어 세트 분류     대표 CPU 예시                           동�
 
 ### Functional Requirements
 
-- **FR-001 (독립적 CPU-GPU 하드웨어 체크리스트 구축)**: `gpu_detector.py`에 CPU(AVX 지원 여부) 및 GPU(Pascal~Blackwell SM 6.1~12.0) 독립 룩업 테이블을 구축하고 실시간 자동 매칭해야 한다.
+- **FR-001 (통합 CPU & GPU 하드웨어 평가 체크리스트 구축)**: `gpu_detector.py`에 CPU(AVX 지원 여부) 및 GPU(Pascal~Blackwell SM 6.1~12.0)를 종합 평가하는 불변 룩업 테이블을 구축하고 실시간 자동 매칭해야 한다.
 - **FR-002 (AVX 미지원 CPU 감지 시 100% GPU VRAM Offload 가드)**: AVX 미지원 CPU 감지 시 모든 신경망 연산에 `-ngl 999`를 강제 적용하여 CPU 연산 병목을 원천 방어해야 한다.
 - **FR-003 (동적 VRAM 벤치마킹 & 컨텍스트 사이징 엔진)**: 물리 VRAM 실측값 및 가용 메모리 예산 수식에 따라 최적 모델(2B/4B/9B)과 최대 안전 컨텍스트 윈도우($n_{\text{ctx}}$: 16K~128K)를 동적으로 산출해야 한다.
 - **FR-004 (8GB 플랫폼 상주 가드 및 4B 투명 라우팅)**: 8GB GPU에서는 `qwen3.5-2b` + BGE 2종의 GPU 상주를 기본 채택하고 4B 요청을 2B로 투명 라우팅하며, 11GB+ 환경에서는 4B/9B 네이티브 서빙을 활성화해야 한다.
@@ -119,7 +115,7 @@ CPU 명령어 세트 분류     대표 CPU 예시                           동�
 
 ## 5. Success Criteria *(mandatory)*
 
-1. **독립적 CPU-GPU 하드웨어 자동 감지 100%**: 임의의 CPU(i7 930, 최신 Intel) 및 GPU(GTX 1070, 1080Ti, 2080, 3060, 4080, 5060Ti, 5080) 조합 주입 시 100% 정확한 아키텍처 및 플래그 매칭 확인.
+1. **통합 CPU-GPU 하드웨어 자동 감지 100%**: 임의의 CPU(i7 930, 최신 Intel) 및 GPU(GTX 1070부터 RTX 5080까지) 조합 주입 시 100% 정확한 아키텍처 및 플래그 매칭 확인.
 2. **동적 컨텍스트 사이징 검증**: 8GB(16K~32K), 11GB(32K~48K), 12GB(64K), 16GB(128K) 가상 VRAM 주입 시 100% 정확한 동적 산출 확인.
 3. **8GB i7 930 환경 무중단 안정성**: 2B (16K~32K) + BGE 2종 GPU 상주 체제에서 VRAM 피크 3.7GB 이하 유지 및 OOM 크래시 **0건**.
 4. **하드코딩 잔재 0건**: 정적 코드 분석 및 전수 검색 결과 레거시 모델명/포트 하드코딩 발생 건수 **0건**.

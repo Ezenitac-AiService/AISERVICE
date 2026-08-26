@@ -1,4 +1,4 @@
-# Data Model: Decoupled CPU-GPU Architecture Specs & Dynamic Profiling
+# Data Model: Unified CPU & GPU Hardware Evaluation Checklist
 
 **Feature**: `034-audit-config-oom-guards`  
 **Date**: 2026-08-26  
@@ -6,7 +6,7 @@
 
 ---
 
-## 1. 독립적 CPU-GPU 아키텍처 스키마 (Pydantic v2)
+## 1. 통합 CPU & GPU 하드웨어 평가 데이터 모델 (Pydantic v2)
 
 ```python
 from enum import Enum
@@ -24,7 +24,7 @@ class GpuArchitectureEnum(str, Enum):
 
 
 class CpuArchitectureFeatures(BaseModel):
-    """독립적 CPU 명령어 세트 특성"""
+    """CPU 명령어 세트 및 성능 특성"""
     cpu_model_name: str = Field(..., description="CPU 모델명 (예: Intel Core i7 930)")
     has_avx: bool = Field(default=False, description="AVX 지원 여부")
     has_avx2: bool = Field(default=False, description="AVX2 지원 여부")
@@ -33,7 +33,7 @@ class CpuArchitectureFeatures(BaseModel):
 
 
 class GpuArchitectureFeatures(BaseModel):
-    """독립적 GPU 아키텍처 세대별 불변 하드웨어 특성"""
+    """GPU 아키텍처 세대별 불변 하드웨어 특성"""
     architecture_name: str = Field(..., description="아키텍처명 (Pascal, Turing, Ampere, Ada, Blackwell)")
     compute_capability: float = Field(..., description="CUDA Compute Capability (6.1, 7.5, 8.6, 8.9, 12.0)")
     has_tensor_cores: bool = Field(..., description="텐서 코어 탑재 여부")
@@ -46,11 +46,11 @@ class GpuArchitectureFeatures(BaseModel):
 
 
 class DynamicHardwareProfile(BaseModel):
-    """실시간 물리 CPU-GPU 독립 실측 합성 프로파일"""
+    """실시간 CPU & GPU 통합 평가 합성 프로파일"""
     device_name: str = Field(..., description="GPU 장치명 (예: NVIDIA GeForce GTX 1070)")
     compute_capability: float = Field(..., description="CUDA Compute Capability")
-    gpu_features: GpuArchitectureFeatures = Field(..., description="GPU 아키텍처 세부 스펙")
-    cpu_features: CpuArchitectureFeatures = Field(..., description="CPU 명령어 세부 스펙")
+    gpu_features: GpuArchitectureFeatures = Field(..., description="GPU 세부 스펙")
+    cpu_features: CpuArchitectureFeatures = Field(..., description="CPU 세부 스펙")
     total_vram_mb: int = Field(..., description="전체 물리 VRAM (MB)")
     free_vram_mb: int = Field(..., description="현재 가용 VRAM (MB)")
     recommended_model: str = Field(..., description="VRAM 최적 추천 상주 모델 (qwen3.5-2b / 4b / 9b)")
