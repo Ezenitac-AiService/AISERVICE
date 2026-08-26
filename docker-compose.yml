@@ -59,6 +59,7 @@ services:
       - ./model_gateway/data:/app/data
       - ./model_gateway/src:/app/src
       - ./model_gateway/scripts:/app/scripts
+      - ./model_gateway/tests:/app/tests
       - /usr/lib/wsl:/usr/lib/wsl:ro
     devices:
       - /dev/dxg:/dev/dxg

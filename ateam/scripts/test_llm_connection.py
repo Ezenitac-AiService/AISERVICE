@@ -22,7 +22,7 @@ def test_llm_endpoints():
     llm_base_url = os.getenv("LLM_BASE_URL", "http://vllm-serv-gateway:8081/v1")
     embedding_base_url = os.getenv("EMBEDDING_BASE_URL", "http://vllm-serv-gateway:8090/v1")
     api_key = os.getenv("LLM_API_KEY", "EMPTY")
-    chat_model = os.getenv("CHAT_LLM_MODEL", "qwen3.5-4b")
+    chat_model = os.getenv("CHAT_LLM_MODEL") or os.getenv("FAST_LLM_MODEL") or os.getenv("SYNTHESIS_LLM_MODEL") or "qwen3.5-2b"
 
     print(f"=== Testing LLM Services Connection ===")
     print(f"LLM Base URL: {llm_base_url}")

@@ -5,7 +5,7 @@
 
 ---
 
-## Task Execution Format: `- [ ] [TaskID] [P?] [Story?] Description with file path`
+## Task Execution Format: `- [x] [TaskID] [P?] [Story?] Description with file path`
 
 ---
 
@@ -13,9 +13,9 @@
 
 **Purpose**: 3대 직교 하드웨어 축(GPU 아키텍처 SM 6.1~12.0, 물리 VRAM 8GB~24GB, CPU AVX 유무) 불변 평가 룩업 테이블 및 정적 감사 스크립트 구축
 
-- [ ] T001 전사 소스코드 및 테스트 파일 대상 하드코딩 패턴(`qwen3.5-4b`, 포트, VRAM 상수) 정적 스캔 스크립트 작성 in `model_gateway/scripts/scan_hardcoding.py`
-- [ ] T002 [P] 3대 직교 하드웨어 축(GPU SM, VRAM, CPU AVX) 평가 룩업 테이블 및 Pydantic v2 데이터 모델 정의 in `model_gateway/src/core/gpu_detector.py`
-- [ ] T003 [P] `model_gateway/config/server_config.json` 및 `model_context_profiles.json`에 동적 VRAM 사이징 프로파일 스키마 동기화 in `model_gateway/config/server_config.json`
+- [x] T001 전사 소스코드 및 테스트 파일 대상 하드코딩 패턴(`qwen3.5-4b`, 포트, VRAM 상수) 정적 스캔 스크립트 작성 in `model_gateway/scripts/scan_hardcoding.py`
+- [x] T002 [P] 3대 직교 하드웨어 축(GPU SM, VRAM, CPU AVX) 평가 룩업 테이블 및 Pydantic v2 데이터 모델 정의 in `model_gateway/src/core/gpu_detector.py`
+- [x] T003 [P] `model_gateway/config/server_config.json` 및 `model_context_profiles.json`에 동적 VRAM 사이징 프로파일 스키마 동기화 in `model_gateway/config/server_config.json`
 
 ---
 
@@ -23,9 +23,9 @@
 
 **Purpose**: 4/5세대 텐서+8GB VRAM(4060/5060) 등 임의의 3축 하드웨어 조합 감지, AVX 미지원 `-ngl 999` 강제, FlashAttn/Q8/FP8/FP4 플래그 주입 TDD 단위 테스트 선행 작성
 
-- [ ] T004 [P] 4/5세대 텐서+8GB VRAM(4060/5060)을 포함한 임의의 3축 하드웨어 조합 모의 주입 시 아키텍처 매칭 및 VRAM 사이징 단위 테스트 작성 in `model_gateway/tests/test_gpu_architecture_specs.py`
-- [ ] T005 [P] AVX 미지원 감지 시 `-ngl 999` 강제 및 GPU SM별 FlashAttention/KV 양자화 플래그 주입 단위 테스트 작성 in `model_gateway/tests/test_hardware_aware_flags.py`
-- [ ] T006 [P] 전사 설정 단일 진실 소스(`ConfigManager`) 반환값 일관성 및 Anti-Shadowing 단위 테스트 작성 in `model_gateway/tests/test_config_hierarchy.py`
+- [x] T004 [P] 4/5세대 텐서+8GB VRAM(4060/5060)을 포함한 임의의 3축 하드웨어 조합 모의 주입 시 아키텍처 매칭 및 VRAM 사이징 단위 테스트 작성 in `model_gateway/tests/test_gpu_architecture_specs.py`
+- [x] T005 [P] AVX 미지원 감지 시 `-ngl 999` 강제 및 GPU SM별 FlashAttention/KV 양자화 플래그 주입 단위 테스트 작성 in `model_gateway/tests/test_hardware_aware_flags.py`
+- [x] T006 [P] 전사 설정 단일 진실 소스(`ConfigManager`) 반환값 일관성 및 Anti-Shadowing 단위 테스트 작성 in `model_gateway/tests/test_config_hierarchy.py`
 
 **Checkpoint**: Foundational TDD 테스트 구축 완료 ➔ 사용자 스토리 구현 착수
 
@@ -37,10 +37,10 @@
 
 **Independent Test**: 다양한 하드웨어 변종(Ada SM 8.9+8GB, Blackwell SM 12.0+8GB, Pascal SM 6.1+11GB, i7 930+Ampere SM 8.6)을 주입하여 `detect_hardware_capabilities()`가 반환하는 플래그와 모델/컨텍스트가 3대 매트릭스와 정확히 일치하는지 검증
 
-- [ ] T007 [P] [US1] `gpu_detector.py`에 CPU AVX 실측, GPU SM 실측, VRAM 실측 기반 `detect_hardware_capabilities()` 3축 합성 로직 구현 in `model_gateway/src/core/gpu_detector.py`
-- [ ] T008 [US1] `ConfigManager`에 VRAM 예산 및 KV 바이트 수식 기반 `calculate_dynamic_context_window()` 및 동적 프로파일링 메서드 구현 in `model_gateway/src/core/config_manager.py`
-- [ ] T009 [US1] `process_manager.py`의 `build_server_command`에서 세대별 최적 플래그(AVX 미지원 `-ngl 999`, SM 6.1 Q8 KV, SM 8.6+ FlashAttn, SM 8.9/12.0 FP8/FP4) 자동 주입 구현 in `model_gateway/src/core/process_manager.py`
-- [ ] T010 [US1] `GET /v1/profile` 엔드포인트에 `gpu_features`, `cpu_features`, `dynamic_n_ctx_max` 필드 연동 in `model_gateway/src/api/routes/inference_api.py`
+- [x] T007 [P] [US1] `gpu_detector.py`에 CPU AVX 실측, GPU SM 실측, VRAM 실측 기반 `detect_hardware_capabilities()` 3축 합성 로직 구현 in `model_gateway/src/core/gpu_detector.py`
+- [x] T008 [US1] `ConfigManager`에 VRAM 예산 및 KV 바이트 수식 기반 `calculate_dynamic_context_window()` 및 동적 프로파일링 메서드 구현 in `model_gateway/src/core/config_manager.py`
+- [x] T009 [US1] `process_manager.py`의 `build_server_command`에서 세대별 최적 플래그(AVX 미지원 `-ngl 999`, SM 6.1 Q8 KV, SM 8.6+ FlashAttn, SM 8.9/12.0 FP8/FP4) 자동 주입 구현 in `model_gateway/src/core/process_manager.py`
+- [x] T010 [US1] `GET /v1/profile` 엔드포인트에 `gpu_features`, `cpu_features`, `dynamic_n_ctx_max` 필드 연동 in `model_gateway/src/api/routes/inference_api.py`
 
 **Checkpoint**: User Story 1 (MVP) 완결 ➔ 3대 직교 하드웨어 자율 서빙 엔진 정상 작동
 
@@ -52,10 +52,10 @@
 
 **Independent Test**: 정적 코드 스캔 스크립트(`scan_hardcoding.py`)를 실행하여 하드코딩된 레거시 fallback 문자열이 0건임을 확인
 
-- [ ] T011 [P] [US2] `inference_api.py` 내부의 fallback 모델명(`qwen3.5-4b`)을 `ConfigManager.get_default_model()`로 교체 in `model_gateway/src/api/routes/inference_api.py`
-- [ ] T012 [P] [US2] `health_api.py`의 하드코딩된 디바이스명/VRAM을 `get_nvml_vram_info()` 실측값으로 동적 교체 in `model_gateway/src/api/routes/health_api.py`
-- [ ] T013 [US2] `ateam/scripts/test_llm_connection.py` 및 `pilos/` 내 모델명 참조를 환경변수 및 동적 탐색으로 교체 in `ateam/scripts/test_llm_connection.py`
-- [ ] T014 [US2] `tests/` 디렉토리 내 레거시 계약 테스트 파일들의 정적 모델 어설션을 동적 프로파일 규격으로 동기화 in `tests/test_tiered_routing_contract.py`
+- [x] T011 [P] [US2] `inference_api.py` 내부의 fallback 모델명(`qwen3.5-4b`)을 `ConfigManager.get_default_model()`로 교체 in `model_gateway/src/api/routes/inference_api.py`
+- [x] T012 [P] [US2] `health_api.py`의 하드코딩된 디바이스명/VRAM을 `get_nvml_vram_info()` 실측값으로 동적 교체 in `model_gateway/src/api/routes/health_api.py`
+- [x] T013 [US2] `ateam/scripts/test_llm_connection.py` 및 `pilos/` 내 모델명 참조를 환경변수 및 동적 탐색으로 교체 in `ateam/scripts/test_llm_connection.py`
+- [x] T014 [US2] `tests/` 디렉토리 내 레거시 계약 테스트 파일들의 정적 모델 어설션을 동적 프로파일 규격으로 동기화 in `tests/test_tiered_routing_contract.py`
 
 **Checkpoint**: User Story 2 완결 ➔ 전사 하드코딩 0건 및 SSOT 규격 확립
 
@@ -67,9 +67,9 @@
 
 **Independent Test**: 다중 동시 추론 및 프로세스 재기동 시 VRAM 누수와 설정 변조가 0건인지 카오스 테스트로 검증
 
-- [ ] T015 [P] [US3] `inference_api.py` 및 `llama_manager.py`에서 요청에 `n_ctx`가 생략된 경우 동적 활성 컨텍스트를 무변조 주입하도록 가드 강화 in `model_gateway/src/api/routes/inference_api.py`
-- [ ] T016 [US3] `llama_manager.py`의 `LOADING` 상태 가드를 강화하여 중복 요청 시 기존 프로세스 종료 없이 `_wait_for_ready` 대기하도록 방어 in `model_gateway/src/core/llama_manager.py`
-- [ ] T017 [US3] 서브프로세스 종료 시 소켓 바인딩 해제 확인 및 미종료 프로세스 `SIGKILL` 강제 회수 로직 구현 in `model_gateway/src/core/process_manager.py`
+- [x] T015 [P] [US3] `inference_api.py` 및 `llama_manager.py`에서 요청에 `n_ctx`가 생략된 경우 동적 활성 컨텍스트를 무변조 주입하도록 가드 강화 in `model_gateway/src/api/routes/inference_api.py`
+- [x] T016 [US3] `llama_manager.py`의 `LOADING` 상태 가드를 강화하여 중복 요청 시 기존 프로세스 종료 없이 `_wait_for_ready` 대기하도록 방어 in `model_gateway/src/core/llama_manager.py`
+- [x] T017 [US3] 서브프로세스 종료 시 소켓 바인딩 해제 확인 및 미종료 프로세스 `SIGKILL` 강제 회수 로직 구현 in `model_gateway/src/core/process_manager.py`
 
 **Checkpoint**: User Story 3 완결 ➔ Anti-Shadowing 및 OOM 리소스 누수 원천 격리
 
@@ -79,9 +79,9 @@
 
 **Purpose**: 전사 통합 회귀 검증 및 문서 동기화 완결
 
-- [ ] T018 [P] Model Gateway 신규 단위/계약 테스트 전체 실행 및 100% 통과 확인 in `model_gateway/tests/`
-- [ ] T019 전사 5대 종합 회귀 테스트 스위트([run_all_regression_tests.py](file:///c:/AISERVICE/bteam/tests/run_all_regression_tests.py)) 실행 및 100% 통과 확인 in `bteam/tests/run_all_regression_tests.py`
-- [ ] T020 [quickstart.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/quickstart.md)에 실시간 실행 로그 및 3대 직교 하드웨어 실측 지표 기록 완료 in `specs/034-audit-config-oom-guards/quickstart.md`
+- [x] T018 [P] Model Gateway 신규 단위/계약 테스트 전체 실행 및 100% 통과 확인 in `model_gateway/tests/`
+- [x] T019 전사 5대 종합 회귀 테스트 스위트([run_all_regression_tests.py](file:///c:/AISERVICE/bteam/tests/run_all_regression_tests.py)) 실행 및 100% 통과 확인 in `bteam/tests/run_all_regression_tests.py`
+- [x] T020 [quickstart.md](file:///c:/AISERVICE/specs/034-audit-config-oom-guards/quickstart.md)에 실시간 실행 로그 및 3대 직교 하드웨어 실측 지표 기록 완료 in `specs/034-audit-config-oom-guards/quickstart.md`
 
 ---
 
