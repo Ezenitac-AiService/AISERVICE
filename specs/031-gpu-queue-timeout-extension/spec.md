@@ -29,6 +29,8 @@
 ### Session 2026-08-26
 - **Q**: GPU 대기 큐에서 대기 중인 사용자가 요청을 중도 포기할 때, 클라이언트 UI 및 게이트웨이의 취소 처리 방식을 어떻게 구성할 것인가요?  
   **A**: **Option A 채택** — 백엔드 연결 끊김 자동 감지(`request.is_disconnected()`)와 함께 UI 상태창에 명시적 `[대기 취소]` 버튼을 제공하여, 취소 즉시 게이트웨이 대기 큐에서 안전하게 방출하고 GPU 자원을 즉시 회수한다.
+- **Q**: 동일한 클라이언트/세션에서 중복 요청(동일 질의 재시도/더블 클릭)이 연속 인입될 때 게이트웨이는 어떻게 처리할 것인가요?  
+  **A**: **Option A 채택 (Request Coalescing & Idempotency)** — 동일 세션/동일 질의(`session_id` + `prompt_hash` 또는 `Idempotency-Key`)가 큐 대기 또는 추론 중일 때, 신규 GPU 슬롯을 중복 할당하지 않고 기존 큐 티켓 스트림에 멀티플렉싱 재연결(Coalescing)하여 단일 GPU 자원 낭비를 원천 차단한다.
 
 ---
 
@@ -91,6 +93,7 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 * **FR-008 (Client Disconnect & Manual Cancel Purge)**: 큐에 대기 중인 요청의 클라이언트 연결이 끊어지거나 사용자가 취소 버튼을 클릭하면, 게이트웨이는 `request.is_disconnected()` 또는 취소 신호를 감지하여 해당 요청을 큐에서 1.0초 이내에 즉시 제거(Purge)하고 GPU 자원을 회수해야 한다.
 * **FR-009 (Max Queue Capacity Guard)**: 큐 크기가 임계치(기본 30건)를 초과할 경우 즉시 HTTP 429(Too Many Requests)와 `Retry-After: 5`를 반환해야 한다.
 * **FR-010 (Hot-Swap / Non-Streaming Compatibility)**: 비스트리밍 단일 요청(`stream=false`)의 경우에도 큐 진입 시 `X-Queue-Position` 헤더 또는 폴링/SSE 업그레이드 지원을 통해 타임아웃을 안전하게 관리해야 한다.
+* **FR-011 (Request Coalescing & Idempotent Deduplication)**: 동일 클라이언트/세션(`session_id` + `prompt_hash` 또는 `Idempotency-Key`)에서 동일한 질의가 큐 대기 또는 추론 진행 중에 중복 인입될 경우, 게이트웨이는 신규 GPU 슬롯을 할당하지 않고 기존 진행 중인 스트림에 멀티플렉싱(Request Coalescing)하여 반환해야 한다.
 
 ---
 
