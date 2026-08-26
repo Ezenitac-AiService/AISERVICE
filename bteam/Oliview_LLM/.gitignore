@@ -1,0 +1,35 @@
+# 가상환경
+.venv/
+venv/
+ENV/
+
+# 파이썬 캐시 및 컴파일된 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 배포 및 패키지 빌드 파일
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 환경 변수 및 로컬 설정 파일
+.env
+.env.local
+.venv
+*.local

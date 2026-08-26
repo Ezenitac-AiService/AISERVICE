@@ -1,0 +1,16 @@
+[project]
+name = "aspect_sentiment"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.14.0",
+    "datasets>=5.0.0",
+    "ipykernel>=7.3.0",
+    "pandas>=3.0.5",
+    "pymysql>=1.1.2",
+    "python-dotenv>=1.1.1",
+    "scikit-learn>=1.9.0",
+    "torch>=2.13.0",
+    "transformers>=5.14.1",
+]

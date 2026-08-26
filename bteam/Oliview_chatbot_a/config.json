@@ -1,0 +1,55 @@
+{
+  "primary_server_host": "http://vllm-serv-gateway",
+  "fallback_server_host": "http://127.0.0.1",
+  "server_host": "http://vllm-serv-gateway",
+  "main_port": 8081,
+  "embedding_port": 8090,
+  "rerank_port": 8091,
+  "default_model": "qwen3.5-2b",
+  "fast_llm_model": "qwen3.5-2b",
+  "synthesis_llm_model": "qwen3.5-2b",
+  "embedding_model": "bge-m3",
+  "rerank_model": "bge-reranker-v2-m3",
+  "default_temperature": 0.3,
+  "default_max_tokens": 2048,
+  "benchmark_max_tokens": 2048,
+  "no_think_max_tokens": 2048,
+  "model_benchmarks": {
+    "qwen3.5-4b": {
+      "model_id": "qwen3.5-4b",
+      "recommended_context_length": 4096,
+      "max_context_length": 8192,
+      "peak_vram_mb": 3950,
+      "tpot_tok_per_sec": 49.00,
+      "status": "AVAILABLE",
+      "description": "메인 대화 및 RAG 심층 합성 모델 (4K 추천 / 8K 최대 맥락)"
+    },
+    "qwen3.5-2b": {
+      "model_id": "qwen3.5-2b",
+      "recommended_context_length": 8192,
+      "max_context_length": 16384,
+      "peak_vram_mb": 2450,
+      "tpot_tok_per_sec": 70.11,
+      "status": "ACTIVE_DEFAULT",
+      "description": "초경량 하이-스피드 모델 (8K 추천 / 16K 최대 맥락)"
+    },
+    "bge-m3": {
+      "model_id": "bge-m3",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 605,
+      "tpot_tok_per_sec": 7.46,
+      "status": "ACTIVE_EMBEDDING",
+      "description": "임베딩 전용 (독립 포트 8090)"
+    },
+    "bge-reranker-v2-m3": {
+      "model_id": "bge-reranker-v2-m3",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 606,
+      "tpot_tok_per_sec": 7.30,
+      "status": "ACTIVE_RERANK",
+      "description": "리랭킹 전용 (독립 포트 8091)"
+    }
+  }
+}

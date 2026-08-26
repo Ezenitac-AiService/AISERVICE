@@ -1,0 +1,56 @@
+{
+    "host": "0.0.0.0",
+    "port": 8081,
+    "backend_port": 8089,
+    "embedding_backend_port": 8090,
+    "rerank_backend_port": 8091,
+    "embedding_model": "bge-m3",
+    "rerank_model": "bge-reranker-v2-m3",
+    "embedding_enabled": true,
+    "rerank_enabled": true,
+    "auxiliary_max_crashes": 3,
+    "allowed_subnets": [
+        "127.0.0.1",
+        "192.168.0.0/16",
+        "10.0.0.0/8",
+        "172.16.0.0/12"
+    ],
+    "firewall_auto_allow": true,
+    "vram_limit_mb": 6500,
+    "default_model": "qwen3.5-2b",
+    "current_n_ctx": 16384,
+    "vram_max_capacity_mb": null,
+    "healthcheck_timeout_s": 120,
+    "graceful_drain_timeout_s": 5.0,
+    "connection_pool": {
+        "max_keepalive_connections": 20,
+        "max_connections": 100
+    },
+    "api_key_enabled": false,
+    "api_keys": [
+        {
+            "key": "sk-vllm-dev-demo1",
+            "name": "Development Sample Key 1",
+            "status": "active"
+        },
+        {
+            "key": "sk-vllm-mobile-app",
+            "name": "Mobile Client App Key",
+            "status": "active"
+        }
+    ],
+    "admin_secret": "aiservice",
+    "speculative_decoding": {
+        "enabled": false,
+        "draft_model": "qwen3.5-2b"
+    },
+    "structured_output": {
+        "enabled": true,
+        "strict_json_schema": true
+    },
+    "hardware_profiling": {
+        "auto_detect": true,
+        "enforce_all_gpu_on_no_avx": true,
+        "fallback_hardware_tier": "pascal_sm61"
+    }
+}

@@ -1,0 +1,150 @@
+version: "3.8"
+
+networks:
+  aiservice-network:
+    name: aiservice-network
+    external: true
+
+volumes:
+  bteam_mysql_data:
+    name: bteam_mysql_data
+
+services:
+  # ============================================================================
+  # 1. 공통 데이터베이스 (MySQL 8.0 - bteam_db)
+  # ============================================================================
+  bteam_db:
+    image: mysql:8.0
+    container_name: bteam_db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_allowed_packet=512M
+      - --innodb_buffer_pool_size=1G
+      - --innodb_log_file_size=256M
+      - --innodb_flush_log_at_trx_commit=2
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-GP123!}
+      MYSQL_DATABASE: ${DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${DB_USER:-gp123}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-GP123!}
+    volumes:
+      - bteam_mysql_data:/var/lib/mysql
+      - ./oliview_project_backup_0813.sql:/docker-entrypoint-initdb.d/01_backup.sql:ro
+    networks:
+      - aiservice-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-GP123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  # ============================================================================
+  # 2. 메인 백엔드 API (Flask - oliview_backend)
+  # ============================================================================
+  oliview_backend:
+    build:
+      context: ./Oliview_Project/backend
+      dockerfile: Dockerfile
+    image: oliview_backend:latest
+    container_name: oliview_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-gp123}
+      DB_PASSWORD: ${DB_PASSWORD:-GP123!}
+      DB_NAME: ${DB_NAME:-cosmetic_db}
+      DB_NAME3: ${DB_NAME:-cosmetic_db}
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 3. 메인 프론트엔드 UI (React Vite - oliview_frontend)
+  # ============================================================================
+  oliview_frontend:
+    build:
+      context: ./Oliview_Project/frontend
+      dockerfile: Dockerfile
+    image: oliview_frontend:latest
+    container_name: oliview_frontend
+    restart: unless-stopped
+    depends_on:
+      - oliview_backend
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 4. 옵션 챗봇 A (Streamlit - oliview_chatbot_a)
+  # ============================================================================
+  oliview_chatbot_a:
+    build:
+      context: ./Oliview_chatbot_a
+      dockerfile: Dockerfile
+    image: oliview_chatbot_a:latest
+    container_name: oliview_chatbot_a
+    init: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-gp123}
+      DB_PASSWORD: ${DB_PASSWORD:-GP123!}
+      DB_NAME: ${DB_NAME:-cosmetic_db}
+      SERVER_HOST: http://vllm-serv-gateway
+      MAIN_PORT: 8081
+      EMBEDDING_PORT: 8090
+      RERANK_PORT: 8091
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      STREAMLIT_SERVER_BASE_URL_PATH: bteam/chata
+    volumes:
+      - ./Oliview_chatbot_a/chroma_db_oliview:/app/chroma_db_oliview
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+    networks:
+      - aiservice-network
+
+  # ============================================================================
+  # 5. 옵션 챗봇 B (FastAPI RAG API - oliview_chatbot_b)
+  # ============================================================================
+  oliview_chatbot_b:
+    build:
+      context: ./Oliview_chatbot_b
+      dockerfile: Dockerfile
+    image: oliview_chatbot_b:latest
+    container_name: oliview_chatbot_b
+    init: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    environment:
+      DB_HOST: bteam_db
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-gp123}
+      DB_PASSWORD: ${DB_PASSWORD:-GP123!}
+      DB_NAME: ${DB_NAME:-cosmetic_db}
+      SERVER_HOST: http://vllm-serv-gateway
+      MAIN_PORT: 8081
+      EMBED_PORT: 8090
+      EMBEDDING_PORT: 8090
+      RERANK_PORT: 8091
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      FASTAPI_ROOT_PATH: /bteam/chatb
+    volumes:
+      - ./Oliview_chatbot_b:/app
+    depends_on:
+      bteam_db:
+        condition: service_healthy
+    networks:
+      - aiservice-network

@@ -1,0 +1,28 @@
+* text=auto
+
+# Source and configuration shared by Windows and Linux
+*.py text eol=lf
+*.sh text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Windows command files
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.pptx binary
+*.xlsx binary
+*.pt binary
+*.pth binary
+*.ckpt binary
+*.safetensors binary

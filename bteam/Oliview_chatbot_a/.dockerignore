@@ -1,0 +1,8 @@
+models/
+.cache/
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+chroma_db_oliview/

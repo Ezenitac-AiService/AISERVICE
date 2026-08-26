@@ -1,0 +1,17 @@
+{
+  "train": {
+    "reviews": 36322,
+    "spans": 101780,
+    "unmatched": 178
+  },
+  "validation": {
+    "reviews": 2440,
+    "spans": 8545,
+    "unmatched": 13
+  },
+  "test": {
+    "reviews": 2441,
+    "spans": 8718,
+    "unmatched": 21
+  }
+}

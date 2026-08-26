@@ -1,0 +1,128 @@
+{
+  "primary_server_host": "http://192.168.0.175",
+  "dev_server_host": "http://10.0.0.41",
+  "fallback_server_host": "http://192.168.0.80",
+  "server_host": "http://192.168.0.175",
+  "server_host_candidates": [
+    "http://127.0.0.1",
+    "http://10.0.0.41",
+    "http://192.168.0.175",
+    "http://192.168.0.80"
+  ],
+  "main_port": 8081,
+  "embedding_port": 8090,
+  "rerank_port": 8091,
+  "default_model": "qwen3.5-4b",
+  "default_all_llms": [
+    "qwen3.5-2b",
+    "qwen3.5-4b",
+    "qwen3.5-9b",
+    "gemma4-e2b",
+    "gemma4-e4b"
+  ],
+  "sample_prompt": "인공지능의 정의를 1문장으로 작성해 주세요.",
+  "sample_system_prompt": "당신은 IT 및 AI 기술 전문 어시스턴트입니다.",
+  "request_timeout_seconds": 180.0,
+  "embedding_model": "bge-m3",
+  "rerank_model": "bge-reranker-v2-m3",
+  "default_temperature": 0.3,
+  "default_max_tokens": 1024,
+  "benchmark_max_tokens": 2048,
+  "no_think_max_tokens": 512,
+  "gpu_profiles": {
+    "RTX_3060": {
+      "device_name": "NVIDIA GeForce RTX 3060",
+      "total_vram_mb": 12288,
+      "cuda_version": "13.2",
+      "host_ip": "192.168.0.175",
+      "concurrent_services": ["llm_main", "embedding_bge_m3", "reranker_bge_m3"],
+      "reserved_vram_embedding_reranker_mb": 1211,
+      "available_llm_vram_mb": 11077,
+      "supported_models_count": 8
+    },
+    "GTX_1070": {
+      "device_name": "NVIDIA GeForce GTX 1070",
+      "total_vram_mb": 8192,
+      "cuda_version": "12.1",
+      "host_ip": "192.168.0.80",
+      "concurrent_services": ["llm_main", "embedding_bge_m3", "reranker_bge_m3"],
+      "reserved_vram_embedding_reranker_mb": 3000,
+      "available_llm_vram_mb": 5192,
+      "supported_models_count": 7
+    }
+  },
+  "model_benchmarks": {
+    "qwen3.5-4b": {
+      "model_id": "qwen3.5-4b",
+      "recommended_context_length": 4096,
+      "max_context_length": 8192,
+      "peak_vram_mb": 3950,
+      "tpot_tok_per_sec": 49.00,
+      "status": "ACTIVE_DEFAULT",
+      "description": "메인 대화 모델 (4K 추천 / 8K 최대 맥락)"
+    },
+    "qwen3.5-2b": {
+      "model_id": "qwen3.5-2b",
+      "recommended_context_length": 8192,
+      "max_context_length": 16384,
+      "peak_vram_mb": 2450,
+      "tpot_tok_per_sec": 70.11,
+      "status": "AVAILABLE",
+      "description": "초경량 하이-스피드 모델 (8K 추천 / 16K 최대 맥락)"
+    },
+    "qwen3.5-9b": {
+      "model_id": "qwen3.5-9b",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 7120,
+      "tpot_tok_per_sec": 43.69,
+      "status": "AVAILABLE",
+      "description": "고성능 추론 대형 모델 (2K 추천 / 4K 최대 맥락)"
+    },
+    "gemma4-e2b": {
+      "model_id": "gemma4-e2b",
+      "recommended_context_length": 8192,
+      "max_context_length": 16384,
+      "peak_vram_mb": 2680,
+      "tpot_tok_per_sec": 52.79,
+      "status": "AVAILABLE",
+      "description": "Gemma 소형 모델 (8K 추천 / 16K 최대 맥락)"
+    },
+    "gemma4-e4b": {
+      "model_id": "gemma4-e4b",
+      "recommended_context_length": 4096,
+      "max_context_length": 8192,
+      "peak_vram_mb": 4210,
+      "tpot_tok_per_sec": 41.68,
+      "status": "AVAILABLE",
+      "description": "Gemma 중형 모델 (4K 추천 / 8K 최대 맥락)"
+    },
+    "gemma4-12b": {
+      "model_id": "gemma4-12b",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 8900,
+      "tpot_tok_per_sec": 30.52,
+      "status": "RTX_3060_AVAILABLE",
+      "description": "[신규] Gemma 12B 대용량 모델 (RTX 3060 12GB 가동)"
+    },
+    "bge-m3": {
+      "model_id": "bge-m3",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 605,
+      "tpot_tok_per_sec": 7.46,
+      "status": "ACTIVE_EMBEDDING",
+      "description": "임베딩 전용 (독립 포트 8090)"
+    },
+    "bge-reranker-v2-m3": {
+      "model_id": "bge-reranker-v2-m3",
+      "recommended_context_length": 2048,
+      "max_context_length": 4096,
+      "peak_vram_mb": 606,
+      "tpot_tok_per_sec": 7.30,
+      "status": "ACTIVE_RERANK",
+      "description": "리랭킹 전용 (독립 포트 8091)"
+    }
+  }
+}

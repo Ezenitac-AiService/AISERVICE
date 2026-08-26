@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oliview AI Production RAG Engine</title>
+    <style>
+    /* 🟢 전체 가독성 및 기본 폰트 크기 극대화 (기본값 대폭 상향) */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background-color: #f1f5f9; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; font-size: 19px; }
+    header { background: linear-gradient(135deg, #2e7d32 0%, #155724 100%); color: white; padding: 28px 40px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    .nav-container { max-width: 1600px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    
+    /* 🟢 메인 프레임 너비 및 레이아웃 확장 */
+    .main-container { max-width: 1600px; width: 100%; margin: 40px auto; padding: 0 32px; display: grid; grid-template-columns: 1fr; gap: 40px; flex: 1; height: auto !important; max-height: none !important; overflow: visible !important; }
+    @media (min-width: 1200px) { .main-container { grid-template-columns: 480px 1fr; } }
+    
+    .sidebar { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 4px 10px rgb(0 0 0 / 0.05); height: fit-content; border: 1px solid #e2e8f0; }
+    .content-area { display: flex; flex-direction: column; gap: 36px; width: 100%; min-width: 0; height: auto !important; overflow: visible !important; }
+    
+    /* 🟢 사이드바 가드레일 필터 탭 크기 및 라벨 대폭 확대 */
+    .form-group { margin-bottom: 32px; }
+    .form-group label { display: block; font-size: 18px; font-weight: 700; color: #334155; margin-bottom: 14px; }
+    .form-control { width: 100%; font-size: 18px; padding: 16px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background-color: #f8fafc; color: #1e293b; outline: none; height: 64px; font-weight: 600; }
+    .form-control:focus { border-color: #2e7d32; background-color: white; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    
+    /* 🟢 상단 질문 메인 입력창 및 분석 요청 버튼 극대화 */
+    .search-box { background: white; border-radius: 20px; padding: 24px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.05); border: 1px solid #e2e8f0; display: flex; gap: 20px; align-items: center; width: 100%; }
+    .search-input { flex: 1; padding: 20px 24px; border: 1px solid #cbd5e1; border-radius: 14px; font-size: 21px; outline: none; font-weight: 700; min-width: 0; height: 72px; }
+    .search-input:focus { border-color: #2e7d32; }
+    .btn-submit { background: linear-gradient(135deg, #2e7d32 0%, #155724 100%); color: white; font-size: 21px; font-weight: 800; padding: 0 52px; border: none; border-radius: 14px; cursor: pointer; transition: opacity 0.2s; white-space: nowrap; height: 72px; display: flex; align-items: center; justify-content: center; }
+    .btn-submit:hover { opacity: 0.9; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    /* 🟢 메인 결과 박스 및 타이틀 크기 상향 */
+    .card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 4px 12px rgb(0 0 0 / 0.05); border: 1px solid #e2e8f0; height: auto !important; overflow: visible !important; }
+    .card-title { font-size: 24px; font-weight: 800; color: #15803d; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #f1f5f9; }
+    
+    /* 🟢 AI 솔루션 본문 폰트 */
+    .llm-box { background-color: rgba(240, 253, 244, 0.7); padding: 32px; border-radius: 16px; border: 1px solid #bbf7d0; line-height: 1.95; font-size: 19.5px; color: #1e293b; font-weight: 500; height: auto !important; text-align: left; }
+    .llm-box strong { color: #115e59; background-color: #bbf7d0; padding: 2px 8px; border-radius: 6px; font-weight: 800; }
+    
+    /* 🟢 점진적 로딩 컴포넌트 */
+    .ai-typing-loading { display: flex; align-items: center; gap: 10px; padding: 8px 0; color: #334155; font-size: 18px; font-weight: 700; }
+    .dot-spinner { display: flex; gap: 8px; align-items: center; margin-left: 8px; }
+    .dot-spinner span { width: 10px; height: 10px; background-color: #2e7d32; border-radius: 50%; display: inline-block; animation: bounce 1.4s infinite ease-in-out both; }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+
+    .placeholder-box { background: white; border-radius: 20px; padding: 80px; text-align: center; border: 1px solid #e2e8f0; min-height: 450px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .placeholder-box h3 { font-size: 26px; font-weight: 800; color: #1e293b; margin-bottom: 16px; }
+    .placeholder-box p { font-size: 18px; color: #64748b; max-width: 650px; line-height: 1.6; }
+    
+    /* 🟢 하단 매칭 소스 상품 그리드 */
+    .product-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 24px !important; height: auto !important; min-height: max-content !important; overflow: visible !important; padding-bottom: 6px !important; }
+    @media (max-width: 1023px) { .product-grid { grid-template-columns: 1fr !important; } }
+    
+    .p-card { background: white; padding: 24px; border-radius: 18px; border: 1px solid #cbd5e1; display: flex !important; flex-direction: column !important; justify-content: space-between !important; min-height: 520px !important; height: auto !important; box-shadow: 0 6px 12px -2px rgba(0,0,0,0.04); position: relative; overflow: visible !important; }
+    .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .p-rank { font-size: 15px; font-weight: 800; padding: 4px 10px; background: #1e293b; color: white; border-radius: 6px; }
+    .p-sentiment { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
+    .p-brand { font-size: 15px; font-weight: 800; color: #155724; margin-bottom: 6px; text-align: left; }
+    
+    .p-name { font-size: 17px; font-weight: 700; color: #1e293b; margin-bottom: 10px; display: block; text-align: left; line-height: 1.4; height: 48px; overflow: hidden; display: -webkit-box; line-clamp: 2; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .p-category { font-size: 14px; color: #475569; margin-bottom: 16px; text-align: left; font-weight: 600; }
+    .p-review { background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; font-size: 15px; color: #1e293b; font-style: italic; line-height: 1.6; margin-bottom: 18px; text-align: left; min-height: 76px; font-weight: 500; }
+    .p-footer { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 16px; }
+    .p-score { color: #f59e0b; font-weight: 800; font-size: 16px; }
+    
+    /* 🟢 하단 주황색 연동 버튼 */
+    .btn-detail-go { font-size: 15px !important; padding: 14px 0 !important; border-radius: 8px !important; letter-spacing: 0.5px; }
+    
+    /* 🟢 실시간 4단계 파이프라인 타임라인 및 요약 배지 스타일 */
+    .timeline-badge-summary { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: #166534; background: #f0fdf4; padding: 8px 18px; border-radius: 9999px; border: 1px solid #bbf7d0; }
+    .timeline-container { display: flex; flex-direction: column; gap: 10px; border-top: 1px dashed #e2e8f0; padding-top: 16px; margin-top: 14px; }
+    .timeline-step { display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; transition: all 0.2s ease; }
+    .timeline-step.active { background: #eff6ff; border-color: #93c5fd; }
+    .timeline-step.done { background: #f0fdf4; border-color: #86efac; }
+    .timeline-step.error { background: #fef2f2; border-color: #fca5a5; }
+    
+    .step-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; background: #cbd5e1; color: #475569; }
+    .timeline-step.active .step-icon { background: #3b82f6; color: white; animation: pulse 1.5s infinite; }
+    .timeline-step.done .step-icon { background: #22c55e; color: white; }
+    .timeline-step.error .step-icon { background: #ef4444; color: white; }
+    
+    .step-content { flex: 1; text-align: left; }
+    .step-title { font-size: 16px; font-weight: 700; color: #1e293b; }
+    .step-desc { font-size: 13px; color: #64748b; margin-top: 2px; }
+    
+    .step-badge { font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 6px; background: #e2e8f0; color: #64748b; }
+    .timeline-step.active .step-badge { background: #dbeafe; color: #1d4ed8; }
+    .timeline-step.done .step-badge { background: #dcfce7; color: #15803d; }
+    .timeline-step.error .step-badge { background: #fee2e2; color: #991b1b; }
+    .timeline-step.is-branch { margin-left: 24px; border-left: 3px dashed #3b82f6; background: #f8fafc; }
+    .timeline-step.is-branch .step-icon { background: #3b82f6; color: white; font-size: 12px; }
+    
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+    
+    /* 🟢 참조 리뷰 원문 아코디언 카드 (FR-012) */
+    .ref-item-card { padding: 14px 18px; border-radius: 10px; background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #22c55e; text-align: left; margin-bottom: 8px; }
+    .ref-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 14px; }
+    .ref-item-rank { font-weight: 800; color: #15803d; background: #dcfce7; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+    .ref-item-tag { font-size: 12px; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+    .ref-item-sentence { font-size: 15px; color: #334155; font-style: italic; line-height: 1.5; margin-top: 4px; }
+    
+    /* 🟢 회복 추천 칩 버튼 (FR-010) */
+    .recovery-chip { padding: 9px 18px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 9999px; color: #15803d; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
+    .recovery-chip:hover { background: #dcfce7; border-color: #22c55e; transform: translateY(-1px); }
+
+    /* 🟢 하단 설명 배너 */
+    .info-banner { margin-top: 32px; padding: 20px; background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; font-size: 16px; color: #334155; line-height: 1.8; }
+    .info-banner p { font-weight: 800; color: #1e293b; margin-bottom: 10px; font-size: 17px; }
+    .hidden { display: none !important; }
+    footer { text-align: center; padding: 32px; font-size: 15px; color: #64748b; border-top: 1px solid #e2e8f0; margin-top: 64px; background: white; }
+    </style>
+</head>
+<body>
+    <!-- 1. 상단 네비게이션 바 -->
+    <header>
+        <div class="nav-container">
+            <h1 style="font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">Oliview <span style="color: #86efac; font-weight: 500;">AI RAG Engine</span></h1>
+            <span style="background: rgba(21, 87, 36, 0.5); font-size: 12px; padding: 4px 12px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.1); color: #bbf7d0;">v3.0.0 Production</span>
+        </div>
+    </header>
+
+    <!-- 2. 메인 대시보드 콘텐츠 -->
+    <main class="main-container">
+        
+        <!-- 왼쪽 사이드바: 필터 제어판 -->
+        <section class="sidebar">
+            <h2 style="font-size: 16px; font-weight: 700; color: #334155; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;">엔진 검색 가드레일 필터</h2>
+            
+            <form id="searchForm">
+                <div class="form-group">
+                    <label>자연어 추천 질문 선택</label>
+                    <select id="queryPreset" class="form-control" onchange="applyPresetQuery()">
+                        <option value="">직접 입력하거나 프리셋 선택</option>
+                        <option value="속건조가 너무 심해서 하루 종일 촉촉하고 흡수 잘되는 보습 영양 앰플 찾고 있어">💧 속건조 해결 촉촉 보습 영양 (추천)</option>
+                        <option value="민감성 피부라 트러블 안나고 순하면서 붉은기 진정에 좋은 쿠션팩트 있나요">✨ 트러블 방지 순한 진정 쿠션</option>
+                        <option value="여름철 기름기 잡고 모공 커버 잘되는 매트한 파운데이션 추천해줘">☀️ 기름기 제어 모공 커버 매트</option>
+                        <option value="눈가 주름이랑 탄력이 고민인데 끈적임 없는 안티에이징 아이크림">👁️ 눈가 주름 탄력 안티에이징</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>지정 브랜드 필터 (Brand)</label>
+                    <select id="brandInput" class="form-control">
+                        <option value="">전체 브랜드 수용</option>
+                        <option value="차앤박">차앤박 (CNP)</option>
+                        <option value="닥터지">닥터지 (Dr.G)</option>
+                        <option value="이니스프리">이니스프리</option>
+                        <option value="에스트라">에스트라</option>
+                        <option value="라운드랩">라운드랩</option>
+                        <option value="식물나라">식물나라</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>고객 감성 필터 (Sentiment)</label>
+                    <select id="sentimentInput" class="form-control">
+                        <option value="">전체 감성 분석 수용</option>
+                        <option value="긍정">긍정 리뷰만 매칭</option>
+                        <option value="부정">부정 리뷰만 매칭</option>
+                        <option value="중립">중립 리뷰만 매칭</option>
+                    </select>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>1단계 스크리닝 (k)</label>
+                        <input type="number" id="fetchKInput" value="20" class="form-control" style="text-align: center; font-weight: 500;">
+                    </div>
+                    <div class="form-group">
+                        <label>최종 고유 추출 (n)</label>
+                        <input type="number" id="topNInput" value="3" class="form-control" style="text-align: center; font-weight: 500;">
+                    </div>
+                </div>
+            </form>
+            
+            <div class="info-banner">
+                <p>🔍 RAG 파이프라인 작동 메커니즘</p>
+                <div>1. 질문 문장을 1024차원 벡터로 변환</div>
+                <div>2. SQL 메타 필터링 후 로컬 유사도 연산</div>
+                <div>3. 임베딩 기반 리랭커 정렬 스크리닝</div>
+                <div>4. LLM 기반 근거 맞춤 답변 도출</div>
+            </div>
+        </section>
+
+        <!-- 오른쪽 영역: 검색창 및 결과 영역 -->
+        <section class="content-area">
+            <div class="search-box">
+                <input type="text" id="queryInput" placeholder="피부 진정에 좋고 성분이 순한 쿠션팩트 추천해줘" class="search-input">
+                <button id="sendBtn" class="btn-submit">
+                    <span id="btnText">분석 요청</span>
+                </button>
+            </div>
+
+            <div id="resultContainer" class="hidden" style="display: flex; flex-direction: column; gap: 20px;">
+                
+                <!-- 🟢 실시간 4단계 파이프라인 진행 상태 타임라인 카드 (FR-001 ~ FR-008) -->
+                <div id="timelineCard" class="card" style="padding: 24px 32px;">
+                    <div id="timelineHeader" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleTimelineDetails()">
+                        <div id="timelineBadge" class="timeline-badge-summary">
+                            <span id="timelineBadgeIcon">🔄</span>
+                            <span id="timelineBadgeText">AI 리뷰 분석 파이프라인 가동 중...</span>
+                        </div>
+                        <button id="timelineToggleBtn" type="button" style="background: none; border: none; font-size: 14px; color: #15803d; font-weight: 700; cursor: pointer;">
+                            상세 접기 ▲
+                        </button>
+                    </div>
+
+                    <div id="timelineSteps" class="timeline-container">
+                        <div class="timeline-step" id="step-INTENT_ANALYSIS">
+                            <div class="step-icon">1</div>
+                            <div class="step-content">
+                                <div class="step-title">질문 의도 & 속성 분석</div>
+                                <div class="step-desc">브랜드, 상품명, 화장품 속성 및 감성 키워드 파싱</div>
+                            </div>
+                            <div class="step-badge" id="badge-INTENT_ANALYSIS">대기 중</div>
+                        </div>
+                        <div class="timeline-step" id="step-HYBRID_SEARCH">
+                            <div class="step-icon">2</div>
+                            <div class="step-content">
+                                <div class="step-title">하이브리드 리뷰 검색</div>
+                                <div class="step-desc">BGE-M3 밀집 벡터 + SQL 메타데이터 필터 검색</div>
+                            </div>
+                            <div class="step-badge" id="badge-HYBRID_SEARCH">대기 중</div>
+                        </div>
+                        <div class="timeline-step" id="step-RERANKING">
+                            <div class="step-icon">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Cross-Encoder 순위 재정렬</div>
+                                <div class="step-desc">BGE-Reranker 정밀 문장 교차 유사도 점수 산출</div>
+                            </div>
+                            <div class="step-badge" id="badge-RERANKING">대기 중</div>
+                        </div>
+                        <div class="timeline-step" id="step-LLM_SYNTHESIS">
+                            <div class="step-icon">4</div>
+                            <div class="step-content">
+                                <div class="step-title">LLM 맞춤 답변 실시간 생성</div>
+                                <div class="step-desc">실제 리뷰 기반 개인화 뷰티 가이드 답변 스트리밍</div>
+                            </div>
+                            <div class="step-badge" id="badge-LLM_SYNTHESIS">대기 중</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI 답변 본문 카드 -->
+                <div class="card">
+                    <div class="card-title">🧠 AI 전문 뷰티 가이드의 맞춤 솔루션</div>
+                    <div id="llmAnswerBox" class="llm-box"></div>
+                    
+                    <!-- 🟢 실제 참조 리뷰 원문 아코디언 (FR-012) -->
+                    <div id="referenceAccordionContainer" style="margin-top: 24px; display: none;">
+                        <details id="referenceDetails" style="cursor: pointer; background: #ffffff; border: 1px solid #dcfce7; border-radius: 12px; padding: 16px 20px;">
+                            <summary style="font-size: 17px; font-weight: 800; color: #166534; outline: none;">
+                                📖 실제 참조 리뷰 원문 (<span id="refCount">0</span>건)
+                            </summary>
+                            <div id="referenceList" style="margin-top: 14px; display: flex; flex-direction: column; gap: 8px;"></div>
+                        </details>
+                    </div>
+
+                    <!-- 🟢 0건 또는 에러 시 추천 검색어 칩 (FR-010) -->
+                    <div id="recoveryChipContainer" style="margin-top: 20px; display: none;">
+                        <div style="font-size: 15px; font-weight: 700; color: #64748b; margin-bottom: 10px;">💡 추천 검색어로 다시 질문해보세요:</div>
+                        <div id="recoveryChips" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
+                    </div>
+                </div>
+
+                <!-- 상품 카드 영역 -->
+                <div>
+                    <div style="font-size: 16px; font-weight: 700; color: #475569; margin-bottom: 12px; padding-left: 4px;">
+                        💬 실시간 매칭 신뢰도 TOP 고유 상품 소스
+                    </div>
+                    <div id="productCardContainer" class="product-grid"></div>
+                </div>
+            </div>
+
+            <div id="placeholderContainer" class="placeholder-box">
+                <h3>실시간 RAG AI 추천을 경험해보세요</h3>
+                <p>상단에 화장품이나 피부 상태에 대한 고민을 입력하시면 데이터베이스의 대용량 실사용자 리뷰 팩트를 하이브리드 리랭킹하여 완벽한 답변을 구성합니다.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>© 2026 Oliview Production RAG Engine. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // 💡 [설정] 백엔드 RAG API 엔드포인트 상대 경로 URL (게이트웨이 서브경로 및 로컬 실행 완전 지원)
+        function getApiEndpoints() {
+            const isGateway = window.location.pathname.startsWith("/bteam/chatb");
+            return {
+                apiUrl: isGateway ? "/bteam/chatb/api/v1/search" : "/api/v1/search",
+                streamUrl: isGateway ? "/bteam/chatb/api/v1/search/stream" : "/api/v1/search/stream"
+            };
+        }
+
+        // [이벤트 바인딩] 분석 요청 클릭 및 엔터키 이벤트 감지
+        document.getElementById('sendBtn').addEventListener('click', executeRagSearch);
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') executeRagSearch();
+        });
+
+        /**
+         * [기능] 타임라인 상세 4단계 접기/펼치기 토글 (FR-008, FR-013)
+         */
+        function toggleTimelineDetails() {
+            const timelineSteps = document.getElementById('timelineSteps');
+            const toggleBtn = document.getElementById('timelineToggleBtn');
+            if (!timelineSteps || !toggleBtn) return;
+
+            if (timelineSteps.classList.contains('hidden')) {
+                timelineSteps.classList.remove('hidden');
+                toggleBtn.textContent = '상세 접기 ▲';
+            } else {
+                timelineSteps.classList.add('hidden');
+                toggleBtn.textContent = '상세 보기 ▼';
+            }
+        }
+
+        /**
+         * [기능] 왼쪽 질문 프리셋 셀렉트 박스 선택 시 가드레일 필터 자동 세팅
+         */
+        function applyPresetQuery() {
+            const presetSelect = document.getElementById('queryPreset');
+            const selectedQuery = presetSelect.value;
+            
+            if (!selectedQuery) return;
+            
+            document.getElementById('queryInput').value = selectedQuery;
+
+            if (selectedQuery.includes("속건조") && selectedQuery.includes("앰플")) {
+                document.getElementById('brandInput').value = "차앤박";
+            } else if (selectedQuery.includes("민감성") && selectedQuery.includes("쿠션")) {
+                document.getElementById('brandInput').value = "닥터지";
+            } else if (selectedQuery.includes("기름기") && selectedQuery.includes("파운데이션")) {
+                document.getElementById('brandInput').value = "이니스프리";
+            } else if (selectedQuery.includes("주름") && selectedQuery.includes("아이크림")) {
+                document.getElementById('brandInput').value = "에스트라";
+            }
+        }
+
+        /**
+         * [보안] XSS 인젝션 방어용 HTML 이스케이프 유틸리티 (FR-B03)
+         */
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        /**
+         * [이커머스] 올리브영 공식몰 검색 정확도 극대화를 위한 상품명 노이즈 정제 (FR-B02)
+         */
+        function cleanProductNameForSearch(rawName, brandName) {
+            if (!rawName) return (brandName || '').trim();
+            let text = rawName;
+            text = text.replace(/\[.*?\]/g, ' ').replace(/\(.*?\)/g, ' ');
+            const noisePatterns = [
+                /\b\d+\+\d+\b/gi,
+                /\b\d+(ml|g|EA|매|입|개)\b/gi,
+                /\b\d+호\b/gi,
+                /기획세트|단독기획|스페셜기획|리필기획|증정기획/gi,
+                /본품|리필|더블기획|트리플기획|한정판/gi,
+                /대용량|미니|샘플|파우치증정/gi
+            ];
+            noisePatterns.forEach(p => { text = text.replace(p, ' '); });
+            text = text.replace(/[^\w\s가-힣a-zA-Z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
+            if (brandName && brandName.trim() && !text.startsWith(brandName.trim())) {
+                text = `${brandName.trim()} ${text}`;
+            }
+            return text || brandName || rawName;
+        }
+
+        /**
+         * [교정] 마크다운(**) 강조 정규식을 복원하고, \n 문자를 <br> 태그로 변환하는 함수
+         */
+        function parseMarkdown(text) {
+            if (!text) return "";
+            let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            return html.replace(/\n/g, '<br>');
+        }
+
+        /**
+         * [기능] 실제 참조 리뷰 원문 아코디언 렌더링 (FR-012, FR-B02)
+         */
+        function renderReferenceReviews(reviews) {
+            const refContainer = document.getElementById('referenceAccordionContainer');
+            const refList = document.getElementById('referenceList');
+            const refCount = document.getElementById('refCount');
+            if (!refContainer || !refList) return;
+
+            refList.innerHTML = '';
+            refCount.textContent = reviews.length;
+
+            reviews.forEach(ref => {
+                const bName = escapeHtml(ref.brand_name || '');
+                const pName = escapeHtml(ref.product_name || '');
+                const aTag = escapeHtml(ref.attribute_tag || ref.display_name || '일반');
+                const sLabel = escapeHtml(ref.sentiment_label || '리뷰');
+                const sentence = escapeHtml(ref.separated_sentence || '');
+                const cleanQuery = cleanProductNameForSearch(ref.product_name || '', ref.brand_name || '');
+                const oyUrl = ref.oliveyoung_search_url || `https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query=${encodeURIComponent(cleanQuery)}`;
+
+                const card = `
+                    <div class="ref-item-card">
+                        <div class="ref-item-header">
+                            <div>
+                                <span class="ref-item-rank">#${ref.rank}</span>
+                                <strong>[${bName}] ${pName}</strong>
+                            </div>
+                            <span class="ref-item-tag">${aTag} · ${sLabel}</span>
+                        </div>
+                        <div class="ref-item-sentence">"${sentence}"</div>
+                        <div style="margin-top: 8px; text-align: right;">
+                            <a href="${oyUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 4px 10px; background-color: #ff7700; color: #ffffff; font-size: 12px; font-weight: 700; border-radius: 6px; text-decoration: none;">
+                                🛍️ 올리브영 상세보기 ↗
+                            </a>
+                        </div>
+                    </div>
+                `;
+                refList.insertAdjacentHTML('beforeend', card);
+            });
+
+            refContainer.style.display = 'block';
+        }
+
+        /**
+         * [기능] 0건 또는 에러 시 추천 검색어 칩 렌더링 (FR-010, FR-B04)
+         */
+        function renderRecoveryChips(chips) {
+            const container = document.getElementById('recoveryChipContainer');
+            const chipsBox = document.getElementById('recoveryChips');
+            if (!container || !chipsBox) return;
+
+            chipsBox.innerHTML = '';
+            chips.forEach(chip => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'recovery-chip';
+                btn.textContent = chip;
+                btn.onclick = () => {
+                    document.getElementById('queryInput').value = chip;
+                    executeRagSearch();
+                };
+                chipsBox.appendChild(btn);
+            });
+
+            container.style.display = 'block';
+        }
+
+        /**
+         * [기능] 소스 데이터셋 추천 카드 동적 빌드 및 올리브영 연동 버튼 바인딩
+         */
+        function renderProductCards(results) {
+            const cardContainer = document.getElementById('productCardContainer');
+            if (!cardContainer) return;
+            cardContainer.innerHTML = ''; 
+
+            results.forEach(product => {
+                const sColor = product.sentiment_label === '긍정' 
+                    ? 'background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe;' 
+                    : 'background: #fffbc4; color: #b45309; border: 1px solid #fef3c7;';
+                
+                const bName = escapeHtml(product.brand_name || '');
+                const pName = escapeHtml(product.product_name || '');
+                const cat = escapeHtml(product.category || '');
+                const sent = escapeHtml(product.separated_sentence || '');
+                const dispTag = escapeHtml(product.display_name || product.attribute_tag || '일반 속성');
+                const cleanQuery = cleanProductNameForSearch(product.product_name || '', product.brand_name || '');
+                const oyUrl = product.oliveyoung_search_url || `https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query=${encodeURIComponent(cleanQuery)}`;
+
+                const cardHtml = `
+                    <div class="p-card">
+                        <div>
+                            <div class="p-header">
+                                <span class="p-rank">${product.rank}위</span>
+                                <span class="p-sentiment" style="${sColor}">${escapeHtml(product.sentiment_label)}리뷰</span>
+                            </div>
+                            <p class="p-brand">${bName}</p>
+                            <h4 class="p-name" title="${pName}">${pName}</h4>
+                            <p class="p-category">🏷️ ${cat}</p>
+                            <div class="p-review">
+                                <p>"${sent}"</p>
+                            </div>
+                        </div>
+                        <div style="margin-top: auto; padding-top: 10px; border-top: 1px dashed #cbd5e1;">
+                            <div class="p-footer">
+                                <span style="color: #64748b;">속성: <strong style="color: #334155;">${dispTag}</strong></span>
+                                <div class="p-score">⭐ ${product.review_score}</div>
+                            </div>
+                            <a href="${oyUrl}" target="_blank" rel="noopener noreferrer" 
+                               style="display: block !important; width: 100% !important; padding: 10px 0 !important; background-color: #f97316 !important; color: white !important; font-weight: 700 !important; font-size: 13px !important; border: none !important; border-radius: 6px !important; cursor: pointer !important; text-align: center !important; text-decoration: none !important; box-shadow: 0 2px 4px rgba(249,115,22,0.2) !important;">
+                                올리브영 상세보기 ↗
+                            </a>
+                        </div>
+                    </div>
+                `;
+                cardContainer.insertAdjacentHTML('beforeend', cardHtml);
+            });
+        }
+
+        /**
+         * [핵심] RAG 백엔드 SSE 실시간 4단계 스트리밍 파이프라인 소비 함수 (FR-001 ~ FR-013)
+         */
+        async function executeRagSearch() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                alert("AI에게 분석을 요청할 자연어 문장 질문을 입력해 주세요!");
+                return;
+            }
+
+            const endpoints = getApiEndpoints();
+            const btnText = document.getElementById('btnText');
+            const placeholder = document.getElementById('placeholderContainer');
+            const resultBox = document.getElementById('resultContainer');
+            const answerBox = document.getElementById('llmAnswerBox');
+            const timelineSteps = document.getElementById('timelineSteps');
+            const timelineBadgeIcon = document.getElementById('timelineBadgeIcon');
+            const timelineBadgeText = document.getElementById('timelineBadgeText');
+            const timelineToggleBtn = document.getElementById('timelineToggleBtn');
+            const refContainer = document.getElementById('referenceAccordionContainer');
+            const recoveryContainer = document.getElementById('recoveryChipContainer');
+            const productGrid = document.getElementById('productCardContainer');
+
+            btnText.textContent = "분석 중...";
+            document.getElementById('sendBtn').disabled = true;
+
+            if (placeholder) placeholder.classList.add('hidden');
+            if (resultBox) resultBox.classList.remove('hidden');
+            if (refContainer) refContainer.style.display = 'none';
+            if (recoveryContainer) recoveryContainer.style.display = 'none';
+            if (productGrid) productGrid.innerHTML = '';
+
+            // 타임라인 초기화 및 펼침 상태 복원
+            timelineSteps.classList.remove('hidden');
+            timelineToggleBtn.textContent = '상세 접기 ▲';
+            timelineBadgeIcon.textContent = '🔄';
+            timelineBadgeText.textContent = 'Agentic AI 파이프라인 가동 중...';
+            timelineSteps.innerHTML = ''; // 동적 Living Inspector를 위한 클린업
+
+            const nodeOrder = [];
+            const nodeMap = new Map();
+
+            function updateLivingInspector(data) {
+                if (!data) return;
+                const nodeId = data.node_id || data.step_id || 'UNKNOWN';
+                const title = data.title || data.step_name || nodeId;
+                const isBranch = !!data.is_branch;
+                const status = data.status || 'running';
+                const badgeText = data.badge_text || (status === 'complete' ? '완료 ✓' : '진행 중...');
+
+                let stepEl = nodeMap.get(nodeId);
+                if (!stepEl) {
+                    stepEl = document.createElement('div');
+                    stepEl.id = `living-node-${nodeId}`;
+                    stepEl.className = `timeline-step ${isBranch ? 'is-branch' : ''} ${status}`;
+                    
+                    const stepNum = isBranch ? '↳' : (nodeOrder.length + 1);
+                    if (!isBranch) nodeOrder.push(nodeId);
+
+                    stepEl.innerHTML = `
+                        <div class="step-icon">${stepNum}</div>
+                        <div class="step-content">
+                            <div class="step-title">${title}</div>
+                        </div>
+                        <div class="step-badge" id="badge-${nodeId}">${badgeText}</div>
+                    `;
+                    timelineSteps.appendChild(stepEl);
+                    nodeMap.set(nodeId, stepEl);
+                } else {
+                    if (status === 'complete' || status === 'done') {
+                        stepEl.className = `timeline-step ${isBranch ? 'is-branch' : ''} done`;
+                    } else if (status === 'error' || status === 'warning') {
+                        stepEl.className = `timeline-step ${isBranch ? 'is-branch' : ''} error`;
+                    } else {
+                        stepEl.className = `timeline-step ${isBranch ? 'is-branch' : ''} active`;
+                    }
+
+                    const titleEl = stepEl.querySelector('.step-title');
+                    if (titleEl && title) titleEl.textContent = title;
+
+                    const badgeEl = stepEl.querySelector('.step-badge');
+                    if (badgeEl) badgeEl.textContent = badgeText;
+                }
+            }
+
+            answerBox.innerHTML = `
+                <div class="ai-typing-loading">
+                    🪄 Agentic AI 다중 비교 및 실시간 리뷰 분석 파이프라인 진행 중...
+                    <div class="dot-spinner"><span></span><span></span><span></span></div>
+                </div>
+            `;
+
+            const payload = {
+                query: query,
+                brand: document.getElementById('brandInput').value || null,
+                keyword: null,
+                sentiment: document.getElementById('sentimentInput').value || null,
+                fetch_k: parseInt(document.getElementById('fetchKInput').value) || 20,
+                top_n: parseInt(document.getElementById('topNInput').value) || 3
+            };
+
+            try {
+                let response = null;
+                try {
+                    response = await fetch(endpoints.streamUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (networkErr) {
+                    console.warn("Stream fetch failed, fallback to standard API", networkErr);
+                }
+
+                if (!response || !response.ok) {
+                    console.warn("Streaming unavailable, falling back to standard API:", endpoints.apiUrl);
+                    const fallbackResp = await fetch(endpoints.apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!fallbackResp.ok) {
+                        throw new Error(`HTTP 통신 실패 서버 오류 (상태코드: ${fallbackResp.status})`);
+                    }
+                    const data = await fallbackResp.json();
+                    
+                    timelineBadgeIcon.textContent = '✅';
+                    timelineBadgeText.textContent = `리뷰 종합 분석 완료 (${data.search_results ? data.search_results.length : 0}건 참조)`;
+                    timelineSteps.classList.add('hidden');
+                    timelineToggleBtn.textContent = '상세 보기 ▼';
+
+                    answerBox.innerHTML = parseMarkdown(data.llm_answer);
+                    if (data.search_results && data.search_results.length > 0) {
+                        renderProductCards(data.search_results);
+                        renderReferenceReviews(data.search_results);
+                    }
+                    return;
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let buffer = '';
+                let accumulatedMarkdown = '';
+                let isFirstToken = true;
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const blocks = buffer.split('\n\n');
+                    buffer = blocks.pop();
+
+                    for (const block of blocks) {
+                        if (!block.trim()) continue;
+                        const lines = block.split('\n');
+                        let evtType = 'message';
+                        let dataStr = '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('event:')) {
+                                evtType = line.slice(6).trim();
+                            } else if (line.startsWith('data:')) {
+                                dataStr = line.slice(5).trim();
+                            }
+                        }
+
+                        let dataObj = null;
+                        try {
+                            dataObj = JSON.parse(dataStr);
+                        } catch (e) {
+                            dataObj = dataStr;
+                        }
+
+                        if (evtType === 'step' || evtType === 'step_update') {
+                            updateLivingInspector(dataObj);
+                        } else if (evtType === 'queue_status') {
+                            const pos = dataObj.queue_position || 1;
+                            const waitSec = dataObj.estimated_wait_sec || 4;
+                            timelineBadgeIcon.textContent = '⏳';
+                            timelineBadgeText.textContent = `GPU 자원 대기 중 (순번 ${pos}번, 약 ${Math.round(waitSec)}초 예상)`;
+                            answerBox.innerHTML = `
+                                <div class="ai-typing-loading" style="color: #b45309;">
+                                    ⏳ 다른 질문을 처리 중입니다. (대기 순번: <strong>${pos}번</strong>, 예상 대기: 약 <strong>${Math.round(waitSec)}초</strong>)
+                                    <div class="dot-spinner"><span></span><span></span><span></span></div>
+                                </div>
+                            `;
+                        } else if (evtType === 'token') {
+                            if (isFirstToken) {
+                                answerBox.innerHTML = '';
+                                isFirstToken = false;
+                                // 실시간 토큰 스트리밍 시작 시 부드럽게 상단 축소
+                                timelineSteps.classList.add('hidden');
+                                timelineToggleBtn.textContent = '상세 보기 ▼';
+                            }
+                            accumulatedMarkdown += dataObj.token || '';
+                            answerBox.innerHTML = parseMarkdown(accumulatedMarkdown);
+                        } else if (evtType === 'complete') {
+                            const sec = (typeof dataObj.total_latency_sec !== 'undefined') ? dataObj.total_latency_sec : (dataObj.metrics && dataObj.metrics.total_latency_ms ? dataObj.metrics.total_latency_ms / 1000 : 0);
+                            const cnt = (typeof dataObj.selected_review_count !== 'undefined') ? dataObj.selected_review_count : (dataObj.reference_reviews ? dataObj.reference_reviews.length : (dataObj.target_count || 0));
+                            const tier = dataObj.context_tier ? ` [${dataObj.context_tier}]` : '';
+                            timelineBadgeIcon.textContent = '✅';
+                            timelineBadgeText.textContent = `리뷰 종합 분석 완료${tier} (${sec.toFixed(1)}초, ${cnt}건 선별)`;
+                            timelineSteps.classList.add('hidden');
+                            timelineToggleBtn.textContent = '상세 보기 ▼';
+
+                            if (dataObj.reference_reviews && dataObj.reference_reviews.length > 0) {
+                                renderReferenceReviews(dataObj.reference_reviews);
+                                renderProductCards(dataObj.reference_reviews);
+                            }
+                        } else if (evtType === 'error') {
+                            timelineBadgeIcon.textContent = '⚠️';
+                            timelineBadgeText.textContent = dataObj.label || '분석 중 문제 발생';
+                            answerBox.innerHTML = `<span style="color:#ef4444; font-weight:700;">⚠️ ${dataObj.error_message || '검색 결과를 찾을 수 없습니다.'}</span>`;
+
+                            if (dataObj.suggested_chips && dataObj.suggested_chips.length > 0) {
+                                renderRecoveryChips(dataObj.suggested_chips);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+                answerBox.innerHTML = '<span style="color:#ef4444; font-weight:600;">⚠️ RAG API 통신 장애: ' + error.message + '</span>';
+            } finally {
+                btnText.textContent = "분석 요청";
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

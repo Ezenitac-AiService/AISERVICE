@@ -1,0 +1,12 @@
+{
+  "_comment": "vllm_serv 교육용 샘플 설정 예시. 개발/서비스 플랫폼(http://192.168.0.80) 등 접속할 서버 주소를 지정하세요.",
+  "server_host": "http://192.168.0.80",
+  "main_port": 8081,
+  "embedding_port": 8090,
+  "rerank_port": 8091,
+  "default_model": "qwen3.5-4b",
+  "embedding_model": "bge-m3",
+  "rerank_model": "bge-reranker-v2-m3",
+  "default_temperature": 0.3,
+  "default_max_tokens": 1024
+}

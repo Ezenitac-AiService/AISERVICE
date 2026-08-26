@@ -1,0 +1,53 @@
+# Git
+.git/
+.gitignore
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs & temp
+*.log
+logs/
+tmp/
+
+# Data & models (exclude heavy artifacts from web image)
+data/*
+!data/README.md
+artifacts/
+checkpoints/
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.sql

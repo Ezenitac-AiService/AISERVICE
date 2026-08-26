@@ -1,0 +1,22 @@
+[project]
+name = "oliview-chatbot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb==1.5.9",
+    "httpx>=0.28.1",
+    "huggingface-hub>=1.26.0",
+    "kiwipiepy>=0.23.2",
+    "langchain-chroma>=1.1.0",
+    "langchain-huggingface>=1.2.2",
+    "openai>=2.53.0",
+    "pydantic>=2.13.4",
+    "pymysql>=1.2.0",
+    "python-dotenv>=1.2.2",
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=5.6.1",
+    "streamlit>=1.61.1",
+    "torch>=2.13.0",
+]

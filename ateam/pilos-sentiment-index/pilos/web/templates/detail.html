@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ code }} · PILOS 종목 분석</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css', v='market-overview-7') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/detail.css', v='detail-toss-4') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css', v='allowed-tree-1') }}" />
+</head>
+<body>
+  <div
+    class="detail-page"
+    id="detail-root"
+    data-code="{{ code }}"
+    data-chat-fixed-stock-code="{{ code }}"
+  >
+    <div class="d-detail-shell">
+    <header class="d-topbar">
+      <div class="d-topbar__identity">
+        <a class="d-back" href="{{ url_for('index') }}" aria-label="전체 종목으로 돌아가기">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true">
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <span id="d-stock-logo" class="d-repo-icon d-stock-logo" aria-hidden="true">
+          <span class="d-stock-logo__fallback">{{ code[0] if code else '?' }}</span>
+        </span>
+        <div>
+          <p class="d-eyebrow">PILOS STOCK LAB</p>
+          <div class="d-stock-id">
+            <h1 id="d-stock-name" class="d-stock-name">불러오는 중…</h1>
+            <span id="d-stock-code" class="d-stock-code mono">{{ code }}</span>
+            <span class="d-repo-visibility">Research</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-date-picker" aria-label="분석 기준일 선택">
+        <span class="d-date-picker__label">분석 기준일</span>
+        <div class="d-date-picker__control">
+          <button type="button" id="d-date-prev" class="d-date-step" aria-label="이전 데이터 날짜">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+              <path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <label class="d-date-input-wrap">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M8 3v4M16 3v4M4 10h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <input type="date" id="d-date-input" class="d-date-input" />
+          </label>
+          <button type="button" id="d-date-next" class="d-date-step" aria-label="다음 데이터 날짜">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <span id="d-date-hint" class="d-date-picker__hint"></span>
+      </div>
+    </header>
+
+    <nav class="d-repo-nav" aria-label="상세 분석 섹션">
+      <a href="#report" class="d-repo-nav__item d-repo-nav__item--active">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+          <path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        </svg>
+        분석 리포트
+      </a>
+      <a href="#chat" class="d-repo-nav__item">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+          <path d="M4 5h16v11H8l-4 4V5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        </svg>
+        종목 질문
+      </a>
+      <a href="#models" class="d-repo-nav__item">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/>
+          <path d="m8.5 12 2.2 2.2 4.8-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        모델 산출물
+      </a>
+      <a href="#data" class="d-repo-nav__item">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+          <ellipse cx="12" cy="5.5" rx="7" ry="2.5" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6" stroke="currentColor" stroke-width="1.7"/>
+        </svg>
+        원자료
+      </a>
+    </nav>
+    </div>
+
+    <div id="d-loading" class="d-page-state">
+      <span class="spinner" aria-hidden="true"></span>
+      <span>종목 데이터를 불러오는 중입니다…</span>
+    </div>
+
+    <div id="d-error" class="d-page-state d-page-state--error" hidden>
+      <p id="d-error-text">데이터를 불러오지 못했습니다.</p>
+      <button type="button" id="d-retry">다시 시도</button>
+    </div>
+
+    <main id="d-content" hidden>
+      <section id="report" class="d-section d-report-section" aria-labelledby="d-llm-heading">
+        <div class="d-section__head">
+          <div>
+            <p class="d-section__eyebrow">01 · 가장 먼저 읽는 해석</p>
+            <h2 id="d-llm-heading">LLM 기반 수급 리포트</h2>
+            <p>저장된 모델 산출물과 실제 수급을 바탕으로 선택한 날짜의 핵심을 설명합니다.</p>
+          </div>
+          <span id="d-llm-status" class="status-badge status-badge--muted">조회 전</span>
+        </div>
+
+        <div id="d-llm-loading" class="d-inline-state">선택한 날짜의 리포트를 불러오는 중입니다…</div>
+        <div id="d-llm-empty" class="d-inline-state" hidden></div>
+
+        <div id="d-llm-content" hidden>
+          <div class="d-report-hero">
+            <div class="d-report-signal">
+              <span id="d-llm-direction" class="d-report-direction">—</span>
+              <strong id="d-llm-signal-score" class="d-report-score">—</strong>
+              <span id="d-llm-signal-level" class="d-report-level">—</span>
+            </div>
+            <div class="d-report-copy">
+              <p id="d-llm-summary" class="d-report-summary"></p>
+              <p id="d-llm-conclusion" class="d-report-conclusion"></p>
+            </div>
+          </div>
+
+          <div class="d-report-metrics">
+            <div><span>실제 수급지수</span><strong id="d-llm-actual-index">—</strong></div>
+            <div><span>전일 대비 신호</span><strong id="d-llm-signal-change">—</strong></div>
+            <div><span>5거래일 평균</span><strong id="d-llm-signal-ma5">—</strong></div>
+            <div><span>분석 댓글</span><strong id="d-llm-comment-count">—</strong></div>
+          </div>
+
+          <div id="d-llm-refresh-banner" class="d-report-alert" hidden></div>
+
+          <details class="d-report-details">
+            <summary>리포트 데이터 상태 전체 보기</summary>
+            <dl class="d-data-list">
+              <div><dt>리포트 기준일</dt><dd id="d-llm-date">—</dd></div>
+              <div><dt>해설 생성 방식</dt><dd id="d-llm-source">—</dd></div>
+              <div><dt>신호 계산 상태</dt><dd id="d-llm-signal-status">—</dd></div>
+              <div><dt>리포트 수급 상태</dt><dd id="d-llm-report-supply-status">—</dd></div>
+              <div><dt>리포트 수급 관측시각</dt><dd id="d-llm-report-observed-at">—</dd></div>
+              <div><dt>현재 수급 상태</dt><dd id="d-llm-current-supply-status">—</dd></div>
+              <div><dt>현재 수급 관측시각</dt><dd id="d-llm-current-observed-at">—</dd></div>
+              <div><dt>리포트 갱신 상태</dt><dd id="d-llm-refresh-status">—</dd></div>
+            </dl>
+          </details>
+          <p id="d-llm-notice" class="d-notice"></p>
+        </div>
+      </section>
+
+      <section id="chat" class="d-section" aria-labelledby="d-chat-heading">
+        <div class="d-section__head">
+          <div>
+            <p class="d-section__eyebrow">02 · 현재 종목 전용 분석 도우미</p>
+            <h2 id="d-chat-heading">현재 종목의 데이터를 질문 블록으로 확인하기</h2>
+            <p><strong id="d-chat-context-name">현재 종목</strong>은 고정됩니다. 허용된 질문을 고르고 날짜만 선택하면 같은 대화 안에서 결과와 추가 질문을 이어서 확인할 수 있습니다.</p>
+          </div>
+        </div>
+
+        <div class="d-chat-inline" data-chat-inline></div>
+      </section>
+
+      <section id="models" class="d-section" aria-labelledby="d-model-heading">
+        <div class="d-section__head">
+          <div>
+            <p class="d-section__eyebrow">03 · 계산 결과와 근거</p>
+            <h2 id="d-model-heading">양방향 모델 산출물</h2>
+            <p>두 모델은 각각 매수 우위·매도 우위 국면의 댓글 표현 연관성을 독립적으로 계산합니다.</p>
+          </div>
+          <span id="d-analysis-status" class="status-badge"></span>
+        </div>
+
+        <div class="d-model-grid">
+          <article class="d-model-card d-model-card--positive" data-model-card="positive">
+            <div class="d-model-card__head">
+              <div><span>BUY REGIME</span><h3>매수 우위 방향 모델</h3></div>
+              <span class="status-badge" data-field="inferenceStatusBadge"></span>
+            </div>
+            <div class="d-model-score-wrap">
+              <span>수급 방향 연관 점수</span>
+              <strong data-field="supplyDemandAssociationScore">—</strong>
+            </div>
+            <dl class="d-data-list d-data-list--compact">
+              <div><dt>모델 variant</dt><dd data-field="variant">—</dd></div>
+              <div><dt>절편</dt><dd data-field="intercept">—</dd></div>
+              <div><dt>댓글 text score</dt><dd data-field="textScore">—</dd></div>
+              <div><dt>댓글 수 기여도</dt><dd data-field="commentCountContribution">—</dd></div>
+              <div><dt>인식 feature 수</dt><dd data-field="recognizedFeatureCount">—</dd></div>
+              <div><dt>고유 토큰 수</dt><dd data-field="uniqueTokenCount">—</dd></div>
+              <div><dt>vocabulary 인식률</dt><dd data-field="vocabularyCoverage">—</dd></div>
+            </dl>
+            <div class="d-keyword-panel">
+              <h4>주요 기여 표현</h4>
+              <div id="d-positive-keywords"></div>
+            </div>
+          </article>
+
+          <article class="d-model-card d-model-card--negative" data-model-card="negative">
+            <div class="d-model-card__head">
+              <div><span>SELL REGIME</span><h3>매도 우위 방향 모델</h3></div>
+              <span class="status-badge" data-field="inferenceStatusBadge"></span>
+            </div>
+            <div class="d-model-score-wrap">
+              <span>수급 방향 연관 점수</span>
+              <strong data-field="supplyDemandAssociationScore">—</strong>
+            </div>
+            <dl class="d-data-list d-data-list--compact">
+              <div><dt>모델 variant</dt><dd data-field="variant">—</dd></div>
+              <div><dt>절편</dt><dd data-field="intercept">—</dd></div>
+              <div><dt>댓글 text score</dt><dd data-field="textScore">—</dd></div>
+              <div><dt>댓글 수 기여도</dt><dd data-field="commentCountContribution">—</dd></div>
+              <div><dt>인식 feature 수</dt><dd data-field="recognizedFeatureCount">—</dd></div>
+              <div><dt>고유 토큰 수</dt><dd data-field="uniqueTokenCount">—</dd></div>
+              <div><dt>vocabulary 인식률</dt><dd data-field="vocabularyCoverage">—</dd></div>
+            </dl>
+            <div class="d-keyword-panel">
+              <h4>주요 기여 표현</h4>
+              <div id="d-negative-keywords"></div>
+            </div>
+          </article>
+        </div>
+
+      </section>
+
+      <section id="data" class="d-section" aria-labelledby="d-data-heading">
+        <div class="d-section__head">
+          <div>
+            <p class="d-section__eyebrow">04 · 해석을 검증하는 원자료</p>
+            <h2 id="d-data-heading">실제 수급과 데이터 품질</h2>
+            <p>리포트와 모델 점수를 판단할 때 함께 봐야 하는 원자료와 적재 상태입니다.</p>
+          </div>
+        </div>
+
+        <div class="d-fact-grid">
+          <article class="d-fact-card d-fact-card--wide">
+            <span>개인 투자자 매수·매도</span>
+            <div class="d-supply-balance">
+              <div class="d-supply-balance__head">
+                <strong id="d-actual-supply-demand-index">—</strong>
+                <span>수급지수</span>
+              </div>
+              <div class="d-supply-track" aria-label="개인 매수·매도 비중">
+                <span id="d-buy-share-bar" class="d-supply-track__buy"></span>
+              </div>
+              <div class="d-supply-volume-row">
+                <span>매수 <strong id="d-actual-buy-volume">—</strong> <small id="d-buy-share">—</small></span>
+                <span>매도 <strong id="d-actual-sell-volume">—</strong> <small id="d-sell-share">—</small></span>
+              </div>
+            </div>
+          </article>
+          <article class="d-fact-card"><span>분석 댓글 수</span><strong id="d-comment-count">—</strong></article>
+          <article class="d-fact-card"><span>수급 데이터 상태</span><strong id="d-supply-status">—</strong><small id="d-supply-observed-at">—</small></article>
+          <article class="d-fact-card"><span>모델 기준일</span><strong id="d-model-date">—</strong></article>
+        </div>
+
+      </section>
+
+      <footer class="d-footer">본 화면은 댓글 데이터와 개인 투자자 수급의 통계적 연관성을 설명하며 투자 권유가 아닙니다.</footer>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/detail.js', v='detail-overview-6') }}"></script>
+  <script src="{{ url_for('static', filename='js/chat.js', v='allowed-tree-2') }}"></script>
+</body>
+</html>

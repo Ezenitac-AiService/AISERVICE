@@ -1,0 +1,90 @@
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForTokenClassification, AutoTokenizer
+
+
+ROOT = Path(__file__).resolve().parent
+
+
+class AspectSentenceSplitter:
+    def __init__(self, model_dir: str | Path) -> None:
+        model_path = Path(model_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
+        self.model = AutoModelForTokenClassification.from_pretrained(model_path)
+        self.model.eval()
+        self.aspects = json.loads(
+            (model_path / "aspects.json").read_text(encoding="utf-8")
+        )
+
+    @torch.inference_mode()
+    def extract(self, review_text: str) -> list[dict[str, str]]:
+        results = []
+        for aspect in self.aspects:
+            encoded = self.tokenizer(
+                aspect,
+                review_text,
+                truncation="only_second",
+                max_length=512,
+                return_offsets_mapping=True,
+                return_tensors="pt",
+            )
+            # KLUE-RoBERTa에서 쓰지 않는 문장 구분 번호 제거
+            encoded.pop("token_type_ids", None)
+            offsets = encoded.pop("offset_mapping")[0].tolist()
+            sequence_ids = encoded.sequence_ids(0)
+            predictions = self.model(**encoded).logits[0].argmax(dim=-1).tolist()
+
+            span_start = None
+            span_end = None
+            for tag, (start, end), sequence_id in zip(
+                predictions,
+                offsets,
+                sequence_ids,
+            ):
+                if sequence_id != 1:
+                    continue
+                if tag == 1:
+                    if span_start is not None:
+                        results.append({
+                            "aspect": aspect,
+                            "aspect_phrase": review_text[span_start:span_end],
+                        })
+                    span_start, span_end = start, end
+                elif tag == 2 and span_start is not None:
+                    span_end = end
+                elif span_start is not None:
+                    results.append({
+                        "aspect": aspect,
+                        "aspect_phrase": review_text[span_start:span_end],
+                    })
+                    span_start = span_end = None
+
+            if span_start is not None:
+                results.append({
+                    "aspect": aspect,
+                    "aspect_phrase": review_text[span_start:span_end],
+                })
+        return results
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=ROOT / "models" / "aspect_span_extractor",
+    )
+    parser.add_argument("--text", required=True)
+    args = parser.parse_args()
+
+    splitter = AspectSentenceSplitter(args.model_dir)
+    print(json.dumps(splitter.extract(args.text), ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

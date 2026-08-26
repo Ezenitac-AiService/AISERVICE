@@ -1,0 +1,53 @@
+{
+  "dev-rtx3060": {
+    "profile_id": "dev-rtx3060",
+    "name": "Primary Trainee Development Workstation (i7-4770 / RTX 3060)",
+    "cpu_model": "Modern x86_64 CPU / i7-4770",
+    "ram_gb": 16,
+    "gpu_name": "NVIDIA GeForce RTX 3060",
+    "vram_mb": 12288,
+    "compute_capability": "8.6",
+    "os_name": "Linux x86_64",
+    "expected_avx": true,
+    "expected_avx2": true,
+    "network": {
+      "bind_host": "0.0.0.0",
+      "allowed_subnets": ["127.0.0.1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"],
+      "firewall_auto_allow": true
+    }
+  },
+  "pascal-avx2-gtx1080ti": {
+    "profile_id": "pascal-avx2-gtx1080ti",
+    "name": "Haswell Xeon E3-1231 v3 + GTX 1080 Ti Development Server",
+    "cpu_model": "Intel(R) Xeon(R) CPU E3-1231 v3 @ 3.40GHz",
+    "ram_gb": 32,
+    "gpu_name": "NVIDIA GeForce GTX 1080 Ti",
+    "vram_mb": 11264,
+    "compute_capability": "6.1",
+    "os_name": "Ubuntu Server 24.04 LTS",
+    "expected_avx": true,
+    "expected_avx2": true,
+    "network": {
+      "bind_host": "0.0.0.0",
+      "allowed_subnets": ["127.0.0.1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"],
+      "firewall_auto_allow": true
+    }
+  },
+  "legacy-i7-930-gtx1070": {
+    "profile_id": "legacy-i7-930-gtx1070",
+    "name": "Legacy Trainee Service Server (i7 930 + GTX 1070)",
+    "cpu_model": "Intel Core i7 930 @ 2.80GHz",
+    "ram_gb": 24,
+    "gpu_name": "NVIDIA GeForce GTX 1070",
+    "vram_mb": 8192,
+    "compute_capability": "6.1",
+    "os_name": "Ubuntu Server 24.04 LTS",
+    "expected_avx": false,
+    "expected_avx2": false,
+    "network": {
+      "bind_host": "0.0.0.0",
+      "allowed_subnets": ["127.0.0.1", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"],
+      "firewall_auto_allow": true
+    }
+  }
+}

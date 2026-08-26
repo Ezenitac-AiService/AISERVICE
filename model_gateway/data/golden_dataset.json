@@ -1,0 +1,222 @@
+{
+  "dataset_version": "2.0.0",
+  "teacher_model": "Antigravity (Gemini 3.6 Flash)",
+  "golden_verified": true,
+  "total_items": 10,
+  "prompts": [
+    {
+      "prompt_id": "ATEAM-STOCK-01",
+      "domain_type": "stock_comment",
+      "input_text": "A: 삼전 오늘 7만전자 뚫는거야? B: 걔네 3분기 실적 생각하면 힘들듯 C: 하닉은 어때? B: 이건 반도체 업황 개선 수혜 받아 가능해보임",
+      "context_metadata": "Stock Discussion Community Board",
+      "expected_slots": [
+        {
+          "speaker": "A",
+          "target": "삼성전자",
+          "sentiment": "positive",
+          "category": "투자가치",
+          "refined_sentence": "A가 삼성전자의 주가 7만 원 돌파 가능성에 대해 기대감을 드러냄."
+        },
+        {
+          "speaker": "B",
+          "target": "삼성전자",
+          "sentiment": "negative",
+          "category": "실적예상",
+          "refined_sentence": "B가 삼성전자의 3분기 실적 저조를 우려함."
+        },
+        {
+          "speaker": "C",
+          "target": "SK하이닉스",
+          "sentiment": "neutral",
+          "category": "전망문의",
+          "refined_sentence": "C가 SK하이닉스의 주가 전망에 대해 질문함."
+        },
+        {
+          "speaker": "B",
+          "target": "SK하이닉스",
+          "sentiment": "positive",
+          "category": "업황수혜",
+          "refined_sentence": "B가 SK하이닉스는 메모리 반도체 업황 개선으로 상승 가능하다고 판단함."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "BTEAM-REVIEW-01",
+      "domain_type": "restaurant_review",
+      "input_text": "트러플 파스타는 면도 생면이고 진해서 너무 맛있었어요! 가격도 합리적이네요. 다만 매장 청결도가 별로였고 서빙 직원이 불친절해서 아쉬웠습니다.",
+      "context_metadata": "Italian Restaurant Review",
+      "expected_slots": [
+        {
+          "category": "맛",
+          "target": "트러플 파스타",
+          "sentiment": "positive",
+          "sentence": "트러플 파스타는 면도 생면이고 진해서 너무 맛있었어요!",
+          "refined_sentence": "트러플 파스타의 생면 식감과 진한 풍미가 매우 만족스럽다."
+        },
+        {
+          "category": "가격",
+          "target": "트러플 파스타",
+          "sentiment": "positive",
+          "sentence": "가격도 합리적이네요.",
+          "refined_sentence": "트러플 파스타의 가격이 합리적이다."
+        },
+        {
+          "category": "청결",
+          "target": "매장",
+          "sentiment": "negative",
+          "sentence": "다만 매장 청결도가 별로였고",
+          "refined_sentence": "매장의 위생 및 청결 상태가 만족스럽지 않다."
+        },
+        {
+          "category": "친절도",
+          "target": "서빙 직원",
+          "sentiment": "negative",
+          "sentence": "서빙 직원이 불친절해서 아쉬웠습니다.",
+          "refined_sentence": "서빙 직원의 응대 태도가 불친절하여 아쉽다."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-SEMICON-02",
+      "domain_type": "semiconductor",
+      "input_text": "HBM3E 12단 적층 메모리 양산 수율이 70%를 돌파하면서 엔비디아 공급망 진입 가능성이 높아졌습니다.",
+      "context_metadata": "Semiconductor Industry Report",
+      "expected_slots": [
+        {
+          "target": "HBM3E 12단",
+          "category": "수율",
+          "sentiment": "positive",
+          "refined_sentence": "HBM3E 12단 적층 메모리의 수율 70% 달성으로 공급망 진입 가능성 확대."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-FINANCE-03",
+      "domain_type": "finance",
+      "input_text": "한국은행 금통위가 기준금리를 0.25%p 인하함에 따라 시중은행의 주택담보대출 금리가 인하될 전망입니다.",
+      "context_metadata": "Central Bank Policy Statement",
+      "expected_slots": [
+        {
+          "target": "기준금리",
+          "category": "금리정책",
+          "sentiment": "neutral",
+          "refined_sentence": "기준금리 25bp 인하에 따른 주담대 금리 하향 조정 예상."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-IT-04",
+      "domain_type": "cloud_it",
+      "input_text": "AWS H100 인스턴스 클러스터 확장을 통해 데이터 처리 처리 속도가 3배 향상되었습니다.",
+      "context_metadata": "Cloud Infrastructure Benchmark",
+      "expected_slots": [
+        {
+          "target": "H100 인스턴스",
+          "category": "성능개선",
+          "sentiment": "positive",
+          "refined_sentence": "H100 클러스터 확장에 따른 3배 성능 향상 검증."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-STOCK-05",
+      "domain_type": "biotech_stock",
+      "input_text": "바이오기업 A사의 항암 신약 임상 3상 결과 유의미한 지표를 확보하며 FDA 승인 기대감이 고조되고 있습니다.",
+      "context_metadata": "Bio Healthcare News",
+      "expected_slots": [
+        {
+          "target": "항암 신약",
+          "category": "임상3상",
+          "sentiment": "positive",
+          "refined_sentence": "임상 3상 성공에 따른 FDA 허가 유효성 입증."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-SEMICON-06",
+      "domain_type": "semiconductor",
+      "input_text": "파운드리 2나노 GAA 공정 전력 효율이 이전 핀펫 대비 15% 향상된 것으로 측정되었습니다.",
+      "context_metadata": "Foundry Tech Brief",
+      "expected_slots": [
+        {
+          "target": "2나노 GAA",
+          "category": "전력효율",
+          "sentiment": "positive",
+          "refined_sentence": "GAA 공정 도입에 따른 전력 효율 15% 개선."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-FINANCE-07",
+      "domain_type": "finance",
+      "input_text": "부동산 PF 사업장 옥석 가리기가 본격화되면서 부실 채권 매각이 신속히 진행되고 있습니다.",
+      "context_metadata": "Real Estate Debt Report",
+      "expected_slots": [
+        {
+          "target": "부동산 PF",
+          "category": "채권매각",
+          "sentiment": "neutral",
+          "refined_sentence": "부실 PF 채권 정리 및 유동성 회복 절차 진행."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-IT-08",
+      "domain_type": "llm_quantization",
+      "input_text": "Qwen 3.5 4B 모델을 Q4_K_M 양자화 적용 시 11GB VRAM 내에서 36.2 tok/s 추론 속도를 달성했습니다.",
+      "context_metadata": "LLM Serving Performance Evaluation",
+      "expected_slots": [
+        {
+          "target": "Qwen 3.5 4B",
+          "category": "양자화성능",
+          "sentiment": "positive",
+          "refined_sentence": "Q4_K_M 양자화를 적용하여 단일 GPU VRAM 오프로드 완주."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    },
+    {
+      "prompt_id": "GOLDEN-TECH-09",
+      "domain_type": "cuda_optimization",
+      "input_text": "FlashAttention-3 CUDA 커널 최적화를 통해 컨텍스트 길이에 따른 메모리 점유율을 O(N)으로 절감했습니다.",
+      "context_metadata": "CUDA Kernel Tuning",
+      "expected_slots": [
+        {
+          "target": "FlashAttention-3",
+          "category": "커널최적화",
+          "sentiment": "positive",
+          "refined_sentence": "O(N) 선형 메모리 점유율 확립으로 차세대 추론 보장."
+        }
+      ],
+      "expected_format": "json_object",
+      "golden_verified": true,
+      "golden_source": "antigravity-ai-agent-direct-synthesis"
+    }
+  ]
+}

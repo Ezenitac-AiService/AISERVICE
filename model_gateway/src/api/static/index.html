@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vLLM Control Center & AI Playground</title>
+    <link rel="stylesheet" href="/dashboard/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chart.js for Real-Time GPU/VRAM Time-Series Canvas Graphs (FR-001) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 048-think-tag-ui-markdown: Markdown Parsing, DOM Purify XSS & Syntax Highlighting -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.9/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+    <div class="background-mesh"></div>
+    <div class="container">
+        <!-- Top App Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="logo-icon">⚡</div>
+                <div>
+                    <h1>vLLM Serving Dashboard</h1>
+                    <p class="subtitle" id="platform-profile-subtitle">Platform: Loading Profile...</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="admin-login-btn" class="secondary-btn">🔒 Admin Login</button>
+                <div id="status-badge" class="status-badge loading">Connecting...</div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs (SPA 4-Tab Layout: FR-010) -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="monitoring">📊 Live Metrics</button>
+            <button class="tab-btn" data-tab="control">⚙️ Model & Config</button>
+            <button class="tab-btn" data-tab="playground">🎮 AI Playground</button>
+            <button class="tab-btn" data-tab="audit">🔑 Audit & API Keys</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="tab-content-container">
+
+            <!-- Tab 1: Live Monitoring & Time-Series Chart.js Canvas (FR-001, FR-003) -->
+            <div id="tab-monitoring" class="tab-panel active">
+                <div class="metrics-summary-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Active Model</span>
+                            <span class="stat-icon">🧠</span>
+                        </div>
+                        <p class="stat-value" id="stat-model">None</p>
+                        <span class="stat-sub" id="stat-profile">Platform Profile: Safe</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">VRAM Usage</span>
+                            <span class="stat-icon">💾</span>
+                        </div>
+                        <p class="stat-value" id="stat-vram">0 / 0 MB</p>
+                        <div class="progress-bar">
+                            <div id="vram-fill" class="progress-fill"></div>
+                        </div>
+                        <span id="vram-warning-badge" class="warning-badge hidden">⚠️ VRAM High (>90%)</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Context Window (n_ctx)</span>
+                            <span class="stat-icon">📏</span>
+                        </div>
+                        <p class="stat-value" id="stat-ctx">0</p>
+                        <span class="stat-sub" id="stat-ctx-limit">Limit: 8192</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Inference Speed</span>
+                            <span class="stat-icon">⚡</span>
+                        </div>
+                        <p class="stat-value" id="stat-speed">0.0 tok/s</p>
+                        <span class="stat-sub" id="stat-ttft">TTFT: -- ms</span>
+                    </div>
+                </div>
+
+                <!-- Chart.js Real-time Canvas Graph Panel -->
+                <section class="glass-panel chart-section">
+                    <div class="panel-header">
+                        <h2>Real-Time Hardware & Inference Metrics Stream</h2>
+                        <span class="live-indicator">LIVE</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="metricsChart"></canvas>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Tab 2: Model & Context Control Panel (FR-002, FR-006) -->
+            <div id="tab-control" class="tab-panel">
+                <section class="glass-panel presets-section">
+                    <h2>Platform Profile Dynamic Presets</h2>
+                    <p class="section-desc">Dynamically fetched from running server capabilities (`/dashboard/api/capabilities`).</p>
+                    <div id="presets-grid" class="presets-grid">
+                        <!-- Dynamically populated from API -->
+                    </div>
+                </section>
+
+                <section class="glass-panel manual-section">
+                    <h2>Manual Configuration & Model Serving Control</h2>
+                    <form id="manual-form">
+                        <div class="form-group">
+                            <label for="model-select">Serving Model ID</label>
+                            <select id="model-select" required>
+                                <!-- Dynamically populated from server -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ctx-input">Context Window Length (n_ctx)</label>
+                            <div class="slider-container">
+                                <input type="range" id="ctx-slider" min="512" max="32768" step="512" value="4096">
+                                <input type="number" id="ctx-input" value="4096" min="512" max="32768">
+                            </div>
+                            <div id="oom-warning" class="warning-text hidden">⚠️ Context length exceeds target platform safe limits!</div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary-btn">Apply Configuration (Requires Admin)</button>
+                            <button type="button" id="unload-btn" class="danger-btn">Unload Model</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <!-- Tab 3: AI Playground (FR-007, FR-008, FR-009, 048-think-tag-ui-markdown) -->
+            <div id="tab-playground" class="tab-panel">
+                <div class="playground-layout-3col">
+                    <!-- Google AI Studio Style Left Collapsible Chat Sessions Sidebar -->
+                    <div class="glass-panel chat-sidebar" id="chat-history-sidebar">
+                        <h3>💬 Chat History</h3>
+                        <button type="button" id="new-chat-btn" class="primary-btn" style="width: 100%;">➕ New Chat</button>
+                        <div class="sidebar-title">Recent Conversations</div>
+                        <div id="session-list-container" class="session-list">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Playground Settings Panel -->
+                    <div class="glass-panel playground-settings">
+                        <h3>⚙️ Parameters</h3>
+                        <div class="form-group">
+                            <label for="pg-model-select">Serving Model</label>
+                            <select id="pg-model-select" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-top: 4px;">
+                                <!-- Dynamically populated from /dashboard/api/capabilities -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="pg-api-key" style="display: flex; justify-content: space-between; align-items: center;">
+                                🔑 API Key <span id="pg-api-key-badge" style="font-size: 0.75rem; color: #9ca3af;">(Optional)</span>
+                            </label>
+                            <input type="password" id="pg-api-key" placeholder="sk-vllm-... (Required in Security Mode)" style="width: 100%; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 0.9rem; margin-top: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="pg-system-prompt">System Instructions</label>
+                            <textarea id="pg-system-prompt" rows="2" placeholder="You are a helpful AI assistant.">You are a helpful AI assistant.</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Thinking Process Mode</label>
+                            <div class="toggle-group" id="think-mode-group">
+                                <button type="button" class="toggle-btn active" data-mode="collapse">📁 Collapse</button>
+                                <button type="button" class="toggle-btn" data-mode="show">👁️ Show</button>
+                                <button type="button" class="toggle-btn" data-mode="off">🚫 Off</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="pg-temp">Temperature: <span id="pg-temp-val">0.7</span></label>
+                            <input type="range" id="pg-temp" min="0.0" max="2.0" step="0.1" value="0.7">
+                        </div>
+                        <div class="form-group">
+                            <label for="pg-top-p">Top_P: <span id="pg-top-p-val">0.9</span></label>
+                            <input type="range" id="pg-top-p" min="0.0" max="1.0" step="0.05" value="0.9">
+                        </div>
+                        <div class="form-group">
+                            <label for="pg-max-tokens">Max Tokens</label>
+                            <input type="number" id="pg-max-tokens" value="1024" min="16" max="4096">
+                        </div>
+                        <button type="button" id="code-export-btn" class="secondary-btn" style="width: 100%; margin-top: 10px;">💻 Code Export</button>
+                    </div>
+
+                    <!-- Google AI Studio 2026 Style Chat Thread Canvas -->
+                    <div class="glass-panel playground-canvas">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3>💬 Multi-Turn Chat Thread</h3>
+                            <span class="badge badge-info" id="pg-active-model">Model: qwen3.5-4b</span>
+                        </div>
+
+                        <!-- Chat Bubbles Thread Container -->
+                        <div id="chat-thread-container" style="height: 380px; overflow-y: auto; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 15px;">
+                            <div class="chat-bubble assistant-bubble" style="background: rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; margin-bottom: 10px; max-width: 85%;">
+                                <strong>🤖 Assistant:</strong> Hello! How can I assist you with LLM inference today?
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <textarea id="pg-prompt-input" rows="3" placeholder="Type message to assistant... (e.g. Explain quantum computing in 2 sentences)"></textarea>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button type="button" id="pg-submit-btn" class="primary-btn" style="flex: 1;">🚀 Send Message (SSE Streaming)</button>
+                            <button type="button" id="clear-chat-btn" class="secondary-btn">🧹 Clear Thread</button>
+                        </div>
+
+                        <!-- Response & Performance Metrics Card -->
+                        <div class="pg-response-card" style="margin-top: 15px;">
+                            <div class="pg-metrics-bar" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <span class="metric-chip">TTFT: <strong id="pg-metric-ttft">-- ms</strong></span>
+                                <span class="metric-chip">Speed: <strong id="pg-metric-speed">-- tok/s</strong></span>
+                                <span class="metric-chip">Total Time: <strong id="pg-metric-latency">-- s</strong></span>
+                                <span class="metric-chip">Tokens: <strong id="pg-metric-tokens">0 in / 0 out</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Audit & API Key Management (FR-004, FR-006) -->
+            <div id="tab-audit" class="tab-panel">
+                <section class="glass-panel security-toggle-card" style="margin-bottom: 20px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h2>🛡️ API Key Authentication Security Mode</h2>
+                            <p id="toggle-status-text" class="section-desc">Current Mode: Disabled (Public Access)</p>
+                        </div>
+                        <button type="button" id="toggle-security-btn" class="primary-btn">Toggle API Key Required Mode</button>
+                    </div>
+                </section>
+
+                <section class="glass-panel metrics-top5-card" style="margin-bottom: 20px;">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>🏆 Top 5 Key Resource Rankings & Metrics</h2>
+                        <button type="button" id="export-csv-btn" class="secondary-btn">📥 Export Metrics CSV</button>
+                    </div>
+                    <div id="top5-ranking-container" style="margin-top: 10px;">
+                        <p class="table-placeholder">Loading top key rankings...</p>
+                    </div>
+                </section>
+
+                <section class="glass-panel apikey-section">
+                    <h2>🔑 API Key Management & SQLite Metrics</h2>
+                    <div id="apikey-controls">
+                        <div class="key-create-bar">
+                            <input type="text" id="new-key-name" placeholder="Client App Name (e.g. Mobile-App-1)">
+                            <button type="button" id="create-key-btn" class="primary-btn">+ Create API Key (Requires Admin)</button>
+                        </div>
+                        <div id="new-key-alert" class="warning-text hidden"></div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Key Name</th>
+                                    <th>Masked Key</th>
+                                    <th>Requests</th>
+                                    <th>Errors</th>
+                                    <th>Prompt Tokens</th>
+                                    <th>Completion Tokens</th>
+                                    <th>Est. Cost ($)</th>
+                                    <th>Status / Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="apikey-list-body">
+                                <tr><td colspan="8" class="table-placeholder">Loading API key metrics...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="glass-panel audit-section">
+                    <div class="panel-header">
+                        <h2>📋 Client Access & Subnet Audit Log Timeline</h2>
+                        <button type="button" id="refresh-audit-btn" class="secondary-btn">🔄 Refresh Logs</button>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Log ID</th>
+                                <th>Timestamp</th>
+                                <th>Client IP</th>
+                                <th>Endpoint</th>
+                                <th>Status Code</th>
+                                <th>Action Payload</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-list-body">
+                            <tr><td colspan="6" class="table-placeholder">Loading access audit history...</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Admin Authentication Modal -->
+    <div id="admin-modal" class="overlay hidden">
+        <div class="glass-panel modal-card">
+            <h2>🔒 Admin Authentication</h2>
+            <p class="modal-desc">Enter Admin Secret Password to execute system control actions</p>
+            <input type="password" id="admin-secret-input" placeholder="Admin Secret Password">
+            <div class="modal-actions">
+                <button type="button" id="modal-login-btn" class="primary-btn">Authenticate</button>
+                <button type="button" id="modal-close-btn" class="secondary-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Code Export Modal -->
+    <div id="code-modal" class="overlay hidden">
+        <div class="glass-panel modal-card code-modal-card">
+            <h2>💻 Code Export Generator</h2>
+            <p class="modal-desc">Copy cURL command or Python OpenAI SDK code to reproduce this playground request</p>
+            <div class="code-tab-bar">
+                <button class="code-tab active" data-lang="curl">cURL</button>
+                <button class="code-tab" data-lang="python">Python OpenAI SDK</button>
+            </div>
+            <pre id="code-snippet" class="code-preview"></pre>
+            <div class="modal-actions">
+                <button type="button" id="copy-code-btn" class="primary-btn">📋 Copy Code</button>
+                <button type="button" id="close-code-btn" class="secondary-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payload Inspector Modal (044-llm-response-payload-viewer) -->
+    <div id="payload-modal" class="overlay hidden">
+        <div class="glass-panel modal-card" style="max-width: 700px; width: 90%;">
+            <h2>👁️ LLM Request & Response Payload Inspector</h2>
+            <p class="modal-desc" id="payload-modal-title">Log Entry Details</p>
+            <div style="text-align: left; margin: 15px 0;">
+                <label style="font-weight: 600; color: #a0aec0;">📥 Input Prompt Text:</label>
+                <pre id="payload-prompt-view" style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; max-height: 150px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; margin-top: 5px;"></pre>
+                
+                <label style="font-weight: 600; color: #a0aec0; margin-top: 15px; display: block;">🤖 LLM Completion Response Text:</label>
+                <pre id="payload-response-view" style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; max-height: 200px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; margin-top: 5px;"></pre>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="close-payload-modal-btn" class="secondary-btn">Close Payload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="spinner"></div>
+        <h2>Applying Configuration...</h2>
+        <p>Model offloading and VRAM loading in progress</p>
+    </div>
+
+    <script src="/dashboard/app.js"></script>
+</body>
+</html>

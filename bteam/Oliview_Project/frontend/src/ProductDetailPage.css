@@ -1,0 +1,180 @@
+.product-detail-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-family: 'Pretendard', sans-serif;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* 상단 배치 (좌우 2분할) */
+.detail-top-section {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 50px;
+}
+
+.detail-image-box {
+  flex: 1;
+  aspect-ratio: 1/1;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fdfdfd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-image-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.detail-info-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-product-name {
+  font-size: 24px;
+  font-weight: bold;
+  color: #222;
+  line-height: 1.4;
+}
+
+.option-select-area {
+  background: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.option-select-area h3 {
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.option-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-item {
+  font-size: 14px;
+  color: #555;
+}
+
+/* 중앙 감성분석 영역 */
+.sentiment-section {
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 30px;
+  border-radius: 12px;
+  margin-bottom: 50px;
+}
+
+.sentiment-section h2 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.sentiment-stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.sentiment-bar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-weight: bold;
+  font-size: 14px;
+  color: #444;
+  width: 100px;
+}
+
+.stat-text {
+  flex: 1;
+  font-size: 14px;
+  color: #222;
+}
+
+.stat-percent {
+  font-weight: bold;
+  color: #ff5722;
+}
+
+/* 하단 리뷰 영역 */
+.reviews-section {
+  margin-top: 30px;
+}
+
+.reviews-section h2 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.review-card {
+  padding: 20px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.review-score {
+  font-weight: bold;
+  color: #faaf00;
+}
+
+.review-date {
+  font-size: 13px;
+  color: #999;
+}
+
+.review-option-tag {
+  font-size: 13px;
+  color: #007bff;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.review-content {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
+}

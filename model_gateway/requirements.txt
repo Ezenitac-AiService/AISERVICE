@@ -1,0 +1,10 @@
+llama-cpp-python>=0.2.60
+fastapi>=0.109.0
+uvicorn>=0.27.0
+huggingface-hub>=0.20.0
+pytest>=8.0.0
+requests>=2.31.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+pynvml>=11.5.0
+redis>=5.0.0

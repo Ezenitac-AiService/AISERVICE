@@ -1,0 +1,152 @@
+{
+    "gemma4-e2b": {
+        "model_name": "Gemma 4 E2B",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 4096,
+        "max_context_length": 9728,
+        "base_vram_mb": 2119,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 5473MB)"
+    },
+    "gemma4-e4b": {
+        "model_name": "Gemma 4 E4B",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 4096,
+        "max_context_length": 6656,
+        "base_vram_mb": 3650,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 3942MB)"
+    },
+    "gemma4-12b": {
+        "model_name": "Gemma 4 12B",
+        "task_type": "llm",
+        "is_supported": false,
+        "recommended_context_length": 0,
+        "max_context_length": 0,
+        "base_vram_mb": 8714,
+        "quant_type": "q4_k_m",
+        "status_reason": "VRAM 용량 초과 (기본 가중치 8714MB > 최대 가용 7592MB)"
+    },
+    "qwen3.5-2b": {
+        "model_name": "Qwen 3.5 2B",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 16384,
+        "max_context_length": 34304,
+        "base_vram_mb": 1884,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache Q8_0 16K: 192MB, 총 VRAM 3.5GB)"
+    },
+    "qwen3.5-4b": {
+        "model_name": "Qwen 3.5 4B",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 12288,
+        "max_context_length": 16384,
+        "base_vram_mb": 3297,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache Q8_0 12K: 432MB, 총 VRAM 5.1GB)"
+    },
+    "qwen3.5-9b": {
+        "model_name": "Qwen 3.5 9B",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 2048,
+        "max_context_length": 2048,
+        "base_vram_mb": 6830,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 762MB)"
+    },
+    "qwen3.5-9b-vision": {
+        "model_name": "Qwen 3.5 9B Vision",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 2048,
+        "max_context_length": 2048,
+        "base_vram_mb": 6830,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 762MB)"
+    },
+    "gemma4-2b-text": {
+        "model_name": "Gemma 4 2B Text-Only",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 4096,
+        "max_context_length": 9728,
+        "base_vram_mb": 1884,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 5708MB)"
+    },
+    "gemma4-4b-text": {
+        "model_name": "Gemma 4 4B Text-Only",
+        "task_type": "llm",
+        "is_supported": true,
+        "recommended_context_length": 4096,
+        "max_context_length": 7168,
+        "base_vram_mb": 3415,
+        "quant_type": "q4_k_m",
+        "status_reason": "GPU 100% 가속 서빙 가능 (KV Cache 여유: 4177MB)"
+    },
+    "gemma4-12b-text": {
+        "model_name": "Gemma 4 12B Text-Only",
+        "task_type": "llm",
+        "is_supported": false,
+        "recommended_context_length": 0,
+        "max_context_length": 0,
+        "base_vram_mb": 8478,
+        "quant_type": "q4_k_m",
+        "status_reason": "VRAM 용량 초과 (기본 가중치 8478MB > 최대 가용 7592MB)"
+    },
+    "gemma4-26b-a4b": {
+        "model_name": "Gemma 4 26B A4B MoE",
+        "task_type": "llm",
+        "is_supported": false,
+        "recommended_context_length": 0,
+        "max_context_length": 0,
+        "base_vram_mb": 18606,
+        "quant_type": "q4_k_m",
+        "status_reason": "VRAM 용량 초과 (기본 가중치 18606MB > 최대 가용 7592MB)"
+    },
+    "qwen3.6-27b": {
+        "model_name": "Qwen 3.6 27B Instruct",
+        "task_type": "llm",
+        "is_supported": false,
+        "recommended_context_length": 0,
+        "max_context_length": 0,
+        "base_vram_mb": 19430,
+        "quant_type": "q4_k_m",
+        "status_reason": "VRAM 용량 초과 (기본 가중치 19430MB > 최대 가용 7592MB)"
+    },
+    "qwen3.6-35b-a3b": {
+        "model_name": "Qwen 3.6 35B A3B MoE",
+        "task_type": "llm",
+        "is_supported": false,
+        "recommended_context_length": 0,
+        "max_context_length": 0,
+        "base_vram_mb": 24729,
+        "quant_type": "q4_k_m",
+        "status_reason": "VRAM 용량 초과 (기본 가중치 24729MB > 최대 가용 7592MB)"
+    },
+    "bge-m3": {
+        "model_name": "BGE M3 (Q8_0 Embedding)",
+        "task_type": "embedding",
+        "is_supported": true,
+        "recommended_context_length": 8192,
+        "max_context_length": 8192,
+        "base_vram_mb": 706,
+        "quant_type": "q8_0",
+        "status_reason": "보조 백엔드 서비스 (전용 포트 8090/8091 상주 구동)"
+    },
+    "bge-reranker-v2-m3": {
+        "model_name": "BGE Reranker v2 M3 (Q8_0 Cross-Encoder)",
+        "task_type": "rerank",
+        "is_supported": true,
+        "recommended_context_length": 8192,
+        "max_context_length": 8192,
+        "base_vram_mb": 706,
+        "quant_type": "q8_0",
+        "status_reason": "보조 백엔드 서비스 (전용 포트 8090/8091 상주 구동)"
+    }
+}

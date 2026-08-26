@@ -1,0 +1,53 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs and temporary output
+*.log
+/logs/
+/tmp/
+
+# Local data: keep only the policy document until sharing is agreed
+/data/*
+!/data/README.md
+
+# Model artifacts and checkpoints
+/artifacts/
+/checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.pkl
+*.joblib
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build and packaging
+build/
+dist/
+*.egg-info/
+
+# Large DB dumps (keep local only; exceeds GitHub 100MB limit)
+/pilos_v2_dump.sql

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.whl
+.venv/
+venv/
+dist/
+*.egg-info/
+
+# Models & Large Archives
+models/
+*.gguf
+*.safetensors
+*.tar
+*.tar.gz
+*.zip
+vllm_serv_seed.tar.gz
+
+# Environment secrets
+.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Runtime logs and PID
+logs/
+*.pid
+log.txt
+
+# CUDA build artifacts
+.bin/
+llama.cpp/build/
+
+# Runtime SQLite DBs
+data/*.db*
+
+# Spec-Kit & Agent metadata
+.agents/
+.legacy/
+.pytest_cache/
+.specify/

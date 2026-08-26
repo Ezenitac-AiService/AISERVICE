@@ -1,0 +1,4 @@
+﻿split,source_reviews,target_rows_before_cleanup,output_rows,conflict_rows,cross_split_duplicate_rows,categories
+train,40049,124077,102165,667,0,4
+validation,2501,9637,7214,12,1358,4
+test,2500,9795,7257,20,1499,4

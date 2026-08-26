@@ -10,12 +10,14 @@
 
 # Large Database Dumps & Backups
 *.sql
+*.sql.gz
 *.dump
 *.backup
 
 # Archives & Large Bundles
 *.tar
 *.tar.gz
+*.gz
 *.zip
 *.7z
 *.whl
@@ -84,3 +86,6 @@ Thumbs.db
 ddns/duckdns-config.xml
 ddns/duckdns.log
 ddns/.env
+
+# Temporary Submodule Git Backups
+.git_submodule_backups/

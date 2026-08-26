@@ -1,0 +1,16 @@
+# ==============================================================================
+# Docker Ignore Rules for Oliview B-Team
+# ==============================================================================
+
+.git/
+.gitignore
+.env
+*.md
+.specify/
+specs/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.log

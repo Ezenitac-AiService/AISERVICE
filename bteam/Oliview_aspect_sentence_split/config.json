@@ -1,0 +1,10 @@
+{
+  "source_data_dir": "../aspect_sentiment/data/aspect",
+  "prepared_data_dir": "data",
+  "model_output_dir": "models/aspect_span_extractor",
+  "base_model": "klue/roberta-base",
+  "max_length": 512,
+  "negative_aspects_per_review": 2,
+  "seed": 42
+}
+

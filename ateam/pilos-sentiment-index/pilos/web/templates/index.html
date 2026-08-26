@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>PILOS 시장 수급 감정지수 AI</title>
+
+  <!-- Pilos Open Graph Meta Tags -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="PILOS AI Research" />
+  <meta property="og:title" content="PILOS 시장 수급 감정지수 분석 AI" />
+  <meta property="og:description" content="종목토론방 빅데이터 심리 분석과 실제 개인·외국인·기관 수급 방향을 예측하는 AI 리포트 서비스입니다." />
+  <meta property="og:image" content="https://ezenitac.duckdns.org/static/images/stock-logos/000660.png" />
+  <meta property="og:url" content="https://ezenitac.duckdns.org/ateam/pilos" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css', v='toss-main-3') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css', v='allowed-tree-1') }}" />
+</head>
+<body>
+  <div class="page">
+
+    <div class="hero-shell">
+      <header class="header">
+        <div class="brand">
+          <span class="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+              <path d="M2 12h4l2.5-7L13 19l2.5-7H22" stroke="currentColor" stroke-width="2.4"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <div class="brand__text">
+            <div class="brand__title-row">
+              <h1 class="brand__title">PILOS</h1>
+              <span class="brand__visibility">Research</span>
+            </div>
+            <p class="brand__subtitle">댓글 심리와 개인 수급의 연결을 연구합니다</p>
+          </div>
+        </div>
+        <nav class="header__nav" aria-label="PILOS 메뉴">
+          <a href="{{ url_for('index') }}">시장 분위기</a>
+          <a href="{{ url_for('about') }}">연구 소개</a>
+        </nav>
+      </header>
+
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero__copy">
+          <p class="hero__eyebrow">PILOS SENTIMENT INDEX</p>
+          <h2 id="hero-title">댓글의 분위기는<br />실제 매수·매도와<br />얼마나 닮아 있을까요?</h2>
+          <p class="hero__description">
+            개인 투자자 수급과 온라인 댓글 표현을 같은 화면에서 비교합니다.<br />
+            숫자보다 먼저, 오늘 시장의 방향을 크게 읽어보세요.
+          </p>
+
+          <div class="search" role="search">
+            <svg class="search__icon" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/>
+              <path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <input
+              id="search-input"
+              class="search__input"
+              type="text"
+              autocomplete="off"
+              placeholder="종목명 또는 코드로 바로 확인하기"
+              aria-label="종목명 또는 코드 검색"
+              role="combobox"
+              aria-expanded="false"
+              aria-autocomplete="list"
+              aria-controls="search-results"
+            />
+            <kbd class="search__hint">/</kbd>
+            <div id="search-results" class="search__results" role="listbox" hidden></div>
+          </div>
+        </div>
+
+        <div class="hero__visual" aria-hidden="true">
+          <div class="hero-orbit hero-orbit--outer"></div>
+          <div class="hero-orbit hero-orbit--inner"></div>
+          <div class="hero-signal-card">
+            <span>오늘 함께 보는 데이터</span>
+            <strong>실제 수급<br />×<br />댓글 신호</strong>
+            <div class="hero-signal-card__tags">
+              <span>매수·매도량</span>
+              <span>댓글 표현</span>
+              <span>모델 비교</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="pipeline-status" aria-labelledby="pipeline-status-title">
+      <div class="pipeline-status__indicator" aria-hidden="true"></div>
+      <div class="pipeline-status__content" aria-live="polite">
+        <div class="pipeline-status__title-row">
+          <h2 id="pipeline-status-title" class="pipeline-status__title">서비스 데이터 갱신 상태</h2>
+          <span id="pipeline-status-badge" class="status-badge status-badge--muted">확인 중</span>
+        </div>
+        <p id="pipeline-status-message" class="pipeline-status__message">
+          최신 자동화 실행 상태를 확인하고 있습니다…
+        </p>
+        <p id="pipeline-status-meta" class="pipeline-status__meta" hidden></p>
+      </div>
+      <button type="button" id="pipeline-status-retry" class="pipeline-status__retry" hidden>
+        다시 확인
+      </button>
+    </section>
+
+    <main id="market-overview">
+      <section class="panel" aria-labelledby="all-title">
+        <div class="panel__head">
+          <div class="panel__title-group">
+            <svg class="panel__icon" viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+              <path d="M4 19V5m6 14V9m6 10V13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <div>
+              <p class="panel__eyebrow">MARKET OVERVIEW</p>
+              <h2 id="all-title" class="panel__title">오늘의 시장 분위기</h2>
+            </div>
+            <button type="button" class="info-dot" data-tooltip="전체 종목의 실제 수급 강도와 댓글 수급 신호를 한눈에 보여줍니다.">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+                <path d="M12 11v5.5M12 8v.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <p class="panel__caption">전체 종목의 실제 개인 수급과 댓글 기반 수급 신호를 큰 카드로 비교합니다.</p>
+
+        <div id="all-list-loading" class="list-loading" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span>불러오는 중입니다…</span>
+        </div>
+
+        <div id="all-list-error" class="list-error" hidden>
+          <p class="list-error__text">전체 종목 목록을 불러오지 못했습니다. 네트워크 상태를 확인해주세요.</p>
+          <button type="button" id="all-list-retry" class="list-error__retry">다시 시도</button>
+        </div>
+
+        <div id="all-stock-list" class="stock-list"></div>
+
+        <div id="all-empty-state" class="empty-state" hidden>
+          <p class="empty-state__title">표시할 종목이 없습니다</p>
+          <p class="empty-state__body">아직 등록된 종목이 없습니다.</p>
+        </div>
+      </section>
+
+      <section id="comment-lab" class="main-comment-lab" aria-labelledby="main-sc-title">
+        <div class="main-comment-lab__head">
+          <div>
+            <p class="main-comment-lab__eyebrow">COMMENT LAB</p>
+            <h2 id="main-sc-title">댓글 한 줄을<br />두 모델에 넣어보세요</h2>
+          </div>
+          <p>
+            입력한 댓글 표현이 매수 우위·매도 우위 모델에서 각각 어떤 반응을 보이는지
+            바로 비교합니다. 공식 일별 수급 신호와는 별개의 실험 기능입니다.
+          </p>
+        </div>
+
+        <form id="main-sc-form" class="main-comment-lab__form" novalidate>
+          <label for="main-sc-input">분석할 댓글</label>
+          <div class="main-comment-lab__composer">
+            <textarea
+              id="main-sc-input"
+              rows="2"
+              maxlength="300"
+              placeholder="예: 지금이 바닥인 것 같아서 추가 매수합니다"
+              aria-label="분석할 댓글 입력"
+            ></textarea>
+            <button type="submit" id="main-sc-submit">
+              <span>두 모델로 분석하기</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+
+        <div id="main-sc-loading" class="main-comment-lab__loading" hidden aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          두 방향 모델이 댓글을 읽고 있습니다…
+        </div>
+        <p id="main-sc-error" class="main-comment-lab__error" hidden role="alert"></p>
+
+        <div id="main-sc-result" class="main-sc-result" hidden aria-live="polite">
+          <article class="main-sc-model main-sc-model--positive">
+            <div class="main-sc-model__head">
+              <div><span>BUY REGIME</span><h3>매수 우위 방향 모델</h3></div>
+              <strong data-main-sc-field="positive-score">—</strong>
+            </div>
+            <p data-main-sc-field="positive-meta"></p>
+            <div class="main-sc-model__keywords" data-main-sc-field="positive-keywords"></div>
+          </article>
+
+          <article class="main-sc-model main-sc-model--negative">
+            <div class="main-sc-model__head">
+              <div><span>SELL REGIME</span><h3>매도 우위 방향 모델</h3></div>
+              <strong data-main-sc-field="negative-score">—</strong>
+            </div>
+            <p data-main-sc-field="negative-meta"></p>
+            <div class="main-sc-model__keywords" data-main-sc-field="negative-keywords"></div>
+          </article>
+
+          <p id="main-sc-notice" class="main-sc-result__notice"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <svg class="footer__icon" viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 11v5.5M12 8v.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <p class="footer__text">
+        본 서비스의 모델 결과는 댓글 데이터와 수급 지표의 통계적 연관성을 나타내며, 투자 권유나 미래 수익을 보장하지 않습니다.
+      </p>
+      <a href="{{ url_for('about') }}" class="footer__link">서비스 소개
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+    </footer>
+
+  </div>
+
+  <!-- 종목 행 템플릿 (JS에서 clone하여 사용) -->
+  <template id="row-template">
+    <a class="stock-row" href="#">
+      <div class="col col--identity">
+        <span class="avatar" aria-hidden="true"></span>
+        <div class="identity-text">
+          <span class="identity-text__name"></span>
+          <span class="identity-text__meta">
+            <span class="identity-text__code"></span>
+          </span>
+        </div>
+      </div>
+
+      <div class="col col--actual">
+        <span class="col-label">
+          개인 투자자 수급
+          <span
+            class="metric-help"
+            role="button"
+            tabindex="0"
+            data-tooltip="개인 투자자의 실제 매수·매도 거래량으로 계산한 수급 지표입니다. 범위는 -1부터 +1이며, 0보다 높으면 매수 우위, 낮으면 매도 우위입니다."
+            aria-label="개인 투자자의 실제 매수·매도 거래량으로 계산한 수급 지표입니다. 범위는 -1부터 +1이며, 0보다 높으면 매수 우위, 낮으면 매도 우위입니다."
+          >i</span>
+        </span>
+        <div class="supply-share" data-state="loading">
+          <div class="supply-share__donut" role="img" aria-label="개인 투자자 매수·매도 비중">
+            <div class="supply-share__center" aria-hidden="true">
+              <span class="supply-share__dominant-label">—</span>
+              <strong class="supply-share__dominant-value">—</strong>
+            </div>
+          </div>
+          <div class="supply-share__details" aria-label="매수·매도 비중">
+            <span class="supply-share__item supply-share__item--buy">
+              <span>매수</span>
+              <strong class="supply-share__buy">—</strong>
+            </span>
+            <span class="supply-share__item supply-share__item--sell">
+              <span>매도</span>
+              <strong class="supply-share__sell">—</strong>
+            </span>
+          </div>
+        </div>
+        <span class="actual-supply-detail">수급 지수 <span class="actual-supply-score"></span></span>
+        <p class="supply-share__interpretation"></p>
+      </div>
+
+      <div class="col col--signal">
+        <span class="col-label">
+          댓글이 보내는 신호
+          <span
+            class="metric-help"
+            role="button"
+            tabindex="0"
+            data-tooltip="현재 댓글에 대한 모델 반응이 과거 동일 수급 방향과 비교해 어느 수준인지 나타냅니다. 감성 확률이나 미래 예측값이 아닙니다."
+            aria-label="현재 댓글에 대한 모델 반응이 과거 동일 수급 방향과 비교해 어느 수준인지 나타냅니다. 감성 확률이나 미래 예측값이 아닙니다."
+          >i</span>
+        </span>
+        <div class="signal-gauge" data-state="loading">
+          <div class="signal-gauge__summary">
+            <strong class="signal-gauge__score">불러오는 중</strong>
+            <span class="signal-gauge__meta"></span>
+          </div>
+          <div
+            class="signal-gauge__track"
+            role="progressbar"
+            aria-label="댓글 기반 수급 연계 신호"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuetext="불러오는 중"
+          >
+            <span class="signal-gauge__fill"></span>
+            <span class="signal-gauge__marker" aria-hidden="true"></span>
+          </div>
+          <div class="signal-gauge__scale" aria-hidden="true">
+            <span>0</span>
+            <span>50</span>
+            <span>100</span>
+          </div>
+          <p class="signal-relationship"></p>
+        </div>
+      </div>
+
+      <div class="col col--confidence model-summary">
+        <span class="col-label">최신 적재 정보</span>
+        <span class="model-date"></span>
+        <span class="model-comment-count"></span>
+        <span class="model-status"></span>
+      </div>
+
+      <div class="col col--chevron">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </a>
+  </template>
+
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/index.js', v='market-overview-9') }}"></script>
+  <script src="{{ url_for('static', filename='js/chat.js', v='allowed-tree-2') }}"></script>
+</body>
+</html>
