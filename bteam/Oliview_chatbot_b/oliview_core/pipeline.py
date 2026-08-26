@@ -21,8 +21,12 @@ from .sanitizer import (
     detect_brand_and_category,
     normalize_korean_markdown,
 )
-from .guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail
+from .guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail, ZERO_SEARCH_TEMPLATE
 from .db import fetch_review_metadata
+from .logger import get_logger
+
+logger = get_logger("oliview.pipeline")
+ZERO_SEARCH_STATIC_MESSAGE = ZERO_SEARCH_TEMPLATE
 
 # ────────────────────────────────────────────────────────────────────────────
 # Spec 017: 한국어 마크다운 안전 생성 가이드라인 (Korean Markdown Safety Rules)
@@ -180,6 +184,14 @@ class OliviewPipeline:
             fallback_used=fallback_used,
             reference_reviews=reference_reviews,
         )
+
+        # Feature 039 / Spec 039: Zero-Search Hard Block (Immediate 0.0s Return without LLM invocation)
+        if len(reference_reviews) == 0:
+            logger.info("Zero-Search Hard Block (pipeline.py): 0 reviews found -> Yielding ZERO_SEARCH_TEMPLATE immediately")
+            def _zero_search_stream() -> Iterator[str]:
+                for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+                    yield line + "\n"
+            return _zero_search_stream(), metadata
 
         # Spec 021: Tier 2/3 Sandboxed Prompt Generation with Canary Token
         sandboxed_payload = PromptInjectionGuardrail.build_sandboxed_rag_prompt(

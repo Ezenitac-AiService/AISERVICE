@@ -11,7 +11,6 @@ from ..config import get_settings
 
 logger = logging.getLogger("oliview.rag.reformulation")
 
-# 도메인 맞춤형 화장품 브랜드/속성 동의어 사전 (Alias & Attribute Dictionary)
 ALIAS_DICTIONARY: Dict[str, List[str]] = {
     "cnp": ["차앤박", "씨앤피"],
     "차앤박": ["cnp", "차앤박 프로폴리스"],
@@ -32,14 +31,10 @@ def hybrid_reformulate_query(
     original_query: str,
     target_names: Optional[List[str]] = None,
 ) -> HybridQueryReformulationResult:
-    """
-    사전 기반 동의어 치환 및 타겟 속성 확장을 통해 보완 쿼리 목록을 생성합니다.
-    """
     t0 = time.time()
     expanded_queries: List[str] = []
     lower_query = original_query.lower()
 
-    # 1. 사전 기반 키워드 치환 및 확장
     for key, synonyms in ALIAS_DICTIONARY.items():
         if key in lower_query:
             for syn in synonyms:
@@ -47,14 +42,12 @@ def hybrid_reformulate_query(
                 if reformulated != lower_query and reformulated not in expanded_queries:
                     expanded_queries.append(reformulated)
 
-    # 2. 타겟 엔티티 기반 명시적 쿼리 추가
     if target_names:
         for tname in target_names:
             entity_query = f"{tname} {original_query}".strip()
             if entity_query not in expanded_queries:
                 expanded_queries.append(entity_query)
 
-    # 3. 중복 제거 및 결합
     all_merged = [original_query]
     for eq in expanded_queries:
         if eq not in all_merged:
@@ -72,10 +65,6 @@ def hybrid_reformulate_query(
 
 
 async def reformulation_node(state: RagGraphState) -> RagGraphState:
-    """
-    LangGraph Reformulation Node.
-    1차 검색 점수가 미흡할 때 쿼리를 재작성하고 2차 보량 검색을 수행합니다.
-    """
     trace_id = state.get("trace_id", "unknown")
     query = state.get("query", "")
     targets = state.get("target_entities", [])

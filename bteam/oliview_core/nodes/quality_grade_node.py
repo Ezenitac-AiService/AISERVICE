@@ -15,11 +15,6 @@ def evaluate_search_quality(
     min_threshold: float = 0.35,
     min_reviews_per_target: int = 1,
 ) -> QualityGradeVerdict:
-    """
-    타겟별 리랭킹 점수 및 리뷰 건수를 평가하여 QualityGradeVerdict를 산출합니다.
-    - 점수 미달(< 0.35) 또는 타겟 결과 0건 시 RETRY_SEARCH 반환.
-    - 정상 시 PASSED 반환.
-    """
     if not reranked_contexts:
         return QualityGradeVerdict(
             status="RETRY_SEARCH",
@@ -87,7 +82,6 @@ def evaluate_search_quality(
 
 
 async def quality_grade_node(state: RagGraphState) -> RagGraphState:
-    """LangGraph Quality Grade Node."""
     reranked = state.get("reranked_contexts", {})
     verdict = evaluate_search_quality(reranked, min_threshold=0.35)
     

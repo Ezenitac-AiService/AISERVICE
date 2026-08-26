@@ -19,11 +19,16 @@ from .config import CoreSettings, get_settings
 from .client import AiGatewayClient
 from .callback import StepCallbackProtocol, StreamlitStepCallback
 from .guardrail import PromptInjectionGuardrail, guardrail
-from .pipeline import (
-    prepare_pipeline_stream,
-    generate_pipeline_answer,
-    generate_pipeline_answer_stream,
-)
+try:
+    from .pipeline import (
+        prepare_pipeline_stream,
+        generate_pipeline_answer,
+        generate_pipeline_answer_stream,
+    )
+except ImportError:
+    prepare_pipeline_stream = None
+    generate_pipeline_answer = None
+    generate_pipeline_answer_stream = None
 
 __all__ = [
     "__version__",

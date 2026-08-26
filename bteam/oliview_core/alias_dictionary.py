@@ -94,7 +94,15 @@ BRAND_ALIAS_MAP: Dict[str, str] = {
 
     # 자연주의 브랜드
     "식물나라": "식물나라",
+    "drjart": "닥터자르트",
+    "dr.jart": "닥터자르트",
+    "닥터자르트": "닥터자르트",
 }
+
+# 정식 한국어 브랜드명을 자체 매핑 키로 자동 등록
+for _canonical in list(set(BRAND_ALIAS_MAP.values())):
+    if _canonical not in BRAND_ALIAS_MAP:
+        BRAND_ALIAS_MAP[_canonical] = _canonical
 
 
 # ──────────────────────────────────────────────────────────────────────────────

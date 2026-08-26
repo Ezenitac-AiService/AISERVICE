@@ -1,15 +1,10 @@
 <!--
 Sync Impact Report:
-- Version Change: 0.0.0 (Template) → 1.0.0
+- Version Change: 1.1.0 → 1.1.1 (PATCH: 원칙 VI 세부 동적 설정 가이드라인 명시)
 - Modified Principles:
-  - PRINCIPLE_1: I. 언어 및 커뮤니케이션 정책 (Language & Communication Policy)
-  - PRINCIPLE_2: II. TDD 및 테스트 우선주의 (Test-First & Contract Verification)
-  - PRINCIPLE_3: III. 서비스 모듈화 및 격리 (Service Modularity & Environment Isolation)
-  - PRINCIPLE_4: IV. 관측 가능성 및 구조화된 로깅 (Observability & Structured Logging)
-  - PRINCIPLE_5: V. 단순성 및 점진적 진화 (Simplicity & Incremental Evolution - YAGNI)
-- Added Sections:
-  - 기술 제약 및 보안 표준 (Technical Constraints & Security Standards)
-  - 개발 워크플로우 및 품질 게이트 (Development Workflow & Quality Gates)
+  - PRINCIPLE_6: VI. 환경별 운영 모드 이원화 및 레거시 시연 지연 허용 (동적 설정 기반 전환 규칙 추가)
+- Added Principles: None
+- Added Sections: None
 - Removed Sections: None
 - Deferred Items / TODOs: None
 -->
@@ -43,9 +38,17 @@ Sync Impact Report:
 - **점진적 통합**: 기능 확장은 독립 모듈 단위로 점진적으로 진행하며, 의존성 충돌을 사전에 관리한다.
 - **근거(Rationale)**: 시스템 복잡도를 통제하고 지속 가능한 유지보수성을 확보하기 위함이다.
 
+### VI. 환경별 운영 모드 이원화 및 레거시 시연 지연 허용 (Dual Operating Modes & PoC Latency Tolerance)
+- **운영 모드 동적 구성 (Zero Hardcoding)**: '기술 실증/시연 모드 (PoC/DEMO)'와 '실제 상용 운영 모드 (PRODUCTION)'는 코드 내에 하드코딩되지 않고, 반드시 **환경 변수(`.env`, 예: `APP_RUN_MODE=DEMO` / `APP_RUN_MODE=PRODUCTION`) 또는 설정 객체(`Settings`)를 통해 런타임에 동적으로 주입 및 전환**되어야 한다.
+- **시연 모드 지연 허용 (DEMO Mode Latency Tolerance)**: `APP_RUN_MODE=DEMO` 환경에서는 제한된 레거시 하드웨어(공유 GPU/CPU, 로컬 DB I/O 핸드셰이크)를 수용하여, **합리적인 처리 지연 기준(제로 서치 $\le 3.0$초, 일반 RAG 답변 $\le 20.0$초 등)을 공식적으로 허용**한다.
+- **상용 모드 고성능 기준 (PRODUCTION Mode SLA)**: `APP_RUN_MODE=PRODUCTION` 환경에서는 분산 캐싱과 GPU 클러스터링 기반의 엄격한 엔터프라이즈 SLA 기준을 적용한다.
+- **무환각 및 사실 무결성 절대 원칙**: 운영 모드(DEMO / PRODUCTION)와 무관하게, **검색 0건 시 가짜 후기 창작 금지(100% 무환각)** 및 **실존 리뷰 기반 인라인 인용 결속(100% Citation)**은 어떠한 모드에서도 절대 타협하거나 생략하지 않는다.
+- **근거(Rationale)**: 환경 간 코드 수정 없이 설정만으로 유연하게 배포 타겟을 전환할 수 있도록 무하드코딩 원칙을 확립하고, 실증 단계의 인프라 제약과 상용 단계의 성능 요구를 체계적으로 분리 충족하기 위함이다.
+
 ## 기술 제약 및 보안 표준
 
 - **기술 스택 및 인프라**: Python 기반 AI/ML 백엔드, FastAPI/vLLM 모델 서빙 게이트웨이, 감정 분석/챗봇 파이프라인, 관계형 데이터베이스 및 Docker 기반 컨테이너 인프라를 표준으로 한다.
+- **환경 변수 기반 동적 설정**: 시연 모드(`DEMO`)와 상용 모드(`PRODUCTION`)의 전환, 타임아웃, SLA 임계치는 `.env` 및 `oliview_core/config.py`의 `Pydantic BaseSettings`를 통해 동적으로 제어한다.
 - **보안 및 환경 통제**: 환경 변수(`.env`) 기반 설정 관리, API Key 및 인증 토큰 보호, 컨테이너 네트워크 접근 제어를 철저히 적용한다.
 
 ## 개발 워크플로우 및 품질 게이트
@@ -63,4 +66,4 @@ Sync Impact Report:
   - **PATCH (경미한 수정)**: 문구 수정, 명확화, 오탈자 교정 등 비시맨틱 정제.
 - **준수성 검증**: 모든 기여(PR, 커밋, 에이전트 태스크)는 본 헌법에 명시된 원칙 및 품질 게이트를 준수하는지 정기적으로 검증되어야 한다.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-17 | **Last Amended**: 2026-08-17
+**Version**: 1.1.1 | **Ratified**: 2026-08-17 | **Last Amended**: 2026-08-26

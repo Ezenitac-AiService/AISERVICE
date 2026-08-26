@@ -14,7 +14,7 @@ from typing import List, Dict, Any, Iterator, AsyncIterator, Optional
 
 import numpy as np
 
-from .config import get_settings, ModelDiscoveryCache
+from .config import get_settings
 from .redis_pool import (
     cache_get, cache_set, build_l2_key, build_l3_key, get_redis_client,
 )
@@ -40,53 +40,6 @@ class AiGatewayClient:
 
     def __init__(self, settings=None):
         self.settings = settings or get_settings()
-        self._discovery_cache = ModelDiscoveryCache(
-            discovered_model=self.settings.synthesis_llm_model,
-            discovered_n_ctx=self.settings.min_required_n_ctx,
-            ttl_seconds=self.settings.discovery_ttl_seconds,
-        )
-
-    def discover_active_model(self, force_refresh: bool = False) -> str:
-        """Dynamically discovers active model from Gateway with 60s TTL caching (Spec 033)."""
-        if not self.settings.auto_discover_model:
-            return self.settings.synthesis_llm_model
-
-        if not force_refresh and self._discovery_cache.is_valid():
-            return self._discovery_cache.discovered_model
-
-        try:
-            url = f"{self.settings.llm_endpoint}/models"
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=1.5) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                models = data.get("data", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-                active_llm = None
-                for m in models:
-                    if isinstance(m, dict):
-                        m_id = m.get("id", "")
-                        if "bge" not in m_id.lower() and (m.get("is_active") or m.get("is_resident")):
-                            active_llm = m_id
-                            n_ctx = m.get("current_n_ctx", 16384)
-                            self._discovery_cache.update(m_id, n_ctx)
-                            break
-
-                if not active_llm:
-                    for m in models:
-                        if isinstance(m, dict):
-                            m_id = m.get("id", "")
-                            if "bge" not in m_id.lower():
-                                active_llm = m_id
-                                self._discovery_cache.update(m_id, 16384)
-                                break
-
-                if active_llm:
-                    return active_llm
-        except Exception as e:
-            logger.warning(
-                f"Failed to discover active model dynamically ({e}). Using default: {self.settings.synthesis_llm_model}"
-            )
-
-        return self.settings.synthesis_llm_model
 
     # ─────────────────────────────────────────────────────────────────────────
     # 1. Embeddings (BGE-M3 on port 8090) with Redis Layer 2 Cache
@@ -255,28 +208,35 @@ class AiGatewayClient:
         prompt: str,
         system_prompt: str = "당신은 올리브영 뷰티 리뷰 분석 AI 어시스턴트 '올리뷰'입니다.",
         max_tokens: int = 4096,
-        temperature: float = 0.1,
+        temperature: Optional[float] = None,
+        top_p: Optional[float] = None,
+        repetition_penalty: Optional[float] = None,
         trace_id: str = "",
         tenant_id: str = "default",
         session_id: str = "",
         queue_callback=None,
     ) -> Iterator[str]:
-        """Yields streaming tokens from LLM via SSE (Spec 031: Sliding Inactivity Timeout + Queue Status).
+        """Yields streaming tokens from LLM via SSE (Spec 031 & Spec 037: Sliding Inactivity Timeout + 2-Stage Top-P).
 
         Args:
             queue_callback: Optional callable(dict) invoked on each `event: queue_status` event
                             to relay queue position/wait info to the UI layer.
         """
+        temp = self.settings.default_temperature if temperature is None else temperature
+        p_val = self.settings.default_top_p if top_p is None else top_p
+        rep_pen = self.settings.default_repetition_penalty if repetition_penalty is None else repetition_penalty
+
         url = f"{self.settings.llm_endpoint}/chat/completions"
-        model_to_use = self.discover_active_model() if self.settings.auto_discover_model else self.settings.synthesis_llm_model
         payload = json.dumps({
-            "model": model_to_use,
+            "model": self.settings.synthesis_llm_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
             "max_tokens": max_tokens,
-            "temperature": temperature,
+            "temperature": temp,
+            "top_p": p_val,
+            "repetition_penalty": rep_pen,
             "stream": True,
         }).encode("utf-8")
 
@@ -288,9 +248,10 @@ class AiGatewayClient:
         }
 
         req = urllib.request.Request(url, data=payload, headers=headers)
+        resp = None
 
         try:
-            # Spec 031 FR-004: Sliding Inactivity Timeout (마지막 패킷 수신 후 15초 무응답)
+            # Spec 037: Environment-based Sliding Inactivity Timeout (Dev: 45s, Prod: 15s)
             inactivity_timeout = self.settings.inactivity_timeout_s
             resp = urllib.request.urlopen(req, timeout=inactivity_timeout)
 
@@ -342,6 +303,12 @@ class AiGatewayClient:
                 extra={"trace_id": trace_id or get_trace_id(), "error_type": type(e).__name__},
             )
             yield f"\n[답변 생성 오류: {e}]"
+        finally:
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
 
     async def agenerate_stream(
         self,

@@ -31,6 +31,8 @@ from .nodes.reformulation_node import hybrid_reformulate_query, reformulation_no
 from .nodes.deep_recall_node import deep_recall_node
 from .nodes.context_node import context_builder_node
 from .nodes.synthesis_node import synthesis_stream_node, get_token_stream
+from .nodes.abstention_node import zero_search_abstention_node, should_abstain_zero_search
+from .guardrail import ZERO_SEARCH_TEMPLATE, GroundednessSanitizer
 from .anaphora_resolver import AnaphoraResolver
 from .session import session_store
 from .logger import get_logger, generate_trace_id, set_trace_id, get_trace_id, StepTimer
@@ -39,24 +41,18 @@ logger = get_logger("oliview.orchestrator")
 
 
 class MultiTargetGraphOrchestrator:
-    """
-    LangGraph StateGraph 기반 진정한 Multi-Agent / Self-RAG 오케스트레이터 (Spec 035).
-    """
-
     def __init__(self):
         self.settings = get_settings()
         self.anaphora_resolver = AnaphoraResolver()
         self.graph = self._build_and_compile_graph()
 
     def _build_and_compile_graph(self):
-        """StateGraph 노드 및 조건부 엣지를 선언하고 compile()을 실행합니다."""
         if StateGraph is None:
             logger.warning("[MultiTargetGraphOrchestrator] LangGraph not installed; running in fallback mode.")
             return None
 
         workflow = StateGraph(RagGraphState)
 
-        # 1. 노드 등록
         workflow.add_node("intent_router", intent_router_node)
         workflow.add_node("search_per_target", self._search_node_wrapper)
         workflow.add_node("reranker", reranker_node)
@@ -66,13 +62,11 @@ class MultiTargetGraphOrchestrator:
         workflow.add_node("context_builder", context_builder_node)
         workflow.add_node("synthesis_stream", synthesis_stream_node)
 
-        # 2. 엣지 연결
         workflow.set_entry_point("intent_router")
         workflow.add_edge("intent_router", "search_per_target")
         workflow.add_edge("search_per_target", "reranker")
         workflow.add_edge("reranker", "quality_grade")
 
-        # 3. Self-RAG 조건부 엣지
         workflow.add_conditional_edges(
             "quality_grade",
             self.should_retry_search,
@@ -83,7 +77,6 @@ class MultiTargetGraphOrchestrator:
             }
         )
 
-        # 재검색 후 다시 검색-리랭킹-컨텍스트 수렴
         workflow.add_edge("reformulation", "search_per_target")
         workflow.add_edge("deep_recall", "context_builder")
         workflow.add_edge("context_builder", "synthesis_stream")
@@ -96,7 +89,6 @@ class MultiTargetGraphOrchestrator:
             return None
 
     def _search_node_wrapper(self, state: RagGraphState) -> Dict[str, Any]:
-        """StateGraph 내 검색 래퍼 노드."""
         target_entities = state.get("target_entities", [])
         merged_pools = dict(state.get("search_pools", {}))
         merged_errors = dict(state.get("target_errors", {}))
@@ -106,7 +98,6 @@ class MultiTargetGraphOrchestrator:
             target_id = target.get("target_id", f"target_{idx}")
             query_to_use = state.get("query", "")
             if reformulation and reformulation.merged_queries:
-                # 2차 검색 시 재작성된 상위 쿼리 사용
                 query_to_use = reformulation.merged_queries[min(idx + 1, len(reformulation.merged_queries) - 1)]
 
             search_state = {
@@ -119,7 +110,6 @@ class MultiTargetGraphOrchestrator:
             for tid, candidates in res.get("search_pools", {}).items():
                 if tid not in merged_pools:
                     merged_pools[tid] = []
-                # 중복 제거 병합
                 existing_ids = {c["doc_id"] for c in merged_pools[tid]}
                 for c in candidates:
                     if c["doc_id"] not in existing_ids:
@@ -131,11 +121,6 @@ class MultiTargetGraphOrchestrator:
         }
 
     def should_retry_search(self, state: RagGraphState) -> str:
-        """
-        Self-RAG 재검색 조건부 라우팅 판정기 (Spec 035 FR-005).
-        - retry_count == 0 이고 품질 verdict == "RETRY_SEARCH" 이면 -> RETRY_SEARCH
-        - retry_count >= 1 이면 무한 루프 방지를 위해 무조건 -> PROCEED_TO_SYNTHESIS
-        """
         retry_count = state.get("retry_count", 0)
         verdict: Optional[QualityGradeVerdict] = state.get("quality_verdict")
 
@@ -152,20 +137,13 @@ class MultiTargetGraphOrchestrator:
         tenant_id: str = "chata",
         queue_callback=None,
     ) -> Iterator[Dict[str, Any]]:
-        """
-        동기/비동기 RAG 파이프라인 실행 및 Living Agent Inspector SSE 이벤트 스트리밍.
-        """
         trace_id = trace_id or generate_trace_id()
         set_trace_id(trace_id)
         pipeline_start = time.perf_counter()
 
-        # 1. 3-Tier Context Harness 예산 동적 산정
         harness = self.settings.get_context_harness()
-
-        # 2. 비명시적 대명사(Anaphora) 탐지
         is_anaphora = self.anaphora_resolver.is_anaphora_query(query)
 
-        # 초기 상태 구성
         state: RagGraphState = {
             "trace_id": trace_id,
             "session_id": session_id,
@@ -194,7 +172,6 @@ class MultiTargetGraphOrchestrator:
             "error_log": [],
         }
 
-        # ── Step 1: Intent & Anaphora Router ──────────────────────────────
         t_node = time.perf_counter()
         yield _make_living_step_event(
             trace_id, "INTENT_ANALYSIS", "1. 의도 및 대화 맥락 분석 중...",
@@ -205,7 +182,6 @@ class MultiTargetGraphOrchestrator:
         state.update(router_result)
 
         target_entities = state.get("target_entities", [])
-        pattern_desc = state.get("pattern_type", "SINGLE")
         elapsed_intent = (time.perf_counter() - t_node) * 1000.0
 
         yield _make_living_step_event(
@@ -214,7 +190,6 @@ class MultiTargetGraphOrchestrator:
             badge_text=f"타겟 {len(target_entities)}건 식별 (+{elapsed_intent/1000.0:.2f}s)"
         )
 
-        # ── Step 2: Parallel Search ────────────────────────────────────────
         t_node = time.perf_counter()
         yield _make_living_step_event(
             trace_id, "HYBRID_SEARCH", "2. 타겟별 하이브리드 검색 중...", StepStatus.RUNNING
@@ -250,7 +225,6 @@ class MultiTargetGraphOrchestrator:
             badge_text=f"{total_found}건 후보 확보 (+{elapsed_search/1000.0:.2f}s)"
         )
 
-        # ── Step 3: Integrated Reranker ────────────────────────────────────
         t_node = time.perf_counter()
         yield _make_living_step_event(
             trace_id, "RERANKING", "3. 타겟별 통합 리랭킹 중...", StepStatus.RUNNING
@@ -271,25 +245,21 @@ class MultiTargetGraphOrchestrator:
             badge_text=f"쿼터 {total_selected}건 선별 (+{elapsed_rerank/1000.0:.2f}s)"
         )
 
-        # ── Step 4: Quality Gate & Self-RAG Reformulation Loop ──────────────
         verdict = evaluate_search_quality(state.get("reranked_contexts", {}), min_threshold=0.35)
         state["quality_verdict"] = verdict
 
         if self.should_retry_search(state) == "RETRY_SEARCH":
             t_branch = time.perf_counter()
-            # 분기 이벤트 방출 (Living Inspector Sub-branch `↳ 🔄`)
             yield _make_living_step_event(
                 trace_id, "QUERY_REFORMULATION", "↳ 🔄 하이브리드 재검색 중 (사전 동의어 + Fast LLM 문맥 쿼리)",
                 StepStatus.RUNNING, is_branch=True, parent_node_id="RERANKING",
                 badge_text=f"품질 보완 (평균 {verdict.average_score:.2f} 미달)"
             )
 
-            # 재작성 노드 실행
             reform_res = hybrid_reformulate_query(query, [t.get("target_name", "") for t in target_entities])
             state["retry_count"] = 1
             state["reformulation_result"] = reform_res
 
-            # 2차 보량 검색 및 재리랭킹
             search_update = self._search_node_wrapper(state)
             state.update(search_update)
             rerank_update = reranker_node(state)
@@ -304,7 +274,6 @@ class MultiTargetGraphOrchestrator:
                 elapsed_ms=elapsed_branch, badge_text=f"재검색 성공 (+{elapsed_branch/1000.0:.2f}s)"
             )
 
-        # ── Step 5: On-Demand Deep Recall (if Anaphora detected) ───────────
         if is_anaphora and session_id:
             t_recall = time.perf_counter()
             yield _make_living_step_event(
@@ -324,11 +293,49 @@ class MultiTargetGraphOrchestrator:
                     )
                     break
 
-        # ── Step 6: 16K/32K Context Build ──────────────────────────────────
+        # Feature 039 / Spec 039: 2026 CRAG Fast-Path Zero-Search Hard Block
+        final_selected = sum(len(v) for v in state.get("reranked_contexts", {}).values())
+        if final_selected == 0:
+            abstain_update = zero_search_abstention_node(state)
+            state.update(abstain_update)
+
+            total_ms = (time.perf_counter() - pipeline_start) * 1000
+            total_sec = round(total_ms / 1000.0, 2)
+
+            yield _make_living_step_event(
+                trace_id, "ABSTENTION", "4. 검색 결과 0건 즉시 안내 (Fast Abstention)", StepStatus.COMPLETE,
+                elapsed_ms=total_ms, badge_text=f"0건 부재 고지 (+{total_sec}s)"
+            )
+
+            for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+                yield {
+                    "trace_id": trace_id,
+                    "event_type": "token",
+                    "token": line + "\n",
+                    "timestamp": time.time(),
+                }
+
+            yield {
+                "trace_id": trace_id,
+                "event_type": "complete",
+                "metrics": state.get("metrics", {}),
+                "total_latency_sec": total_sec,
+                "is_cached": False,
+                "context_tier": harness.tier_name,
+                "l5_cache_key": "",
+                "selected_review_count": 0,
+                "reference_reviews": [],
+                "is_fallback": False,
+                "target_count": len(target_entities),
+                "retry_count": state.get("retry_count", 0),
+                "suggested_chips": state.get("zero_search_verdict", {}).get("suggested_chips", ["스킨케어", "쿠션", "인기 앰플"]),
+                "timestamp": time.time(),
+            }
+            return
+
         context_result = context_builder_node(state)
         state.update(context_result)
 
-        # ── Step 7: Synthesis Stream ───────────────────────────────────────
         yield _make_living_step_event(
             trace_id, "LLM_SYNTHESIS", "4. 실시간 마크다운 답변 생성 중...", StepStatus.RUNNING,
             badge_text=f"토큰 스트리밍 (16K/32K {harness.tier_name})"
@@ -342,7 +349,6 @@ class MultiTargetGraphOrchestrator:
                 "timestamp": time.time(),
             }
 
-        # ── 참조 리뷰 메타데이터 조립 ──
         ref_reviews = []
         for target_id, reviews in state.get("reranked_contexts", {}).items():
             for idx, r in enumerate(reviews, start=1):
@@ -383,7 +389,6 @@ class MultiTargetGraphOrchestrator:
             elapsed_ms=total_ms, badge_text=f"총 {total_sec}s 완료"
         )
 
-        # ── Complete Event ─────────────────────────────────────────────────
         yield {
             "trace_id": trace_id,
             "event_type": "complete",
@@ -413,10 +418,6 @@ class MultiTargetGraphOrchestrator:
             yield event
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Living Inspector Event Helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
 def _make_living_step_event(
     trace_id: str,
     node_id: str,
@@ -427,12 +428,11 @@ def _make_living_step_event(
     is_branch: bool = False,
     parent_node_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """2026 Living Agent Inspector 호환 동적 노드/분기 SSE 이벤트를 생성합니다."""
     return {
         "trace_id": trace_id,
         "event_type": "step_update",
-        "step_id": node_id,          # 이전 UI 하위 호환
-        "step_name": title,           # 이전 UI 하위 호환
+        "step_id": node_id,
+        "step_name": title,
         "node_id": node_id,
         "parent_node_id": parent_node_id,
         "title": title,
@@ -445,7 +445,6 @@ def _make_living_step_event(
 
 
 def _make_fallback_event(trace_id: str, reason: str) -> Dict[str, Any]:
-    """폴백 알림 이벤트를 생성합니다."""
     return {
         "trace_id": trace_id,
         "event_type": "fallback_alert",
@@ -459,5 +458,4 @@ def _make_fallback_event(trace_id: str, reason: str) -> Dict[str, Any]:
     }
 
 
-# Singleton instance
 graph_orchestrator = MultiTargetGraphOrchestrator()

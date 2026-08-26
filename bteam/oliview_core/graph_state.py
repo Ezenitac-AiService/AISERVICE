@@ -8,10 +8,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Enumerations
-# ──────────────────────────────────────────────────────────────────────────────
-
 class PatternType(str, Enum):
     """RAG 라우팅 패턴 분류."""
     EXPLICIT_COMPARE = "PATTERN_EXPLICIT_COMPARE"       # 명시적 제품 비교
@@ -48,10 +44,6 @@ class SubStepAction(str, Enum):
     RECALLING = "RECALLING"
     ERROR_SKIPPED = "ERROR_SKIPPED"
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Pydantic Schemas for 2026 Harness Engineering (Spec 035)
-# ──────────────────────────────────────────────────────────────────────────────
 
 class ContextHarnessProfile(BaseModel):
     """실시간 게이트웨이 하드웨어 프로파일에 기반한 3-Tier 컨텍스트 예산."""
@@ -119,10 +111,6 @@ class LivingInspectorEvent(BaseModel):
     timestamp: float = Field(default=0.0)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Core TypedDict Entities
-# ──────────────────────────────────────────────────────────────────────────────
-
 class SpecHeader(TypedDict, total=False):
     """제품 스펙 메타데이터 헤더."""
     price: Optional[int]
@@ -133,12 +121,12 @@ class SpecHeader(TypedDict, total=False):
 
 class TargetEntity(TypedDict):
     """검증된 분석 대상 엔티티."""
-    target_id: str                     # e.g., "target_1"
-    target_name: str                   # e.g., "차앤박 프로폴리스 에너지 앰플"
-    brand_name: Optional[str]          # e.g., "차앤박"
-    product_name: Optional[str]        # e.g., "프로폴리스 에너지 앰플"
-    target_type: str                   # TargetType value
-    attribute_query: Optional[str]     # e.g., "수분감", "장점"
+    target_id: str
+    target_name: str
+    brand_name: Optional[str]
+    product_name: Optional[str]
+    target_type: str
+    attribute_query: Optional[str]
     spec_header: Optional[SpecHeader]
 
 
@@ -174,83 +162,67 @@ class RerankedReview(TypedDict, total=False):
     rating: Optional[float]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# LangGraph Global State Schema
-# ──────────────────────────────────────────────────────────────────────────────
-
 class RagGraphState(TypedDict, total=False):
     """LangGraph StateGraph 전역 상태 스키마 (Spec 035)."""
-    # 식별자 및 세션 메타데이터
     trace_id: str
     session_id: str
     user_id: Optional[str]
     tenant_id: str
     query: str
     normalized_query: str
-
-    # 3-Tier 컨텍스트 하네스
     context_harness: ContextHarnessProfile
-
-    # 의도 및 지시어 분석
-    pattern_type: str                                   # PatternType value
+    pattern_type: str
     target_entities: List[TargetEntity]
     is_anaphora_detected: bool
     recalled_turn_payload: Optional[DeepRecallTurnPayload]
-
-    # 검색 풀 및 품질 검증
-    search_pools: Dict[str, List[CandidateReview]]      # {target_id: [candidates]}
-    reranked_contexts: Dict[str, List[RerankedReview]]   # {target_id: [selected reviews]}
+    search_pools: Dict[str, List[CandidateReview]]
+    reranked_contexts: Dict[str, List[RerankedReview]]
     quality_verdict: Optional[QualityGradeVerdict]
     retry_count: int
     reformulation_result: Optional[HybridQueryReformulationResult]
-
-    # 컨텍스트 조립
-    context_text: str                                    # 16K/32K XML sandboxed context
+    context_text: str
     canary_token: str
     is_fallback: bool
     fallback_reason: Optional[str]
-    target_errors: Dict[str, str]                        # {target_id: "error message"}
-
-    # L5 캐시 및 메트릭
+    target_errors: Dict[str, str]
     is_cached: bool
     l5_cache_key: str
     metrics: Dict[str, Any]
     error_log: List[str]
+    # Feature 039: Zero-Search Hard Block & Entity-Aspect RAG
+    app_run_mode: str
+    is_zero_review_state: bool
+    zero_search_verdict: Optional[Dict[str, Any]]
+    groundedness_violations: List[str]
+    category_candidates: List[Dict[str, Any]]
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Real-Time UI Event Model
-# ──────────────────────────────────────────────────────────────────────────────
 
 FALLBACK_LABEL = "⚡ 신속 분석 모드 (실시간 기본 검색)"
 
 
 class SubStepDetail(TypedDict, total=False):
-    """타겟별 서브스텝 상세 정보."""
     target_index: int
     total_targets: int
     target_id: str
     target_name: str
-    action: str                       # SubStepAction value
+    action: str
     count: int
     message: str
 
 
 class FallbackInfo(TypedDict, total=False):
-    """폴백 상태 정보."""
     triggered: bool
-    label: str                        # "⚡ 신속 분석 모드 (실시간 기본 검색)"
+    label: str
     reason: str
 
 
 class SubStepEvent(TypedDict, total=False):
-    """실시간 계층형 서브스텝 UI SSE 이벤트."""
     trace_id: str
-    event_type: str                   # "step_update" | "token" | "complete" | "fallback_alert"
-    step_id: str                      # "INTENT" | "SEARCH" | "RERANK" | "QUALITY_GRADE" | "REFORMULATION" | "DEEP_RECALL" | "CONTEXT_BUILD" | "SYNTHESIS"
-    step_name: str                    # 표시 제목
+    event_type: str
+    step_id: str
+    step_name: str
     sub_step: Optional[SubStepDetail]
-    status: str                       # StepStatus value
+    status: str
     fallback_info: Optional[FallbackInfo]
     elapsed_ms: float
     timestamp: float

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SSEEventStreamContract",
+  "description": "Unified Server-Sent Events contract for ChatA and ChatB",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "event_type",
+    "timestamp"
+  ],
+  "properties": {
+    "trace_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["step_update", "token", "complete", "fallback_alert", "error"]
+    },
+    "timestamp": {
+      "type": "number"
+    },
+    "step_id": {
+      "type": "string",
+      "enum": ["INTENT", "SEARCH", "RERANK", "ABSTENTION", "SYNTHESIS", "DONE"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "complete", "error", "abstained"]
+    },
+    "token": {
+      "type": "string"
+    },
+    "selected_review_count": {
+      "type": "integer"
+    },
+    "total_latency_sec": {
+      "type": "number"
+    },
+    "reference_reviews": {
+      "type": "array"
+    }
+  }
+}

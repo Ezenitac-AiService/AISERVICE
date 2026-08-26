@@ -15,9 +15,6 @@ logger = get_logger("oliview.node.context")
 
 
 def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
-    """
-    16K/32K+ XML 샌드박스 컨텍스트를 조립하는 LangGraph 노드.
-    """
     trace_id = state.get("trace_id", get_trace_id())
     reranked_contexts = state.get("reranked_contexts", {})
     target_entities = state.get("target_entities", [])
@@ -25,20 +22,15 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
     recalled_turn = state.get("recalled_turn_payload")
     settings = get_settings()
 
-    # 1. 3-Tier Context Harness 예산 확보
     harness: ContextHarnessProfile = state.get("context_harness") or settings.get_context_harness()
 
     with StepTimer("CONTEXT_BUILD", trace_id=trace_id):
-        # 2. 카나리아 토큰 생성 (Tier 4 가드레일)
         canary_token = f"CANARY_{uuid.uuid4().hex[:8].upper()}"
-
         entity_map = {e["target_id"]: e for e in target_entities}
 
-        # 3. XML 샌드박스 컨텍스트 조립
         context_parts: List[str] = []
         context_parts.append(f'<context canary="{canary_token}" tier="{harness.tier_name}">')
 
-        # 3-A. On-Demand Deep Recall 컨텍스트 주입 (과거 대명사 역참조 시)
         if recalled_turn:
             context_parts.append(f'  <recalled_context turn="{recalled_turn.turn_index}">')
             context_parts.append(f'    <user_query>{escape_review_xml(recalled_turn.user_query)}</user_query>')
@@ -50,7 +42,6 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
                 context_parts.append('    </specs>')
             context_parts.append('  </recalled_context>')
 
-        # 3-B. 타겟별 스펙 및 선별 리뷰 주입
         for target_id, reviews in reranked_contexts.items():
             entity = entity_map.get(target_id, {})
             target_name = entity.get("target_name", target_id)
@@ -74,7 +65,8 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
             token_budget = harness.tokens_per_target
             used_tokens = 0
 
-            for review in reviews:
+            is_multi_target = len(reranked_contexts) > 1
+            for idx, review in enumerate(reviews, start=1):
                 review_text = review.get("review_text", "")
                 estimated_tokens = int(len(review_text) * 1.45)
 
@@ -88,9 +80,10 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
 
                 escaped_text = escape_review_xml(review_text)
                 score = review.get("rerank_score", 0.0)
-                rank = review.get("rank", 0)
+                rank = review.get("rank", idx)
+                citation_tag = f"[{target_name} 리뷰 {idx}]" if is_multi_target else f"[리뷰 {idx}]"
                 context_parts.append(
-                    f'      <review rank="{rank}" score="{score:.3f}">'
+                    f'      <review rank="{rank}" score="{score:.3f}" citation="{citation_tag}">'
                     f'{escaped_text}'
                     f'</review>'
                 )
@@ -98,6 +91,7 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
 
             context_parts.append("    </reviews>")
             context_parts.append("  </target>")
+
 
         if is_fallback:
             fallback_reason = state.get("fallback_reason", "리랭커 타임아웃")
@@ -108,7 +102,6 @@ def context_builder_node(state: RagGraphState) -> Dict[str, Any]:
         context_parts.append("</context>")
         raw_context_text = "\n".join(context_parts)
 
-        # 4. PreFlightContextGuard 85% 안전 마진 검증 및 단계적 축소
         sanitized_context, was_truncated = PreFlightContextGuard.validate_and_truncate(
             raw_context_text,
             total_n_ctx=harness.total_n_ctx,

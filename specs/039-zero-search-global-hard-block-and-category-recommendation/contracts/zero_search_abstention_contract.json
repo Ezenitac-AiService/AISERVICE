@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ZeroSearchAbstentionContract",
+  "description": "Schema for deterministic Zero-Search Fast Abstention response across ChatA and ChatB",
+  "type": "object",
+  "required": [
+    "status",
+    "is_zero_search",
+    "template_markdown",
+    "suggested_chips",
+    "selected_review_count",
+    "reference_reviews",
+    "latency_ms",
+    "app_run_mode"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ABSTAINED_ZERO_SEARCH"]
+    },
+    "is_zero_search": {
+      "type": "boolean",
+      "const": true
+    },
+    "template_markdown": {
+      "type": "string",
+      "description": "Standardized honest zero-search Korean message without any hallucinated user citations"
+    },
+    "suggested_chips": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2
+    },
+    "selected_review_count": {
+      "type": "integer",
+      "const": 0
+    },
+    "reference_reviews": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "latency_ms": {
+      "type": "number",
+      "description": "Processing latency in milliseconds (<= 3000ms in DEMO, <= 500ms in PROD)"
+    },
+    "app_run_mode": {
+      "type": "string",
+      "enum": ["DEMO", "PRODUCTION"]
+    }
+  }
+}

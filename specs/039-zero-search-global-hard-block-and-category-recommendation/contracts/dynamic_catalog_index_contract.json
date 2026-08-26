@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DynamicCatalogIndexContract",
+  "description": "Schema for in-memory review-bearing product and brand catalog cache",
+  "type": "object",
+  "required": [
+    "active_brand_count",
+    "active_product_count",
+    "categories_loaded",
+    "is_loaded",
+    "load_duration_ms"
+  ],
+  "properties": {
+    "active_brand_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "active_product_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "categories_loaded": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "is_loaded": {
+      "type": "boolean"
+    },
+    "load_duration_ms": {
+      "type": "number"
+    }
+  }
+}

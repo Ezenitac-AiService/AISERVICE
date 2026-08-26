@@ -4,6 +4,7 @@ Centralized Configuration Manager for Oliview Core (Spec 035 - 3-Tier Context Ha
 
 import os
 import socket
+from enum import Enum
 from functools import lru_cache
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -11,6 +12,12 @@ from dataclasses import dataclass
 import time
 
 from .graph_state import ContextHarnessProfile
+
+
+class AppRunMode(str, Enum):
+    """Constitution Principle VI: Dynamic execution environment mode."""
+    DEMO = "DEMO"
+    PRODUCTION = "PRODUCTION"
 
 
 def _is_running_in_docker() -> bool:
@@ -148,10 +155,26 @@ class CoreSettings(BaseModel):
     chroma_hnsw_search_ef: int = 64
     faiss_index_dir: Optional[str] = Field(default_factory=lambda: os.getenv("FAISS_INDEX_DIR", None))
 
-    # Operation Mode & Lenient Timeout Profiles (Spec 035 / Spec 037: development vs production)
+    # Operation Mode & Lenient Timeout Profiles (Constitution Principle VI: DEMO vs PRODUCTION)
+    app_run_mode: AppRunMode = Field(
+        default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO").upper())
+        if os.getenv("APP_RUN_MODE", "DEMO").upper() in ("DEMO", "PRODUCTION")
+        else AppRunMode.DEMO,
+        description="Constitution Principle VI: Dynamic operating mode (DEMO vs PRODUCTION)"
+    )
     rag_operation_mode: str = Field(
         default_factory=lambda: os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower()
     )
+
+    @property
+    def zero_search_sla_sec(self) -> float:
+        """SLA threshold for Zero-Search Fast Abstention (DEMO <= 3.0s, PRODUCTION <= 0.5s)."""
+        return 3.0 if self.app_run_mode == AppRunMode.DEMO else 0.5
+
+    @property
+    def rag_sla_sec(self) -> float:
+        """SLA threshold for full multi-target RAG (DEMO <= 20.0s, PRODUCTION <= 8.0s)."""
+        return 20.0 if self.app_run_mode == AppRunMode.DEMO else 8.0
 
     # Lenient Timeouts (seconds) - Spec 037 POC Demo Friendly
     timeout_search_sec: float = Field(default_factory=lambda: 10.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 5.0)

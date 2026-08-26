@@ -70,6 +70,46 @@ def tool_search_catalog(query: str, category: Optional[str] = None, limit: int =
         return []
 
 
+def tool_search_aspect_candidates(
+    aspect_name: str,
+    category: Optional[str] = None,
+    limit: int = 3,
+) -> List[Dict[str, Any]]:
+    """Aspect-based product candidate discovery using DBMS summaries and composite ranking (Spec 039)."""
+    try:
+        from .dynamic_catalog_index import get_dynamic_catalog_index
+        from ..db import fetch_aspect_summaries
+
+        catalog = get_dynamic_catalog_index()
+        aspect_records = fetch_aspect_summaries(category)
+        if aspect_records:
+            ranked = catalog.rank_aspect_candidates(
+                aspect_records=aspect_records,
+                target_aspect=aspect_name,
+                category_keyword=category,
+                min_reviews=5,
+                top_k=limit,
+            )
+            if ranked:
+                return [
+                    {
+                        "product_id": c.product_id,
+                        "product_name": c.product_name,
+                        "brand_name": c.brand_name,
+                        "category_name": c.category,
+                        "positive_ratio": c.positive_ratio,
+                        "composite_score": c.composite_score,
+                        "total_review_count": c.total_review_count,
+                        "avg_rating": c.avg_rating,
+                    }
+                    for c in ranked
+                ]
+    except Exception as e:
+        logger.warning(f"tool_search_aspect_candidates fallback: {e}")
+
+    return tool_search_catalog(query=aspect_name, category=category, limit=limit)
+
+
 def tool_search_series_candidates(
     series_keyword: str,
     brand: Optional[str] = None,

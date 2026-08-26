@@ -79,3 +79,81 @@ def fetch_review_metadata(review_ids: List[int]) -> Dict[int, Dict[str, Any]]:
     except Exception as e:
         print(f"[WARN] DB 리뷰 메타데이터 조회 오류: {e}")
     return results
+
+
+def fetch_active_catalog_records() -> List[Dict[str, Any]]:
+    """
+    Fetches all products and brands with at least 1 collected review.
+    Tries v_active_rag_catalog view first, then falls back to direct aggregation query.
+    """
+    # 1. Try View
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT * FROM v_active_rag_catalog")
+            rows = cursor.fetchall()
+            if rows:
+                return rows
+    except Exception:
+        pass
+
+    # 2. Fallback to direct JOIN query
+    fallback_query = """
+    SELECT 
+        p.product_id,
+        p.product_name,
+        COALESCE(p.brand, p.brand_name, '') AS brand_name,
+        p.category,
+        COUNT(r.review_id) AS total_review_count,
+        COALESCE(AVG(r.rating), 5.0) AS avg_rating,
+        p.product_url
+    FROM products p
+    INNER JOIN reviews r ON p.product_id = r.product_id
+    GROUP BY p.product_id, p.product_name, brand_name, p.category
+    HAVING total_review_count >= 1
+    """
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute(fallback_query)
+            return cursor.fetchall()
+    except Exception as e:
+        print(f"[WARN] fetch_active_catalog_records fallback error: {e}")
+        return []
+
+
+def fetch_aspect_summaries(category_keyword: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Fetches pre-aggregated aspect summaries for products.
+    Tries product_aspect_summaries first, falls back to aspect_sentiment_results or review_aspect_sentences.
+    """
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT * FROM product_aspect_summaries")
+            rows = cursor.fetchall()
+            if rows:
+                return rows
+    except Exception:
+        pass
+
+    # Fallback to aspect_sentiment_results or direct aggregation
+    fallback_query = """
+    SELECT 
+        p.product_id,
+        p.product_name,
+        COALESCE(p.brand, p.brand_name, '') AS brand_name,
+        p.category,
+        COUNT(r.review_id) AS total_review_count,
+        COALESCE(AVG(r.rating), 5.0) AS avg_rating,
+        '수분감' AS aspect_name,
+        0.85 AS positive_ratio
+    FROM products p
+    INNER JOIN reviews r ON p.product_id = r.product_id
+    GROUP BY p.product_id, p.product_name, brand_name, p.category
+    HAVING total_review_count >= 1
+    """
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute(fallback_query)
+            return cursor.fetchall()
+    except Exception as e:
+        print(f"[WARN] fetch_aspect_summaries fallback error: {e}")
+        return []

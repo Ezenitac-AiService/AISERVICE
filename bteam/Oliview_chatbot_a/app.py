@@ -439,11 +439,18 @@ if question_to_process:
                     callback=callback,
                     category_hint=st.session_state.selected_category,
                 )
-                status_box.update(
-                    label=f"✅ 리뷰 분석 및 검색 완료 ({exec_meta.total_latency_sec:.1f}초, {exec_meta.selected_review_count}건 선별)",
-                    state="complete",
-                    expanded=False,
-                )
+                if exec_meta.selected_review_count == 0:
+                    status_box.update(
+                        label=f"✅ 분석 완료 ({exec_meta.total_latency_sec:.1f}초, 0건 부재 고지)",
+                        state="complete",
+                        expanded=False,
+                    )
+                else:
+                    status_box.update(
+                        label=f"✅ 리뷰 분석 및 검색 완료 ({exec_meta.total_latency_sec:.1f}초, {exec_meta.selected_review_count}건 선별)",
+                        state="complete",
+                        expanded=False,
+                    )
             except Exception as error:
                 status_box.update(label="⚠️ 파이프라인 초기화 오류", state="error")
                 raise error

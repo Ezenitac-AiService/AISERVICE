@@ -21,6 +21,20 @@ from .types import (
 logger = logging.getLogger("oliview.security")
 
 
+ZERO_SEARCH_TEMPLATE = """죄송합니다. 현재 올리브영 데이터베이스에 질문하신 상품/라인에 대한 실제 구매자 리뷰를 찾을 수 없습니다.
+
+💡 **안내 사항**:
+- 현재 등록된 실제 구매자 리뷰 데이터가 없습니다.
+- 정확한 상품명(예: '헤라 센슈얼 누드 밤', '차앤박 프로폴리스 에너지 액티브 앰플')으로 다시 질문해 주시거나, 추천을 원하시는 카테고리(예: '촉촉한 립밤 추천해줘')를 문의해 주시면 최적의 제품을 안내해 드리겠습니다. 🌿"""
+
+ZERO_SEARCH_PROMPT = """사용자가 질문한 화장품 또는 카테고리에 대한 실제 구매자 리뷰를 현재 올리브영 데이터베이스에서 찾을 수 없습니다.
+
+[응답 가이드]
+1. 현재 등록된 실제 구매자 리뷰 데이터가 없음을 정직하고 친절하게 안내하세요.
+2. 절대로 임의의 가짜 후기나 창작된 문장(예: "사용자 A는 만족했습니다" 등)을 지어내지 마세요.
+3. 다른 올리브영 추천 제품이나 정확한 상품명 재질의를 권장하세요."""
+
+
 class PromptInjectionGuardrail:
     """Multi-tiered Defense-in-Depth Prompt Injection Guardrail Engine."""
 
@@ -786,4 +800,118 @@ class PreFlightContextGuard:
             f"Truncated from {len(context_text)} to {len(truncated)} chars."
         )
         return truncated, True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cosmetic Negative Aspect Distortion Guardrail (Spec 038 FR-002, US2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def sanitize_negative_aspect_distortions(text: str) -> str:
+    """
+    LLM 생성 답변에서 화장품 부정 속성어(각질부각, 요철부각, 다크닝 등)가 긍정적 효과로 왜곡된 표현을 정정합니다.
+    예: '각질부각 효과: 각질을 부드럽게 해준다' -> '각질 부각 여부: 각질을 부드럽게 해준다'
+    """
+    if not text:
+        return text
+
+    # 1. '{부정속성} 효과' -> '{부정속성} 여부' 또는 '{부정속성} 완화/케어'
+    patterns = [
+        (r"각질부각\s*효과", "각질 부각 여부"),
+        (r"요철부각\s*효과", "요철 부각 여부"),
+        (r"다크닝\s*효과", "다크닝 발생 여부"),
+        (r"들뜸\s*효과", "들뜸 현상 여부"),
+        (r"밀림\s*효과", "밀림 현상 여부"),
+        (r"뭉침\s*효과", "뭉침 현상 여부"),
+        (r"가루날림\s*효과", "가루날림 여부"),
+        (r"건조함\s*효과", "건조함 및 당김 여부"),
+        (r"번짐\s*효과", "번짐 발생 여부"),
+    ]
+
+    sanitized = text
+    for pattern, replacement in patterns:
+        sanitized = re.sub(pattern, replacement, sanitized)
+
+    return sanitized
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Groundedness & Anti-Fictional-Review Sanitizer (Feature 039 / Spec 039)
+# ──────────────────────────────────────────────────────────────────────────────
+
+from dataclasses import dataclass, field
+
+@dataclass
+class GroundednessSanitizerResult:
+    cleaned_markdown: str
+    removed_fictional_quotes: List[str] = field(default_factory=list)
+    valid_citation_count: int = 0
+    has_violations: bool = False
+
+
+class GroundednessSanitizer:
+    """
+    Post-generation Groundedness & Anti-Fictional-Review Sanitizer.
+    Strips fictional user placeholders ('사용자 A/B/C', '고객 1') and unanchored quotes.
+    """
+
+    # Fictional placeholder signatures
+    _RE_FICTIONAL_USER = re.compile(
+        r"[-–—]?\s*\*?(?:사용자\s*[A-Za-z0-9가-힣]+|고객\s*[A-Za-z0-9가-힣]+|구매자\s*[A-Za-z0-9가-힣]+|익명의\s*구매자|어떤\s*사용자|일부\s*고객)\*?",
+        re.IGNORECASE
+    )
+
+    # Line-level fictional review quote patterns
+    _RE_FICTIONAL_LINE = re.compile(
+        r"(?:실제\s*사용자\s*후기|사용자\s*리뷰|고객\s*후기|구매자\s*평가)\s*:\s*[\"“'].*?[\"”']\s*(?:[-–—]?\s*\*?사용자\s*[A-Za-z0-9]+\*?)?",
+        re.IGNORECASE
+    )
+
+    # Valid citation pattern: [제품명 리뷰 N] or [리뷰 N]
+    _RE_CITATION = re.compile(r"\[(?:[^\]]+\s+)?리뷰\s*\d+\]")
+
+    def sanitize_markdown(self, markdown_text: str) -> GroundednessSanitizerResult:
+        if not markdown_text:
+            return GroundednessSanitizerResult(cleaned_markdown="", has_violations=False)
+
+        lines = markdown_text.split("\n")
+        cleaned_lines = []
+        removed_quotes = []
+        has_violations = False
+        valid_citations = len(self._RE_CITATION.findall(markdown_text))
+
+        for line in lines:
+            # Check for fictional placeholders like '사용자 A' or '사용자 B'
+            fictional_matches = self._RE_FICTIONAL_USER.findall(line)
+            if fictional_matches and not self._RE_CITATION.search(line):
+                has_violations = True
+                removed_quotes.extend(fictional_matches)
+                # Strip the fictional attribution from line
+                cleaned_line = self._RE_FICTIONAL_USER.sub("", line).strip()
+                # If the line was just a fake quote line, omit or clean it
+                if self._RE_FICTIONAL_LINE.search(line):
+                    # Check if citation exists in line
+                    if not self._RE_CITATION.search(line):
+                        continue  # Strip the entire fake quote line
+                cleaned_lines.append(cleaned_line)
+            elif self._RE_FICTIONAL_LINE.search(line) and not self._RE_CITATION.search(line):
+                # Fake quote line with no citation
+                has_violations = True
+                removed_quotes.append(line.strip())
+                continue
+            else:
+                cleaned_lines.append(line)
+
+        cleaned_text = "\n".join(cleaned_lines)
+        # Also clean any remaining trailing fictional markers
+        if self._RE_FICTIONAL_USER.search(cleaned_text):
+            has_violations = True
+            cleaned_text = self._RE_FICTIONAL_USER.sub("", cleaned_text)
+
+        return GroundednessSanitizerResult(
+            cleaned_markdown=cleaned_text.strip(),
+            removed_fictional_quotes=removed_quotes,
+            valid_citation_count=valid_citations,
+            has_violations=has_violations,
+        )
+
 

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GroundednessSanitizerContract",
+  "description": "Schema for post-generation citation verification and anti-fictional review sanitizer",
+  "type": "object",
+  "required": [
+    "original_length",
+    "cleaned_length",
+    "fictional_patterns_detected",
+    "unanchored_quotes_removed",
+    "valid_citations_retained",
+    "is_pure_grounded"
+  ],
+  "properties": {
+    "original_length": {
+      "type": "integer"
+    },
+    "cleaned_length": {
+      "type": "integer"
+    },
+    "fictional_patterns_detected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Detected fake placeholders such as '사용자 A', '고객 1', '익명의 구매자'"
+    },
+    "unanchored_quotes_removed": {
+      "type": "integer",
+      "description": "Count of quotes lacking [제품명 리뷰 N] citation anchors that were removed"
+    },
+    "valid_citations_retained": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "is_pure_grounded": {
+      "type": "boolean"
+    }
+  }
+}

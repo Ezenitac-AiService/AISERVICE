@@ -18,8 +18,6 @@ except ImportError:
 
 
 class RedisSessionStore:
-    """Multi-turn conversation session store backed by Redis list & TTL sliding window."""
-
     def __init__(
         self,
         host: Optional[str] = None,
@@ -27,7 +25,7 @@ class RedisSessionStore:
         db: int = 0,
         password: Optional[str] = None,
         socket_timeout: float = 1.0,
-        default_ttl_seconds: int = 259200,  # 3 days
+        default_ttl_seconds: int = 259200,
     ):
         self.host = host or os.environ.get("REDIS_HOST", "127.0.0.1")
         self.port = port or int(os.environ.get("REDIS_PORT", 6379))
@@ -73,9 +71,6 @@ class RedisSessionStore:
         ttl: Optional[int] = None,
         is_blocked: bool = False
     ) -> None:
-        """
-        Appends a new message item to session history and trims oldest messages beyond max_messages.
-        """
         if is_blocked:
             return
 
@@ -100,7 +95,6 @@ class RedisSessionStore:
             except Exception:
                 pass
 
-        # In-memory fallback
         if session_id not in self._local_fallback_store:
             self._local_fallback_store[session_id] = []
         self._local_fallback_store[session_id].append(msg_obj)
@@ -117,9 +111,6 @@ class RedisSessionStore:
         reference_reviews: Optional[List[Dict[str, Any]]] = None,
         ttl: Optional[int] = None,
     ) -> None:
-        """
-        과거 턴 원본 페이로드(스펙/리뷰)를 Redis L4에 독립 키로 보존하여 On-Demand Deep Recall을 지원합니다.
-        """
         payload = {
             "turn_index": turn_index,
             "user_query": user_query,
@@ -144,9 +135,6 @@ class RedisSessionStore:
         self._local_turn_payloads[session_id][turn_index] = payload
 
     def get_turn_payload(self, session_id: str, turn_index: int) -> Optional[DeepRecallTurnPayload]:
-        """
-        Redis L4에서 특정 과거 턴의 원본 페이로드를 온디맨드로 역조회합니다.
-        """
         client = self._get_client()
         if client:
             try:
@@ -163,7 +151,6 @@ class RedisSessionStore:
         return None
 
     def get_messages(self, session_id: str, max_messages: int = 30) -> List[Dict[str, Any]]:
-        """Retrieves conversation history list for the given session ID."""
         client = self._get_client()
         if client:
             try:
@@ -178,7 +165,6 @@ class RedisSessionStore:
         return self._local_fallback_store.get(session_id, [])
 
     def clear_session(self, session_id: str) -> None:
-        """Clears session history from Redis and local memory."""
         client = self._get_client()
         if client:
             try:
@@ -189,10 +175,6 @@ class RedisSessionStore:
                 pass
         self._local_fallback_store.pop(session_id, None)
         self._local_turn_payloads.pop(session_id, None)
-
-    # ─────────────────────────────────────────────────────────────────────────
-    # LangGraph State Checkpoint (L4 Cache)
-    # ─────────────────────────────────────────────────────────────────────────
 
     def save_checkpoint(self, session_id: str, state_dict: Dict[str, Any], ttl: Optional[int] = None) -> bool:
         client = self._get_client()
@@ -227,5 +209,4 @@ class RedisSessionStore:
         return None
 
 
-# Default singleton instance
 session_store = RedisSessionStore()

@@ -189,6 +189,12 @@ class RagGraphState(TypedDict, total=False):
     l5_cache_key: str
     metrics: Dict[str, Any]
     error_log: List[str]
+    # Feature 039: Zero-Search Hard Block & Entity-Aspect RAG
+    app_run_mode: str
+    is_zero_review_state: bool
+    zero_search_verdict: Optional[Dict[str, Any]]
+    groundedness_violations: List[str]
+    category_candidates: List[Dict[str, Any]]
 
 
 FALLBACK_LABEL = "⚡ 신속 분석 모드 (실시간 기본 검색)"

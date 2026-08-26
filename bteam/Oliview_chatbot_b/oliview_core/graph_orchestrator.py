@@ -31,6 +31,8 @@ from .nodes.reformulation_node import hybrid_reformulate_query, reformulation_no
 from .nodes.deep_recall_node import deep_recall_node
 from .nodes.context_node import context_builder_node
 from .nodes.synthesis_node import synthesis_stream_node, get_token_stream
+from .nodes.abstention_node import zero_search_abstention_node, should_abstain_zero_search
+from .guardrail import ZERO_SEARCH_TEMPLATE, GroundednessSanitizer
 from .anaphora_resolver import AnaphoraResolver
 from .session import session_store
 from .logger import get_logger, generate_trace_id, set_trace_id, get_trace_id, StepTimer
@@ -290,6 +292,46 @@ class MultiTargetGraphOrchestrator:
                         elapsed_ms=elapsed_recall, badge_text=f"Turn {turn_idx} 복원 (+{elapsed_recall:.1f}ms)"
                     )
                     break
+
+        # Feature 039 / Spec 039: 2026 CRAG Fast-Path Zero-Search Hard Block
+        final_selected = sum(len(v) for v in state.get("reranked_contexts", {}).values())
+        if final_selected == 0:
+            abstain_update = zero_search_abstention_node(state)
+            state.update(abstain_update)
+
+            total_ms = (time.perf_counter() - pipeline_start) * 1000
+            total_sec = round(total_ms / 1000.0, 2)
+
+            yield _make_living_step_event(
+                trace_id, "ABSTENTION", "4. 검색 결과 0건 즉시 안내 (Fast Abstention)", StepStatus.COMPLETE,
+                elapsed_ms=total_ms, badge_text=f"0건 부재 고지 (+{total_sec}s)"
+            )
+
+            for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+                yield {
+                    "trace_id": trace_id,
+                    "event_type": "token",
+                    "token": line + "\n",
+                    "timestamp": time.time(),
+                }
+
+            yield {
+                "trace_id": trace_id,
+                "event_type": "complete",
+                "metrics": state.get("metrics", {}),
+                "total_latency_sec": total_sec,
+                "is_cached": False,
+                "context_tier": harness.tier_name,
+                "l5_cache_key": "",
+                "selected_review_count": 0,
+                "reference_reviews": [],
+                "is_fallback": False,
+                "target_count": len(target_entities),
+                "retry_count": state.get("retry_count", 0),
+                "suggested_chips": state.get("zero_search_verdict", {}).get("suggested_chips", ["스킨케어", "쿠션", "인기 앰플"]),
+                "timestamp": time.time(),
+            }
+            return
 
         context_result = context_builder_node(state)
         state.update(context_result)

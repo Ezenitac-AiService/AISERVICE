@@ -15,7 +15,7 @@ from ..alias_dictionary import normalize_query_brands, resolve_brand_alias
 from ..anaphora_resolver import anaphora_resolver
 from ..sanitizer import detect_brand_and_category
 from ..utils.entity_normalizer import HybridEntityNormalizer
-from ..tools.search_tools import tool_search_catalog
+from ..tools.search_tools import tool_search_catalog, tool_search_aspect_candidates
 from ..logger import get_logger, get_trace_id, StepTimer
 
 logger = get_logger("oliview.node.router")
@@ -76,9 +76,14 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
                 ))
 
         elif pattern_type == PatternType.FEATURE_DISCOVERY:
-            # 카테고리/속성 기반 올리브영 DB 실존 인기 상품 3~5개 자동 발굴
+            # 카테고리/속성 기반 올리브영 DB 실존 인기 상품 2~3개 자동 발굴 (Spec 039)
             search_cat = norm_result.extracted_category or query
-            candidates = tool_search_catalog(query=search_cat, category=norm_result.extracted_category, limit=settings.max_targets)
+            primary_aspect = norm_result.extracted_aspects[0] if norm_result.extracted_aspects else search_cat
+            candidates = tool_search_aspect_candidates(
+                aspect_name=primary_aspect,
+                category=norm_result.extracted_category,
+                limit=settings.max_targets,
+            )
 
             if candidates:
                 for idx, c in enumerate(candidates):

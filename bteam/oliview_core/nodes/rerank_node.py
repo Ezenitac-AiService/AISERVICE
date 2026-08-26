@@ -1,7 +1,5 @@
-"""
-Reranker Node with Per-Target Quota Partitioning (Spec 030 FR-006 / FR-007 / FR-011).
-수집된 후보군을 단일 통합 배치로 리랭킹하고, 타겟별 쿼터로 독립 선별.
-5.0s 타임아웃 초과 시 0ms 1차 유사도 순위 유지 안전 폴백.
+"""Reranker Node with Document-Level Dynamic Top-P & Score Cliff Truncation (Spec 037 FR-004, FR-005).
+수집된 후보군을 단일 통합 배치로 리랭킹하고, 타겟별 문서 Top-P (85% 질량) 및 점수 절벽 컷오프로 독립 선별.
 """
 
 import time
@@ -13,36 +11,32 @@ from ..graph_state import (
     FALLBACK_LABEL,
 )
 from ..client import AiGatewayClient
+from ..utils.document_top_p import DocumentTopPCalculator
 from ..logger import get_logger, get_trace_id, StepTimer
 
 logger = get_logger("oliview.node.rerank")
+_top_p_calc = DocumentTopPCalculator()
 
 
 def reranker_node(state: RagGraphState) -> Dict[str, Any]:
     """
-    단일 통합 배치 리랭킹 및 타겟별 쿼터 파티셔닝 노드.
-
-    동작 흐름:
-    1. 모든 타겟의 후보 문서를 단일 리스트로 병합
-    2. 3건 이하 단축 경로 (FR-011): 리랭킹 스킵
-    3. 단일 통합 배치로 8091 GPU 리랭킹 (5.0s 타임아웃)
-    4. 타임아웃 시 0ms 즉각 1차 유사도 순위 유지 (안전 폴백)
-    5. 타겟별 쿼터 파티셔닝: 각 타겟에서 상위 2~3건 독립 선별
+    단일 통합 배치 리랭킹 및 문서 동적 Top-P 선별 노드 (Spec 037).
     """
     trace_id = state.get("trace_id", get_trace_id())
     query = state.get("normalized_query", state.get("query", ""))
     search_pools = state.get("search_pools", {})
+    target_entities = state.get("target_entities", [])
     settings = get_settings()
 
+    entity_map = {e["target_id"]: e for e in target_entities}
     reranked_contexts: Dict[str, List[RerankedReview]] = {}
     is_fallback = False
     fallback_reason = None
-    metrics_update: Dict[str, Any] = {}
 
-    with StepTimer("RERANK", trace_id=trace_id) as timer:
+    with StepTimer("RERANK", trace_id=trace_id):
         # 1. 모든 후보를 단일 리스트로 병합
         all_candidates: List[CandidateReview] = []
-        target_offsets: Dict[str, tuple] = {}  # {target_id: (start_idx, end_idx)}
+        target_offsets: Dict[str, tuple] = {}
 
         for target_id, candidates in search_pools.items():
             start = len(all_candidates)
@@ -57,100 +51,85 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                 "fallback_reason": "검색 결과 0건",
             }
 
-        # 2. 단축 경로 (FR-011): 3건 이하면 리랭킹 스킵
-        if len(all_candidates) <= 3:
-            logger.info(
-                f"후보 {len(all_candidates)}건 — 단축 경로 (리랭킹 스킵)",
-                extra={"trace_id": trace_id, "doc_count": len(all_candidates)},
-            )
-            for target_id, (start, end) in target_offsets.items():
-                subset = all_candidates[start:end]
-                reranked_contexts[target_id] = [
-                    RerankedReview(
-                        doc_id=c["doc_id"],
-                        review_text=c["review_text"],
-                        target_id=c["target_id"],
-                        target_name=c["target_name"],
-                        rerank_score=c["first_stage_score"],
-                        rank=idx + 1,
-                    )
-                    for idx, c in enumerate(subset[:settings.reranked_per_target])
-                ]
-            return {
-                "reranked_contexts": reranked_contexts,
-                "is_fallback": False,
-            }
-
-        # 3. 단일 통합 배치 리랭킹 (5.0s 타임아웃)
+        # 2. 리랭킹 점수 계산 (AiGatewayClient 호출)
         all_texts = [c["review_text"] for c in all_candidates]
         client = AiGatewayClient()
 
-        scores = client.rerank(query, all_texts, trace_id=trace_id)
+        timeout_sec = settings.timeout_rerank_sec
+        scores = client.rerank(query, all_texts, timeout=timeout_sec, trace_id=trace_id)
 
         if scores is None:
-            # 4. 타임아웃/장애 — 0ms 즉각 1차 유사도 순위 유지 폴백
             is_fallback = True
-            fallback_reason = "리랭커 5.0s 타임아웃 또는 GPU 장애"
+            fallback_reason = f"리랭커 {timeout_sec:.1f}s 타임아웃 또는 GPU 장애"
             logger.warning(
                 f"리랭커 폴백 발동: {fallback_reason}",
                 extra={"trace_id": trace_id, "fallback": True},
             )
-            # 1차 유사도 점수(first_stage_score)로 대체
             scores = [c["first_stage_score"] for c in all_candidates]
 
-        # 5. 타겟별 쿼터 파티셔닝 (FR-006: 특정 제품 쏠림 0% 보장)
+        # 점수 매핑
+        for c, s in zip(all_candidates, scores):
+            c["rerank_score"] = float(s)
+
+        # 3. 타겟별 파티션 및 문서 동적 Top-P (85% 누적 질량 + Cliff 0.25 컷오프) 적용
         for target_id, (start, end) in target_offsets.items():
-            target_candidates = all_candidates[start:end]
-            target_scores = scores[start:end]
+            subset = all_candidates[start:end]
+            if not subset:
+                reranked_contexts[target_id] = []
+                continue
 
-            # 점수 기준 내림차순 정렬
-            indexed = list(enumerate(zip(target_candidates, target_scores)))
-            indexed.sort(key=lambda x: x[1][1], reverse=True)
+            entity = entity_map.get(target_id, {})
+            target_name = entity.get("target_name", subset[0]["target_name"])
 
-            # 타겟별 쿼터 선별 (16K: 5~8건, 32K: 10~15건 동적 확장)
-            harness = state.get("context_harness") or settings.get_context_harness()
-            quota = harness.reranked_per_target
-            selected = indexed[:quota]
-
-            reranked_contexts[target_id] = [
-                RerankedReview(
-                    doc_id=cand.get("doc_id", str(rank_idx)),
-                    review_text=cand.get("review_text", ""),
-                    target_id=cand.get("target_id", target_id),
-                    target_name=cand.get("target_name", target_id),
-                    product_name=cand.get("product_name") or cand.get("target_name"),
-                    brand_name=cand.get("brand_name", ""),
-                    category=cand.get("category", "화장품"),
-                    attribute_name=cand.get("attribute_name", ""),
-                    product_url=cand.get("product_url", "#"),
-                    rerank_score=float(score),
-                    rank=rank_idx + 1,
-                    rating=cand.get("rating", 5.0),
-                )
-                for rank_idx, (_, (cand, score)) in enumerate(selected)
+            candidate_dicts = [
+                {
+                    "score": c.get("rerank_score", 0.0),
+                    "text": c["review_text"],
+                    "review_id": c.get("doc_id", ""),
+                    "rating": c.get("rating", 5),
+                    "option": c.get("option", "기본"),
+                }
+                for c in subset
             ]
 
-        total_selected = sum(len(v) for v in reranked_contexts.values())
-        logger.info(
-            f"리랭킹 완료: 후보 {len(all_candidates)}건 → 선별 {total_selected}건 "
-            f"(타겟 {len(reranked_contexts)}개, 폴백={'Y' if is_fallback else 'N'})",
-            extra={
-                "trace_id": trace_id,
-                "step_id": "RERANK",
-                "doc_count": total_selected,
-                "fallback": is_fallback,
-            },
-        )
+            # Document Top-P 적용
+            citations = _top_p_calc.filter_documents(
+                candidate_dicts,
+                target_name=target_name,
+            )
 
-    metrics_update["rerank_latency_ms"] = timer.elapsed_ms
+            # RerankedReview 변환
+            selected_reviews: List[RerankedReview] = []
+            for rank_idx, cit in enumerate(citations, start=1):
+                selected_reviews.append(RerankedReview(
+                    doc_id=cit.review_id,
+                    review_text=cit.snippet,
+                    target_id=target_id,
+                    target_name=target_name,
+                    rerank_score=cit.rerank_score,
+                    rank=rank_idx,
+                ))
 
-    result: Dict[str, Any] = {
+            # 최소 1건 보장: 만약 Top-P에서 0건으로 모두 탈락했으나 원본 후보가 있었다면 최고점 1건 보존
+            if not selected_reviews and subset:
+                best = max(subset, key=lambda x: x.get("rerank_score", 0.0))
+                selected_reviews.append(RerankedReview(
+                    doc_id=best["doc_id"],
+                    review_text=best["review_text"],
+                    target_id=target_id,
+                    target_name=target_name,
+                    rerank_score=best.get("rerank_score", 0.0),
+                    rank=1,
+                ))
+
+            reranked_contexts[target_id] = selected_reviews
+            logger.info(
+                f"[{target_id}] Document Top-P 선별 완료: {len(selected_reviews)}건 선별",
+                extra={"trace_id": trace_id, "doc_count": len(selected_reviews)},
+            )
+
+    return {
         "reranked_contexts": reranked_contexts,
         "is_fallback": is_fallback,
+        "fallback_reason": fallback_reason,
     }
-    if fallback_reason:
-        result["fallback_reason"] = fallback_reason
-    if metrics_update:
-        result["metrics"] = metrics_update
-
-    return result

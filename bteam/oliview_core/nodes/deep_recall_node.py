@@ -13,7 +13,6 @@ logger = logging.getLogger("oliview.rag.deep_recall")
 
 
 async def deep_recall_node(state: RagGraphState) -> RagGraphState:
-    """LangGraph Deep Recall Node."""
     trace_id = state.get("trace_id", "unknown")
     session_id = state.get("session_id", "")
     is_anaphora = state.get("is_anaphora_detected", False)
@@ -21,8 +20,6 @@ async def deep_recall_node(state: RagGraphState) -> RagGraphState:
 
     if is_anaphora and session_id:
         t0 = time.time()
-        # Redis L4에서 최근 턴 순회 탐색 (예: turn 1~30)
-        # 우선 최신 턴부터 역조회
         for turn_idx in range(30, 0, -1):
             payload = session_store.get_turn_payload(session_id, turn_idx)
             if payload:

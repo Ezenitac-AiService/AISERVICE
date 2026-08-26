@@ -38,14 +38,14 @@ from common import (
 
 try:
     from oliview_core.session import session_store
-    from oliview_core.guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail
+    from oliview_core.guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail, ZERO_SEARCH_TEMPLATE
     from oliview_core.config import get_settings
     from oliview_core.graph_orchestrator import MultiTargetGraphOrchestrator
 except ImportError:
     import sys
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from oliview_core.session import session_store
-    from oliview_core.guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail
+    from oliview_core.guardrail import PromptInjectionGuardrail, EarlyIntentGuardrail, ZERO_SEARCH_TEMPLATE
     from oliview_core.config import get_settings
     from oliview_core.graph_orchestrator import MultiTargetGraphOrchestrator
 
@@ -966,14 +966,31 @@ async def search_products_with_rag_stream(request_body: SearchRequest, request: 
                 break
 
         if not web_response_list:
-            err_evt = {
-                "phase": PipelinePhase.ERROR.value,
-                "label": "⚠️ 유효한 추천 상품 없음",
-                "error_message": "필터링 후 유효한 리뷰를 찾지 못했습니다.",
-                "retry_query": request_body.query,
-                "suggested_chips": ["컬러그램", "식물나라", "올리브영 인기상품"],
+            step_zero_evt = {
+                "phase": PipelinePhase.COMPLETED.value,
+                "label": "✅ 검색 완료 (0건 부재 고지)",
+                "status": "complete",
+                "elapsed_sec": round(time.time() - t_start, 2),
+                "progress_percent": 100,
             }
-            yield f"event: error\ndata: {json.dumps(err_evt, ensure_ascii=False)}\n\n"
+            yield f"event: step\ndata: {json.dumps(step_zero_evt, ensure_ascii=False)}\n\n"
+
+            for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+                yield f"event: token\ndata: {json.dumps({'token': line + '\n'}, ensure_ascii=False)}\n\n"
+
+            complete_zero_evt = {
+                "phase": PipelinePhase.COMPLETED.value,
+                "label": "✅ 분석 완료 (0건 선별)",
+                "status": "complete",
+                "total_latency_sec": round(time.time() - t_start, 2),
+                "searched_review_count": 0,
+                "selected_review_count": 0,
+                "model_used": "crag-fast-abstention",
+                "fallback_triggered": False,
+                "reference_reviews": [],
+                "suggested_chips": ["스킨케어", "쿠션", "인기 앰플"],
+            }
+            yield f"event: complete\ndata: {json.dumps(complete_zero_evt, ensure_ascii=False)}\n\n"
             return
 
         # Step 4: LLM_SYNTHESIS
