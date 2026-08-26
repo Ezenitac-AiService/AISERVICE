@@ -8,8 +8,8 @@
 
 **Purpose**: Project initialization and configuration setup
 
-- [ ] T001 Initialize L5 Redis configuration parameters (`redis_ttl_llm_response=43200`, `redis_ttl_llm_jitter=3600`, `enable_l5_cache=True`) in `bteam/oliview_core/config.py`
-- [ ] T002 [P] Define `L5CacheKeyParams`, `L5ResponseCachePayload`, and `CacheReplayChunk` Pydantic models in `bteam/oliview_core/types.py`
+- [x] T001 Initialize L5 Redis configuration parameters (`redis_ttl_llm_response=43200`, `redis_ttl_llm_jitter=3600`, `enable_l5_cache=True`) in `bteam/oliview_core/config.py`
+- [x] T002 [P] Define `L5CacheKeyParams`, `L5ResponseCachePayload`, and `CacheReplayChunk` Pydantic models in `bteam/oliview_core/types.py`
 
 ---
 
@@ -19,10 +19,10 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 [P] Create unit test suite for L5 cache key generation, normalization, and TTL jitter in `bteam/tests/unit/test_l5_cache.py`
-- [ ] T004 [P] Implement `build_l5_key()` with Unicode NFKC, whitespace collapsing, and sorted doc_ids hashing in `bteam/oliview_core/redis_pool.py`
-- [ ] T005 Implement `get_l5_response()` (0.2s Fail-Fast timeout) and `set_l5_response()` with TTL Jitter in `bteam/oliview_core/redis_pool.py`
-- [ ] T006 [P] Implement `replay_cached_stream()` word-boundary async generator in `bteam/oliview_core/redis_pool.py`
+- [x] T003 [P] Create unit test suite for L5 cache key generation, normalization, and TTL jitter in `bteam/tests/unit/test_l5_cache.py`
+- [x] T004 [P] Implement `build_l5_key()` with Unicode NFKC, whitespace collapsing, and sorted doc_ids hashing in `bteam/oliview_core/redis_pool.py`
+- [x] T005 Implement `get_l5_response()` (0.2s Fail-Fast timeout) and `set_l5_response()` with TTL Jitter in `bteam/oliview_core/redis_pool.py`
+- [x] T006 [P] Implement `replay_cached_stream()` word-boundary async generator in `bteam/oliview_core/redis_pool.py`
 
 **Checkpoint**: Foundation ready - L5 cache engine and replay utilities are ready for node integration.
 
@@ -35,12 +35,12 @@
 **Independent Test**: "차앤박 프로폴리스 앰플 장점 알려줘" 질의를 1회 실행하여 캐시 생성 후, 2회차 재질의 시 GPU 슬롯을 점유하지 않고 50ms 이내에 응답이 스트리밍 완료됨을 검증 (`quickstart.md` Scenario 1).
 
 ### Tests for User Story 1
-- [ ] T007 [P] [US1] Create contract and unit tests for L5 cache hit replay and TTFT < 50ms in `bteam/tests/unit/test_l5_replay.py`
+- [x] T007 [P] [US1] Create contract and unit tests for L5 cache hit replay and TTFT < 50ms in `bteam/tests/unit/test_l5_replay.py`
 
 ### Implementation for User Story 1
-- [ ] T008 [US1] Integrate L5 cache lookup and `replay_cached_stream` into `bteam/oliview_core/nodes/synthesis_node.py` before `generate_stream`
-- [ ] T009 [US1] Collect full stream completion text and commit to L5 cache upon successful generation in `bteam/oliview_core/nodes/synthesis_node.py`
-- [ ] T010 [US1] Update `stream_rag` in `bteam/oliview_core/graph_orchestrator.py` to handle `is_cached: true` step events and observability metadata
+- [x] T008 [US1] Integrate L5 cache lookup and `replay_cached_stream` into `bteam/oliview_core/nodes/synthesis_node.py` before `generate_stream`
+- [x] T009 [US1] Collect full stream completion text and commit to L5 cache upon successful generation in `bteam/oliview_core/nodes/synthesis_node.py`
+- [x] T010 [US1] Update `stream_rag` in `bteam/oliview_core/graph_orchestrator.py` to handle `is_cached: true` step events and observability metadata
 
 **Checkpoint**: User Story 1 is fully functional and delivers 100% GPU offloading for exact query cache hits.
 
@@ -53,12 +53,12 @@
 **Independent Test**: "헤라 블랙쿠션" 질의 후 "이거 지속력 어때?"를 질의했을 때 롬앤 쿠션 캐시와 충돌하지 않고 정확한 헤라 쿠션 답변이 생성되는지 검증 (`quickstart.md` Scenario 2).
 
 ### Tests for User Story 2
-- [ ] T011 [P] [US2] Create unit tests for multi-turn rewritten query and doc IDs hash invalidation in `bteam/tests/unit/test_l5_invalidation.py`
+- [x] T011 [P] [US2] Create unit tests for multi-turn rewritten query and doc IDs hash invalidation in `bteam/tests/unit/test_l5_invalidation.py`
 
 ### Implementation for User Story 2
-- [ ] T012 [US2] Connect `state["rewritten_query"]` from `bteam/oliview_core/nodes/router_node.py` to `synthesis_node.py` L5 key builder
-- [ ] T013 [US2] Integrate top-K doc_ids from `bteam/oliview_core/nodes/rerank_node.py` into `synthesis_node.py` L5 key calculation
-- [ ] T014 [US2] Add `tenant_id` namespace parameter propagation from `graph_orchestrator.py` to `synthesis_node.py`
+- [x] T012 [US2] Connect `state["rewritten_query"]` from `bteam/oliview_core/nodes/router_node.py` to `synthesis_node.py` L5 key builder
+- [x] T013 [US2] Integrate top-K doc_ids from `bteam/oliview_core/nodes/rerank_node.py` into `synthesis_node.py` L5 key calculation
+- [x] T014 [US2] Add `tenant_id` namespace parameter propagation from `graph_orchestrator.py` to `synthesis_node.py`
 
 **Checkpoint**: User Stories 1 AND 2 are both active and preserve 100% data and conversation integrity.
 
@@ -71,12 +71,12 @@
 **Independent Test**: 동일 질의 3건 동시 유입 시 GPU 추론 1회만 발생하고 나머지는 캐시를 대기/공유하며, 20자 미만 응답은 캐시되지 않음을 검증 (`quickstart.md` Scenario 3).
 
 ### Tests for User Story 3
-- [ ] T015 [P] [US3] Create unit tests for SingleFlight concurrent stampede and Poisoning Deny-List in `bteam/tests/unit/test_l5_stampede_guard.py`
+- [x] T015 [P] [US3] Create unit tests for SingleFlight concurrent stampede and Poisoning Deny-List in `bteam/tests/unit/test_l5_stampede_guard.py`
 
 ### Implementation for User Story 3
-- [ ] T016 [US3] Implement `SingleFlightLock` wrapper around L5 cache miss in `bteam/oliview_core/nodes/synthesis_node.py`
-- [ ] T017 [US3] Implement `Poisoning Deny-List Guard` (blocking error phrases, refusals, <20 chars) before `set_l5_response` in `bteam/oliview_core/redis_pool.py`
-- [ ] T018 [US3] Implement `Cache-Control: no-cache` and `X-Bypass-Cache: true` bypass support in `bteam/oliview_core/nodes/synthesis_node.py`
+- [x] T016 [US3] Implement `SingleFlightLock` wrapper around L5 cache miss in `bteam/oliview_core/nodes/synthesis_node.py`
+- [x] T017 [US3] Implement `Poisoning Deny-List Guard` (blocking error phrases, refusals, <20 chars) before `set_l5_response` in `bteam/oliview_core/redis_pool.py`
+- [x] T018 [US3] Implement `Cache-Control: no-cache` and `X-Bypass-Cache: true` bypass support in `bteam/oliview_core/nodes/synthesis_node.py`
 
 **Checkpoint**: All user stories functional, protected against stampedes, and immune to cache poisoning.
 
@@ -86,10 +86,10 @@
 
 **Purpose**: E2E validation, Docker synchronization, and regression testing
 
-- [ ] T019 [P] Create end-to-end integration test suite in `bteam/tests/integration/test_l5_cache_integration.py`
-- [ ] T020 Run end-to-end quickstart validation scenarios per `quickstart.md`
-- [ ] T021 Sync changes to Docker containers (`docker restart oliview_chatbot_a oliview_chatbot_b`)
-- [ ] T022 Update `specs/032-llm-response-caching/quickstart.md` with final verification results
+- [x] T019 [P] Create end-to-end integration test suite in `bteam/tests/integration/test_l5_cache_integration.py`
+- [x] T020 Run end-to-end quickstart validation scenarios per `quickstart.md`
+- [x] T021 Sync changes to Docker containers (`docker restart oliview_chatbot_a oliview_chatbot_b`)
+- [x] T022 Update `specs/032-llm-response-caching/quickstart.md` with final verification results
 
 ---
 
