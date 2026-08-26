@@ -76,9 +76,9 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 ### Functional Requirements
 
 * **FR-001 (Gateway Queue Controller)**: 모델 게이트웨이(`model_gateway`)는 단일 GPU 동시 처리 한도(기본 `active_slots=1~2`)를 초과하는 요청에 대해 비동기 우선순위 대기 큐(`AsyncFairQueue`)를 운영해야 한다.
-* **FR-002 (SSE Heartbeat & Queue Stream)**: 게이트웨이는 요청이 큐에 진입한 즉시 HTTP 200 SSE 스트림을 오픈하고, 최소 1.5초 간격으로 `event: queue_status` 또는 `: keepalive` 하트비트를 클라이언트에 지속 전송해야 한다.
+* **FR-002 (SSE Keep-Alive & Queue Update)**: 게이트웨이는 요청이 큐에 진입한 즉시 HTTP 200 SSE 스트림을 오픈하고, 순번 변동 시 즉시(Event-Driven) 또는 최대 3~5초 간격으로 `event: queue_status`를 전송하며, 대기 중 무응답 방지를 위해 15초 주기로 `: keepalive\n\n` 하트비트를 클라이언트에 지속 전송해야 한다.
 * **FR-003 (Queue Status Payload)**: `queue_status` 이벤트는 `queue_position`(대기 순번, 정수), `estimated_wait_sec`(예상 대기 초, 실수), `active_requests`(현재 연산 중인 요청 수), `timestamp` 필드를 포함해야 한다.
-* **FR-004 (Client Sliding-Window Timeout)**: 챗봇 코어 클라이언트(`AiGatewayClient`)는 고정 타이머 대신 **마지막 수신 패킷 기준 슬라이딩 윈도우 타임아웃**을 적용하여, 하트비트가 수신되는 동안에는 타임아웃 예외를 발생시키지 않고 대기 리스를 자동 연장해야 한다.
+* **FR-004 (Client Sliding Inactivity Timeout)**: 챗봇 코어 클라이언트(`AiGatewayClient`)는 고정 타이머 대신 **마지막 패킷 수신 기준 무응답(Inactivity) 타임아웃(15초)**을 적용하여, 하트비트나 큐 이벤트가 수신되는 동안에는 총 대기 시간이 길어지더라도 타임아웃 없이 대기 리스를 자동 연장해야 한다.
 * **FR-005 (Chat A Streamlit Queue UX)**: `StreamlitGraphAdapter` 및 `06.02.app.py`는 `queue_status` 수신 시 `st.status()` 상태 라벨을 `⏳ GPU 대기 중 (순번 N번, 약 T초 예상)`으로 실시간 업데이트해야 한다.
 * **FR-006 (Chat B Web UI Queue UX)**: `project_ragapi.py` 및 `index.html`은 `queue_status` 수신 시 타임라인 상단 뱃지를 `⏳ 대기 순번: N번 (예상 T초)`으로 실시간 변경하고 대기 애니메이션을 유지해야 한다.
 * **FR-007 (Tenant Fair Scheduling)**: 게이트웨이 스케줄러는 요청 헤더(`X-Tenant-Id` 또는 클라이언트 식별자)를 기반으로 Deficit Round Robin(DRR) 공정 큐잉을 적용하여 서비스 간 기아를 방지해야 한다.
@@ -105,7 +105,7 @@ Chat A와 Chat B가 동시에 여러 요청을 보낼 때, 특정 챗봇의 긴 
 
 * **SC-001 (동시 요청 타임아웃 0건 달성)**: Chat A와 Chat B에서 동시 3건 이상의 요청이 인입될 때, GPU 연산 지연으로 인한 504 / ReadTimeout 예외 발생률 **0.0%**.
 * **SC-002 (초기 큐 피드백 지연 시간)**: 큐 진입 후 첫 번째 `queue_status` 이벤트가 클라이언트에 전달되기까지의 시간 **< 200ms**.
-* **SC-003 (하트비트 신뢰성)**: 대기 중 최소 **1.5초마다 1회 이상** 하트비트/큐 이벤트가 전송되어 프록시 및 브라우저의 유휴 연결 끊김 방지.
+* **SC-003 (하트비트 및 큐 갱신 신뢰성)**: 순번 변경 시 500ms 이내 실시간 통보 및 대기 중 최소 **15초마다 1회 이상** 하트비트가 전송되어 프록시 및 브라우저의 유휴 연결 끊김 방지.
 * **SC-004 (테넌트 공정성)**: 연속된 긴 질의 환경에서 다른 테넌트의 단일 질의 대기 시간이 직전 요청 완료 시간 이상으로 지연되지 않음(기아 현상 0건).
 * **SC-005 (자원 누수 방지)**: 클라이언트 탭 닫힘 시 큐 내 잔여 요청이 **1.0초 이내**에 즉시 메모리에서 제거됨.
 
