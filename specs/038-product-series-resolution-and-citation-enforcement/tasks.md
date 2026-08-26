@@ -10,8 +10,8 @@
 
 **Purpose**: 프로젝트 기초 데이터 모델, 뷰티 부정 속성 사전 정의 및 공통 스키마 구축
 
-- [ ] T001 [P] Create series matching and stream payload schemas in `bteam/Oliview_chatbot_a/oliview_core/models/series_models.py`
-- [ ] T002 [P] Define `NEGATIVE_ASPECT_LEXICON` dictionary and polarity mapping in `bteam/Oliview_chatbot_a/oliview_core/models/aspect_lexicon.py`
+- [X] T001 [P] Create series matching and stream payload schemas in `bteam/Oliview_chatbot_a/oliview_core/models/series_models.py`
+- [X] T002 [P] Define `NEGATIVE_ASPECT_LEXICON` dictionary and polarity mapping in `bteam/Oliview_chatbot_a/oliview_core/models/aspect_lexicon.py`
 
 ---
 
@@ -19,9 +19,9 @@
 
 **Purpose**: 모든 User Story가 의존하는 시리즈 퍼지 매칭 엔진, 부정 속성 감지기 및 FastAPI 서버 베이스라인 구축
 
-- [ ] T003 [P] Implement series/sub-brand substring and fuzzy expansion helper in `bteam/Oliview_chatbot_a/oliview_core/tools/search_tools.py`
-- [ ] T004 [P] Integrate series expansion and negative lexicon recognition into `bteam/Oliview_chatbot_a/oliview_core/utils/entity_normalizer.py`
-- [ ] T005 [P] Setup FastAPI application with static file mount and SSE route skeleton in `bteam/Oliview_chatbot_a/main.py`
+- [X] T003 [P] Implement series/sub-brand substring and fuzzy expansion helper in `bteam/Oliview_chatbot_a/oliview_core/tools/search_tools.py`
+- [X] T004 [P] Integrate series expansion and negative lexicon recognition into `bteam/Oliview_chatbot_a/oliview_core/utils/entity_normalizer.py`
+- [X] T005 [P] Setup FastAPI application with static file mount and SSE route skeleton in `bteam/Oliview_chatbot_a/main.py`
 
 **Checkpoint**: 시리즈 매칭 도구, 부정 속성 사전, FastAPI 라우팅 베이스 완료 — User Story 개발 진입 가능
 
@@ -36,14 +36,14 @@
 ### Tests for User Story 1 (Test-First TDD) ⚠️
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T006 [P] [US1] Unit test for series resolution (e.g., "헤라 센슈얼 립" $\rightarrow$ "헤라 센슈얼 누드 밤/글로스" candidates) in `bteam/Oliview_chatbot_a/tests/test_series_resolution.py`
-- [ ] T007 [P] [US1] Unit test for multi-target series citation formatting (`[헤라 센슈얼 누드 밤 리뷰 1]`) in `bteam/Oliview_chatbot_a/tests/test_series_citations.py`
+- [X] T006 [P] [US1] Unit test for series resolution (e.g., "헤라 센슈얼 립" $\rightarrow$ "헤라 센슈얼 누드 밤/글로스" candidates) in `bteam/Oliview_chatbot_a/tests/test_series_resolution.py`
+- [X] T007 [P] [US1] Unit test for multi-target series citation formatting (`[헤라 센슈얼 누드 밤 리뷰 1]`) in `bteam/Oliview_chatbot_a/tests/test_series_citations.py`
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Update `router_node.py` to auto-expand series queries into multi-target `EXPLICIT_COMPARE` when $\ge 2$ product candidates match in `bteam/Oliview_chatbot_a/oliview_core/nodes/router_node.py`
-- [ ] T009 [US1] Update `search_node.py` to retrieve balanced reviews (max 3 reviews per series product) in `bteam/Oliview_chatbot_a/oliview_core/nodes/search_node.py`
-- [ ] T010 [US1] Enforce `[제품명 리뷰 N]` namespace citations and XML context assembly in `bteam/Oliview_chatbot_a/oliview_core/nodes/context_node.py` and `synthesis_node.py`
+- [X] T008 [US1] Update `router_node.py` to auto-expand series queries into multi-target `EXPLICIT_COMPARE` when $\ge 2$ product candidates match in `bteam/Oliview_chatbot_a/oliview_core/nodes/router_node.py`
+- [X] T009 [US1] Update `search_node.py` to retrieve balanced reviews (max 3 reviews per series product) in `bteam/Oliview_chatbot_a/oliview_core/nodes/search_node.py`
+- [X] T010 [US1] Enforce `[제품명 리뷰 N]` namespace citations and XML context assembly in `bteam/Oliview_chatbot_a/oliview_core/nodes/context_node.py` and `synthesis_node.py`
 
 **Checkpoint**: User Story 1 완성 (시리즈명 약칭 질의 100% 실존 상품 매칭 및 인용 무결성 확보)
 
@@ -57,13 +57,13 @@
 
 ### Tests for User Story 2 (Test-First TDD) ⚠️
 
-- [ ] T011 [P] [US2] Unit test for cosmetic negative lexicon guard and polarity constraints in `bteam/Oliview_chatbot_a/tests/test_negative_aspect_guard.py`
-- [ ] T012 [P] [US2] Unit test for Zero-Search Hard Block (0 reviews $\rightarrow$ 0 fake pros/cons) in `bteam/Oliview_chatbot_a/tests/test_zero_search_hard_block.py`
+- [X] T011 [P] [US2] Unit test for cosmetic negative lexicon guard and polarity constraints in `bteam/Oliview_chatbot_a/tests/test_negative_aspect_guard.py`
+- [X] T012 [P] [US2] Unit test for Zero-Search Hard Block (0 reviews $\rightarrow$ 0 fake pros/cons) in `bteam/Oliview_chatbot_a/tests/test_zero_search_hard_block.py`
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Implement negative aspect constraint injector and zero-search hard block in `bteam/Oliview_chatbot_a/oliview_core/nodes/synthesis_node.py`
-- [ ] T014 [US2] Implement negative aspect polarity validator and hallucination post-processor in `bteam/Oliview_chatbot_a/oliview_core/guardrail.py`
+- [X] T013 [US2] Implement negative aspect constraint injector and zero-search hard block in `bteam/Oliview_chatbot_a/oliview_core/nodes/synthesis_node.py`
+- [X] T014 [US2] Implement negative aspect polarity validator and hallucination post-processor in `bteam/Oliview_chatbot_a/oliview_core/guardrail.py`
 
 **Checkpoint**: User Story 1 & 2 완성 (시리즈 발굴 + 뷰티 부정 속성 왜곡 방지 및 제로 서치 무환각 달성)
 
@@ -77,14 +77,14 @@
 
 ### Tests for User Story 3 (Test-First TDD) ⚠️
 
-- [ ] T015 [P] [US3] Integration test for FastAPI SSE stream endpoint (`POST /api/v1/chat/stream`) and token chunks in `bteam/Oliview_chatbot_a/tests/test_fastapi_web_stream.py`
+- [X] T015 [P] [US3] Integration test for FastAPI SSE stream endpoint (`POST /api/v1/chat/stream`) and token chunks in `bteam/Oliview_chatbot_a/tests/test_fastapi_web_stream.py`
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Implement full FastAPI application and SSE event generator in `bteam/Oliview_chatbot_a/main.py`
-- [ ] T017 [US3] Build Desktop Pixel-Identical HTML structure (2-column `[1.6:1.4]` brand/category/aspect chips + 1-click examples + bottom fixed bar) in `bteam/Oliview_chatbot_a/static/index.html`
-- [ ] T018 [US3] Implement Desktop CSS styling (Pretendard font, Olive Young `#2E9E44`, glassmorphism, status box, review accordion) in `bteam/Oliview_chatbot_a/static/css/style.css`
-- [ ] T019 [US3] Implement client-side SSE consumption, real-time status updates, and `AbortController` stop handler in `bteam/Oliview_chatbot_a/static/js/app.js`
+- [X] T016 [US3] Implement full FastAPI application and SSE event generator in `bteam/Oliview_chatbot_a/main.py`
+- [X] T017 [US3] Build Desktop Pixel-Identical HTML structure (2-column `[1.6:1.4]` brand/category/aspect chips + 1-click examples + bottom fixed bar) in `bteam/Oliview_chatbot_a/static/index.html`
+- [X] T018 [US3] Implement Desktop CSS styling (Pretendard font, Olive Young `#2E9E44`, glassmorphism, status box, review accordion) in `bteam/Oliview_chatbot_a/static/css/style.css`
+- [X] T019 [US3] Implement client-side SSE consumption, real-time status updates, and `AbortController` stop handler in `bteam/Oliview_chatbot_a/static/js/app.js`
 
 **Checkpoint**: User Story 1, 2, 3 완성 (FastAPI 웹 전환 및 데스크탑 Pixel-Identical UI 완성)
 
@@ -98,12 +98,12 @@
 
 ### Tests for User Story 4 (Test-First TDD) ⚠️
 
-- [ ] T020 [P] [US4] Contract test for mobile viewport responsiveness and bottom sheet event triggers in `bteam/Oliview_chatbot_a/tests/test_mobile_responsive_contract.py`
+- [X] T020 [P] [US4] Contract test for mobile viewport responsiveness and bottom sheet event triggers in `bteam/Oliview_chatbot_a/tests/test_mobile_responsive_contract.py`
 
 ### Implementation for User Story 4
 
-- [ ] T021 [US4] Implement 2026 Mobile Responsive CSS (`@media (max-width: 768px)`, horizontal swipe chips, Thumb-Zone input bar, safe-area-inset) in `bteam/Oliview_chatbot_a/static/css/mobile.css`
-- [ ] T022 [US4] Implement interactive slide-up **Bottom Sheet Drawer** and inline `[리뷰 N]` badge tap handlers in `bteam/Oliview_chatbot_a/static/js/chat_ui.js`
+- [X] T021 [US4] Implement 2026 Mobile Responsive CSS (`@media (max-width: 768px)`, horizontal swipe chips, Thumb-Zone input bar, safe-area-inset) in `bteam/Oliview_chatbot_a/static/css/mobile.css`
+- [X] T022 [US4] Implement interactive slide-up **Bottom Sheet Drawer** and inline `[리뷰 N]` badge tap handlers in `bteam/Oliview_chatbot_a/static/js/chat_ui.js`
 
 **Checkpoint**: User Story 1~4 전체 기능 완결 (데스크탑 동일 레이아웃 + 2026 모바일 최적화 바텀 시트 반응형 웹 완비)
 
@@ -113,9 +113,10 @@
 
 **Purpose**: 전사 회귀 검증, ChatB 동기화 및 E2E 실시간 쿼리 품질 검증
 
-- [ ] T023 [P] Execute all new unit and contract test suites with pytest across `bteam/Oliview_chatbot_a/tests/`
-- [ ] T024 Synchronize updated core models, tools, and negative aspect guard to `bteam/Oliview_chatbot_b/oliview_core/`
-- [ ] T025 Execute end-to-end quickstart validation scenarios from `specs/038-product-series-resolution-and-citation-enforcement/quickstart.md`
+- [X] T023 [P] Execute all new unit and contract test suites with pytest across `bteam/Oliview_chatbot_a/tests/`
+- [X] T024 Synchronize updated core models, tools, and negative aspect guard to `bteam/Oliview_chatbot_b/oliview_core/`
+- [X] T025 Execute end-to-end quickstart validation scenarios from `specs/038-product-series-resolution-and-citation-enforcement/quickstart.md`
+
 
 ---
 
