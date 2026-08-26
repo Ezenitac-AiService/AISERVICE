@@ -64,11 +64,12 @@ PROS_CONS_PROMPT = """아래 제공된 올리브영 실제 리뷰 데이터를 �
 from ..models.aspect_lexicon import get_aspect_guard_instruction, is_negative_aspect
 from ..guardrail import sanitize_negative_aspect_distortions
 
-ZERO_SEARCH_TEMPLATE = """죄송합니다. 현재 올리브영 데이터베이스에 질문하신 상품/라인에 대한 실제 구매자 리뷰 데이터를 찾을 수 없습니다.
+ZERO_SEARCH_TEMPLATE = """죄송합니다. 사용자가 질문한 화장품 또는 카테고리에 대한 실제 구매자 리뷰를 현재 올리브영 데이터베이스에서 찾을 수 없습니다.
 
 💡 **안내 사항**:
-- 현재 등록된 실제 구매자 리뷰가 없습니다.
+- 현재 등록된 실제 구매자 리뷰 데이터가 없습니다.
 - 정확한 상품명(예: '헤라 센슈얼 누드 밤', '차앤박 프로폴리스 에너지 액티브 앰플')으로 다시 질문해 주시거나, 추천을 원하시는 카테고리(예: '촉촉한 립밤 추천해줘')를 문의해 주시면 최적의 제품을 안내해 드리겠습니다. 🌿"""
+
 
 # 하위 호환성용 별칭
 ZERO_SEARCH_PROMPT = ZERO_SEARCH_TEMPLATE
