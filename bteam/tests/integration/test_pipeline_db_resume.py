@@ -89,3 +89,88 @@ def test_sqlalchemy_lease_recovers_expired_owner_and_records_history():
     assert len(expired) == 1
     assert expired[0].status == "FAILED"
     assert expired[0].error_code == "LEASE_EXPIRED"
+
+
+def test_all_products_cycle_watermark_and_exact_resume():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    executed_steps: list[tuple[str, str]] = []
+
+    with Session(engine) as session:
+        # 1. Run that fails on 'report'
+        def step_tracker(step_name: str, fail: bool = False):
+            def handler(context):
+                executed_steps.append((step_name, context.selector))
+                if fail:
+                    raise RuntimeError(f"failure in {step_name}")
+
+            return handler
+
+        runner = PipelineRunner(
+            step_handlers={
+                "crawl": step_tracker("crawl"),
+                "sentence_split": step_tracker("sentence_split"),
+                "sentiment": step_tracker("sentiment"),
+                "report": step_tracker("report", fail=True),
+                "index": step_tracker("index"),
+            },
+            lease_store=SqlAlchemyLeaseStore(session, ttl_seconds=60),
+            run_store=SqlAlchemyRunStore(session),
+        )
+
+        with pytest.raises(RuntimeError, match="failure in report"):
+            runner.run_once(selector="all-products", steps="all", interval_hours=0)
+
+        run_id = next(iter(runner.runs))
+        persisted = session.scalars(
+            select(PipelineRunHistoryORM)
+            .where(PipelineRunHistoryORM.run_id == run_id)
+            .order_by(PipelineRunHistoryORM.id)
+        ).all()
+        assert [r.step_name for r in persisted] == [
+            "crawl",
+            "sentence_split",
+            "sentiment",
+            "report",
+        ]
+        assert [r.status for r in persisted] == [
+            "COMPLETED",
+            "COMPLETED",
+            "COMPLETED",
+            "FAILED",
+        ]
+
+        # 2. Resumed runner picks up from 'report'
+        resumed_runner = PipelineRunner(
+            step_handlers={
+                "crawl": step_tracker("crawl"),
+                "sentence_split": step_tracker("sentence_split"),
+                "sentiment": step_tracker("sentiment"),
+                "report": step_tracker("report", fail=False),
+                "index": step_tracker("index"),
+            },
+            lease_store=SqlAlchemyLeaseStore(session, ttl_seconds=60),
+            run_store=SqlAlchemyRunStore(session),
+        )
+
+        resumed_result = resumed_runner.run_once(
+            selector="all-products", steps="all", resume_run_id=run_id
+        )
+
+        assert resumed_result.metadata["status"] == "COMPLETED"
+        assert resumed_result.completed == {
+            "crawl",
+            "sentence_split",
+            "sentiment",
+            "report",
+            "index",
+        }
+
+        all_rows = session.scalars(
+            select(PipelineRunHistoryORM)
+            .where(PipelineRunHistoryORM.run_id == run_id)
+            .order_by(PipelineRunHistoryORM.id)
+        ).all()
+        assert len(all_rows) == 5
+        assert all(r.status == "COMPLETED" for r in all_rows)
+

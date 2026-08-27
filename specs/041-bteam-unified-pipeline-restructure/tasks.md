@@ -233,3 +233,12 @@ graph TD
 - [ ] T103 [HIGH] `--all-products`와 cycle 실행이 coordinator lease 외에 제품별 `(product_pipeline, product:{id})` lease를 순서대로 획득·해제하고, 제품별 immutable watermark·changed-input eligibility·실패 run exact resume을 Green MySQL 통합 테스트로 증명한다. `FR-002`, `FR-006`, `SC-006` (partial; 활성 246개 제품 lease 획득·해제와 active lease 0은 Green에서 검증했으나 제품별 changed-input watermark 및 실패 run exact resume의 MySQL E2E는 잔여)
 - [X] T104 [HIGH] Redis version manager를 Green Redis durable publisher와 연결해 실제 성공한 제품 범위만 `report/rag` version을 전진·publish하고, partial failure와 재시작 뒤에도 제품별 namespace가 유지되는지 검증한다. `FR-015`, `FR-018` (제품별 durable current/version key, publish 실패 시 local version 미전진, 두 one-shot runner 재시작에서 v2→v3 연속성 및 Green runtime 증거 완료)
 - [X] T105 [HIGH] 성공한 Green pipeline v2 `index` event를 기준으로 동일 source review를 Dashboard·ChatA·ChatB에서 조회하는 end-to-end freshness probe를 실행해 60초 이내 timestamp, cache version, citation evidence를 raw artifact로 보존한다. `SC-015` (동일 event의 source review 98이 Dashboard 0.112초, ChatA 0.242초, ChatB 0.319초에 citation으로 노출; cache v2와 raw citation IDs/route를 `migration/artifacts/pipeline-runtime-verification.json`에 보존)
+
+## Phase 16: Convergence
+
+- [ ] T106 [CRITICAL] 외부 변경 권한자의 `CUTOVER_APPROVED`·`BACKUP_READY`·`DATA_MIGRATION_READY`·`DECOMMISSION_APPROVED` 승인 artifact 및 hash chain을 검증한 뒤에만 운영 data endpoint 전환, Nginx cutover, 최소 24시간 soak, Blue decommission을 수행한다 per `FR-009`, `FR-017`, `FR-023`, `SC-017`, `Constitution III` (partial)
+- [X] T107 [HIGH] `--all-products` 및 cycle 실행 시 immutable watermark, 제품별 changed-input eligibility, MySQL server UTC 기준 lease 획득·해제와 실패 run exact resume의 E2E 정합성을 검증한다 per `FR-002`, `FR-006`, `SC-006` (`test_all_products_cycle_watermark_and_exact_resume` 및 run store/lease store 통합 검증 완료)
+- [ ] T108 [HIGH] 외부 승인된 PRODUCTION 환경에서 서로 다른 GPU-backed Gateway endpoint 2개 이상과 Redis primary/replica/Sentinel quorum (또는 managed HA)의 startup preflight, readiness, 장애 복구 및 fingerprint를 검증한다 per `FR-008`, `FR-009`, `FR-012` (partial)
+- [ ] T109 [HIGH] 실제 candidate Nginx 바이너리/설정의 `nginx -t`, 원자적 reload/rollback 모의 rehearsal, 네 Green candidate route smoke 및 Blue 운영 data write 0건 audit을 검증한다 per `SC-003`, `SC-017` (partial)
+- [ ] T110 [MEDIUM] 고정 performance corpus의 200회 benchmark(DEMO/PRODUCTION) 및 10제품×10,000리뷰 report load 하에서의 latency, DB lock/contention, PII/secret 무유출 raw artifact를 보존한다 per `SC-007`, `SC-008`, `SC-010`, `SC-012` (partial)
+
