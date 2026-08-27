@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "feature": "041-bteam-unified-pipeline-restructure",
+  "generated_at": "2026-08-27T00:00:00+09:00",
+  "scope": "read-only baseline; no Blue mutation performed",
+  "source_roots": [
+    {"path": "bteam/oliview_core", "role": "shared-core-duplicate-candidate", "file_count": 41, "bytes_excluding_runtime_caches": 291921},
+    {"path": "bteam/Oliview_Project", "role": "crawler-dashboard-source", "file_count": 101, "bytes_excluding_runtime_caches": 1693385},
+    {"path": "bteam/Oliview_aspect_sentence_split", "role": "sentence-splitter-and-model", "file_count": 56, "bytes_excluding_runtime_caches": 4434133656},
+    {"path": "bteam/Oliview_aspect_sentiment", "role": "sentiment-classifier-and-model", "file_count": 55, "bytes_excluding_runtime_caches": 1550278039},
+    {"path": "bteam/Oliview_LLM", "role": "report-generator", "file_count": 32, "bytes_excluding_runtime_caches": 370630},
+    {"path": "bteam/Oliview_chatbot_a", "role": "streamlit-rag-chatbot-and-chroma", "file_count": 180, "bytes_excluding_runtime_caches": 4941752952},
+    {"path": "bteam/Oliview_chatbot_b", "role": "fastapi-rag-chatbot", "file_count": 85, "bytes_excluding_runtime_caches": 613171}
+  ],
+  "configuration_files": {
+    "secret_values_recorded": false,
+    "files_and_key_names_only": [
+      {"path": "bteam/.env", "keys": ["DB_HOST", "DB_PORT", "DB_ROOT_PASSWORD", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_NAME3", "host", "ID", "PW", "DBName", "MODEL_GATEWAY_HOST", "MODEL_GATEWAY_PORT", "SERVER_HOST", "MAIN_PORT", "EMBED_PORT", "EMBEDDING_PORT", "RERANK_PORT", "DEFAULT_MODEL", "FAST_LLM_MODEL", "FAST_LLM_MAX_TOKENS", "SYNTHESIS_LLM_MODEL", "SYNTHESIS_LLM_MODEL_ALT", "SYNTHESIS_MAX_TOKENS", "DEEP_REPORT_MAX_TOKENS", "MAX_9B_CONTEXT_BUDGET", "EMBEDDING_MODEL", "RERANK_MODEL", "FRONTEND_PORT", "BACKEND_PORT", "CHATBOT_A_PORT", "CHATBOT_B_PORT", "SMTP_SERVER", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]},
+      {"path": "bteam/Oliview_Project/.env", "keys": ["DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME3", "SMTP_SERVER", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD"]},
+      {"path": "bteam/Oliview_aspect_sentence_split/.env", "keys": ["host", "ID", "PW", "DBName"]},
+      {"path": "bteam/Oliview_aspect_sentiment/.env", "keys": ["host", "ID", "PW", "DBName"]},
+      {"path": "bteam/Oliview_LLM/.env", "keys": ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"]},
+      {"path": "bteam/Oliview_chatbot_a/.env", "keys": ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD", "USE_LLM_METADATA_FILTER"]}
+    ]
+  },
+  "artifacts": {
+    "mysql_dump": {"path": "bteam/oliview_project_backup_0813.sql", "bytes": 1259911507, "content_exposed": false},
+    "legacy_chroma": {"path": "bteam/Oliview_chatbot_a/chroma_db_oliview/chroma.sqlite3", "bytes": 85413888, "collection": "oliview_review_sentences", "observed_vector_count": 57435, "content_exposed": false},
+    "legacy_chroma_metadata_observation": "id=str(sentence_id); metadata has product_id, product_name, brand_name, analysis_category_name, category_names, attribute_name, sentiment, review_date; source review id is absent"
+  },
+  "blue_runtime": {
+    "compose_project": "aiservice",
+    "active_compose_config": "C:/AISERVICE/docker-compose.yml",
+    "bteam_compose_alternate": "C:/AISERVICE/bteam/docker-compose.yml",
+    "network": "aiservice-network",
+    "containers": [
+      {"name": "bteam_db", "service": "bteam_db", "image": "mysql:8.0", "state": "running", "health": "healthy", "ports": ["3306/tcp", "33060/tcp"]},
+      {"name": "oliview_backend", "service": "oliview_backend", "image": "oliview_backend:latest", "state": "running", "health": "none", "ports": ["5050/tcp"]},
+      {"name": "oliview_frontend", "service": "oliview_frontend", "image": "oliview_frontend:latest", "state": "running", "health": "none", "ports": ["5173/tcp"]},
+      {"name": "oliview_chatbot_a", "service": "oliview_chatbot_a", "image": "oliview_chatbot_a:latest", "state": "running", "health": "none", "ports": ["8501/tcp"]},
+      {"name": "oliview_chatbot_b", "service": "oliview_chatbot_b", "image": "oliview_chatbot_b:latest", "state": "running", "health": "none", "ports": ["8002/tcp"]},
+      {"name": "aiservice-gateway", "service": "gateway", "image": "aiservice-gateway:latest", "state": "running", "health": "none", "ports": ["80/tcp", "8080/tcp"]},
+      {"name": "vllm-serv-gateway", "service": "vllm-serv", "image": "vllm-serv:latest", "state": "running", "health": "none", "ports": ["8081/tcp", "8090/tcp", "8091/tcp"]},
+      {"name": "aiservice-redis", "service": "redis", "image": "redis:7-alpine", "state": "running", "health": "healthy", "ports": ["6379/tcp"]}
+    ],
+    "active_public_gateway": {"host_ports": [80, 8080], "routes": ["/bteam/oliview/api/ -> oliview_backend:5050", "/bteam/oliview/ -> oliview_frontend:5173", "/bteam/chata/ -> oliview_chatbot_a:8501", "/bteam/chatb/ -> oliview_chatbot_b:8002"]},
+    "observed_volumes": ["bteam_bteam_mysql_data", "bteam_mysql_data", "aiservice_redis_data", "ateam_db_data"],
+    "observed_networks": ["aiservice-network", "bteam_bteam_net", "model_gateway_default"]
+  },
+  "legacy_redis_key_classes": [
+    {"pattern": "v1:rag:pool:{target_slug}:{attr_slug}", "class": "addressable_only_if_reverse_mapping_is_proven", "source": "bteam/oliview_core/redis_pool.py"},
+    {"pattern": "emb:bge-m3:{sha256}", "class": "content_hash_non_addressable", "source": "bteam/oliview_core/redis_pool.py"},
+    {"pattern": "rerank:{query_hash}:{docs_hash}", "class": "query_content_hash_non_addressable", "source": "bteam/oliview_core/redis_pool.py"},
+    {"pattern": "olliview:l5:{tenant}:{sha256}", "class": "query_document_hash_non_addressable", "source": "bteam/oliview_core/redis_pool.py"}
+  ],
+  "duplicate_candidates": [
+    "bteam/oliview_core and bteam/Oliview_chatbot_a/oliview_core and bteam/Oliview_chatbot_b/oliview_core",
+    "service-local config.py and redis_pool.py implementations",
+    "multiple independent pyproject.toml/.env/DB/Gateway configuration files",
+    "fixed container_name and shared aiservice-network definitions in alternate Compose files"
+  ],
+  "protection_invariants": [
+    "Do not edit, stop, remove, rename, or reuse Blue containers, network, volume, bind mounts, active upstream, or operational data endpoints during Green validation.",
+    "Do not record secret values, SQL/Chroma payloads, Redis payloads, or credentials in inventory artifacts.",
+    "Green must use a separate Compose project/network and restored snapshots or cloned endpoints in VALIDATION."
+  ]
+}

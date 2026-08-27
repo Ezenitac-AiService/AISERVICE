@@ -1,0 +1,190 @@
+name: bteam-green
+
+services:
+  mysql-green:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${GREEN_DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${GREEN_DB_USER:-bteam_green}
+      MYSQL_PASSWORD: ${GREEN_DB_PASSWORD:?set GREEN_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${GREEN_DB_ROOT_PASSWORD:?set GREEN_DB_ROOT_PASSWORD}
+    volumes:
+      - green_mysql_data:/var/lib/mysql
+    networks: [green]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis-green:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - green_redis_data:/data
+    networks: [green]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  chroma-green:
+    image: chromadb/chroma:1.5.9
+    restart: unless-stopped
+    environment:
+      IS_PERSISTENT: "TRUE"
+      ANONYMIZED_TELEMETRY: "FALSE"
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      - green_chroma_data:/data
+    networks: [green]
+    healthcheck:
+      test: ["CMD-SHELL", "chroma --help >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  pipeline_runner:
+    build:
+      context: .
+      dockerfile: pipelines/Dockerfile
+    # A failed readiness/handler dependency must remain operator-visible; it
+    # must not become an endless restart loop that hides a failed run.
+    restart: "no"
+    environment: &green_pipeline_env
+      APP_RUN_MODE: ${APP_RUN_MODE:-DEMO}
+      DEPLOYMENT_STAGE: ${DEPLOYMENT_STAGE:-VALIDATION}
+      MYSQL_WRITE_ENDPOINT: mysql-green:3306
+      BLUE_MYSQL_ENDPOINT: ${BLUE_MYSQL_ENDPOINT:-bteam_db:3306}
+      CHROMA_WRITE_ENDPOINT: http://chroma-green:8000
+      BLUE_CHROMA_ENDPOINT: ${BLUE_CHROMA_ENDPOINT:-http://blue-chroma-unset:8000}
+      REDIS_ENDPOINT: redis://redis-green:6379/0
+      BLUE_REDIS_ENDPOINT: ${BLUE_REDIS_ENDPOINT:-redis://blue-redis-unset:6379/0}
+      CRAWLER_ENDPOINT: ${CRAWLER_ENDPOINT:-}
+      GATEWAY_ENDPOINTS: ${GATEWAY_ENDPOINTS:-[]}
+      MODEL_GATEWAY_ENDPOINTS: ${MODEL_GATEWAY_ENDPOINTS:-}
+      MYSQL_HOST: mysql-green
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${GREEN_DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${GREEN_DB_USER:-bteam_green}
+      MYSQL_PASSWORD: ${GREEN_DB_PASSWORD:?set GREEN_DB_PASSWORD}
+    depends_on:
+      mysql-green: { condition: service_healthy }
+      redis-green: { condition: service_healthy }
+      chroma-green: { condition: service_healthy }
+    networks: [green]
+    volumes:
+      - ${GREEN_MODEL_ROOT:-./models}:/models:ro
+
+  dashboard_backend:
+    build:
+      context: .
+      dockerfile: services/dashboard_backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_RUN_MODE: ${APP_RUN_MODE:-DEMO}
+      DEPLOYMENT_STAGE: ${DEPLOYMENT_STAGE:-VALIDATION}
+      MYSQL_READ_ENDPOINT: mysql-green:3306
+      MYSQL_HOST: mysql-green
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${GREEN_DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${GREEN_DB_USER:-bteam_green}
+      MYSQL_PASSWORD: ${GREEN_DB_PASSWORD:?set GREEN_DB_PASSWORD}
+      REDIS_ENDPOINT: redis://redis-green:6379/0
+      PORT: "5050"
+    ports: ["127.0.0.1:15050:5050"]
+    depends_on:
+      mysql-green: { condition: service_healthy }
+    networks: [green]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5050/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  dashboard_frontend:
+    build:
+      context: .
+      dockerfile: services/dashboard_frontend/Dockerfile
+    restart: unless-stopped
+    ports: ["127.0.0.1:15173:5173"]
+    depends_on:
+      dashboard_backend: { condition: service_healthy }
+    networks: [green]
+
+  chatbot_a:
+    build:
+      context: .
+      dockerfile: services/chatbot_a/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_RUN_MODE: ${APP_RUN_MODE:-DEMO}
+      DEPLOYMENT_STAGE: ${DEPLOYMENT_STAGE:-VALIDATION}
+      MYSQL_READ_ENDPOINT: mysql-green:3306
+      MYSQL_HOST: mysql-green
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${GREEN_DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${GREEN_DB_USER:-bteam_green}
+      MYSQL_PASSWORD: ${GREEN_DB_PASSWORD:?set GREEN_DB_PASSWORD}
+      REDIS_ENDPOINT: redis://redis-green:6379/0
+      CHROMA_READ_ENDPOINT: http://chroma-green:8000
+      GATEWAY_ENDPOINTS: ${GATEWAY_ENDPOINTS:-[]}
+      MODEL_GATEWAY_ENDPOINTS: ${MODEL_GATEWAY_ENDPOINTS:-}
+      PORT: "8501"
+    ports: ["127.0.0.1:18501:8501"]
+    depends_on:
+      mysql-green: { condition: service_healthy }
+      chroma-green: { condition: service_healthy }
+    networks: [green]
+    volumes:
+      - ${GREEN_MODEL_ROOT:-./models}:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8501/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  chatbot_b:
+    build:
+      context: .
+      dockerfile: services/chatbot_b/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_RUN_MODE: ${APP_RUN_MODE:-DEMO}
+      DEPLOYMENT_STAGE: ${DEPLOYMENT_STAGE:-VALIDATION}
+      MYSQL_READ_ENDPOINT: mysql-green:3306
+      MYSQL_HOST: mysql-green
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${GREEN_DB_NAME:-cosmetic_db}
+      MYSQL_USER: ${GREEN_DB_USER:-bteam_green}
+      MYSQL_PASSWORD: ${GREEN_DB_PASSWORD:?set GREEN_DB_PASSWORD}
+      REDIS_ENDPOINT: redis://redis-green:6379/0
+      CHROMA_READ_ENDPOINT: http://chroma-green:8000
+      GATEWAY_ENDPOINTS: ${GATEWAY_ENDPOINTS:-[]}
+      MODEL_GATEWAY_ENDPOINTS: ${MODEL_GATEWAY_ENDPOINTS:-}
+      PORT: "8002"
+    ports: ["127.0.0.1:18002:8002"]
+    depends_on:
+      mysql-green: { condition: service_healthy }
+      chroma-green: { condition: service_healthy }
+    networks: [green]
+    volumes:
+      - ${GREEN_MODEL_ROOT:-./models}:/models:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  green_mysql_data:
+  green_redis_data:
+  green_chroma_data:
+
+networks:
+  green:
+    name: bteam-green-network

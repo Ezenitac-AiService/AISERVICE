@@ -1,0 +1,27 @@
+{
+  "recorded_at": "2026-08-26T23:35:48.547763+00:00",
+  "route": "candidate-direct-probe",
+  "blue_mutated": false,
+  "results": [
+    {
+      "url": "http://127.0.0.1:15050/healthz",
+      "status": 200,
+      "latency_ms": 77.81
+    },
+    {
+      "url": "http://127.0.0.1:18501/healthz",
+      "status": 200,
+      "latency_ms": 4.84
+    },
+    {
+      "url": "http://127.0.0.1:18002/healthz",
+      "status": 200,
+      "latency_ms": 16.19
+    },
+    {
+      "url": "http://127.0.0.1:15173/bteam/oliview/",
+      "status": 200,
+      "latency_ms": 51.91
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "grounded": {
+    "schema_version": 2,
+    "report_id": 1,
+    "product_id": 2,
+    "product_code": "P",
+    "product_name": "테스트 제품",
+    "report_status": "grounded",
+    "abstention_reason": null,
+    "total_reviews_analyzed": 1,
+    "aspect_summary": {},
+    "key_complaints": ["c1"],
+    "key_praises": [],
+    "improvement_suggestions": [{"suggestion_id":"s1","text":"사용성을 개선한다","basis_claim_ids":["c1"]}],
+    "markdown_report": "테스트",
+    "created_at": "2026-08-27T00:00:00Z",
+    "claims": [{"claim_id":"c1","text":"커버력이 좋아요","citations":[{"source_review_id":7,"quote":"커버력이 좋아요"}]}]
+  }
+}

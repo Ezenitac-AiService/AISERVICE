@@ -1,0 +1,21 @@
+{
+  "artifact_version": 3,
+  "environment": "Green pipeline image with registry and no healthy model Gateway",
+  "command": "python -m pipelines.pipeline_runner --product-id 1 --steps all --interval-hours 0",
+  "exit_code": 1,
+  "error_type": "StageDependencyError",
+  "structured_event": {
+    "event": "pipeline_failed",
+    "status": "FAILED",
+    "selector": "product:1",
+    "steps": "all",
+    "run_id": "85280714-d65d-486c-a5eb-dca8651b4c13",
+    "error_code": "StageDependencyError",
+    "message": "no healthy model gateway configured for report"
+  },
+  "completed_before_failure": ["crawl", "sentence_split", "sentiment"],
+  "failed_step": "report",
+  "success_recorded": false,
+  "blue_changed": false,
+  "restart_policy": "no"
+}

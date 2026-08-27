@@ -1,0 +1,1 @@
+"""Grounded product report generation."""

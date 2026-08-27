@@ -1,0 +1,108 @@
+{
+  "artifact_version": 1,
+  "recorded_at": "2026-08-27",
+  "green_compose_project": "bteam-green",
+  "blue_mutated": false,
+  "test_gate": {
+    "command_scope": "bteam/tests",
+    "passed": 77,
+    "failed": 0
+  },
+  "canonical_steps": [
+    "crawl",
+    "sentence_split",
+    "sentiment",
+    "report",
+    "index"
+  ],
+  "index_probe": {
+    "command": "python -m pipelines.pipeline_runner --product-id 1 --steps index --interval-hours 0",
+    "run_id": "e2a205c7-851b-467e-a430-b371c82709c3",
+    "status": "COMPLETED",
+    "batch_size": 500,
+    "collection_id": "7ebb1569-59d8-49cf-bd78-c16afec17768",
+    "indexed_sentences": 315,
+    "indexed_reviews": 156,
+    "cache_version": 2,
+    "mysql_indexed_reviews_product_1": 375,
+    "mysql_pending_vector_reviews_product_1": 102,
+    "chroma_v2_count": 57435
+  },
+  "failure_probe": {
+    "command": "python -m pipelines.pipeline_runner --product-id 1 --steps all --interval-hours 0",
+    "run_id": "62ce83bd-382c-4b9e-9fc9-445a025376fa",
+    "status": "FAILED",
+    "failed_step": "crawl",
+    "error_code": "StageDependencyError",
+    "message": "review crawler adapter is not configured",
+    "completed_before_failure": []
+  },
+  "all_products_lease_probe": {
+    "command": "python -m pipelines.pipeline_runner --all-products --steps crawl --interval-hours 0",
+    "run_id": "476dbe79-6cdb-4998-8d47-965c7530ea7f",
+    "status": "FAILED",
+    "due_products": 246,
+    "error_code": "StageDependencyError",
+    "message": "review crawler adapter is not configured",
+    "active_leases_after_run": 0
+  },
+  "actual_model_probe": {
+    "command": "python -m pipelines.pipeline_runner --product-id 1 --steps sentence_split,sentiment --interval-hours 0",
+    "run_id": "e58264de-810a-434d-8fa5-b1ef8ff57651",
+    "status": "COMPLETED",
+    "temporary_review_code": 9990000001,
+    "sentence_split": {
+      "model": "TransformerSentenceSplitter",
+      "processed_reviews": 1,
+      "inserted_sentences": 0
+    },
+    "sentiment": {
+      "model": "TransformerSentimentAnalyzer",
+      "processed_reviews": 1,
+      "stored_results": 0
+    },
+    "temporary_data_removed": true
+  },
+  "redis_publish_probe": {
+    "product_id": 37,
+    "first_one_shot_version": 2,
+    "second_one_shot_version": 3,
+    "current_key": "bteam:DEMO:product:37:rag:current",
+    "versioned_key": "bteam:DEMO:product:37:rag:v3:version",
+    "restart_continuity": true
+  },
+  "freshness_probe": {
+    "index_event_time": "2026-08-27T03:45:14.140950+00:00",
+    "product_id": 137,
+    "source_review_id": 98,
+    "aspect_sentence_id": 325,
+    "cache_version": 2,
+    "chatbot_a": {
+      "http_status": 200,
+      "citation_visible": true,
+      "citation_ids": [98, 13415, 63704393],
+      "seconds_from_index_event": 0.242
+    },
+    "chatbot_b": {
+      "http_status": 200,
+      "citation_visible": true,
+      "citation_ids": [98, 13415, 63704393],
+      "seconds_from_index_event": 0.319
+    },
+    "dashboard": {
+      "http_status": 200,
+      "status": "grounded",
+      "citation_visible": true,
+      "citation_ids": [98, 13415, 63704393, 11900, 1179, 44409],
+      "seconds_from_index_event": 0.112,
+      "route": "/bteam/oliview/api/search"
+    }
+  },
+  "limitations": [
+    "crawl now performs transactional review/preprocessing upsert through JsonReviewCrawler, but Green has no CRAWLER_ENDPOINT so production all-products acquisition is fail-closed and not E2E-proven",
+    "sentence_split and sentiment load the preserved local Transformer models; the isolated Green probe completed with zero extracted spans, so non-empty production model output remains unproven",
+    "report requires a configured healthy model Gateway and has no successful production transaction evidence",
+    "Redis cache publication and interval watermark handling are verified; all-products changed-input execution and DB exact resume remain open convergence work",
+    "Dashboard freshness is now measured; the remaining SC-015 concern is preserving this probe as a repeatable post-index operation"
+  ]
+}

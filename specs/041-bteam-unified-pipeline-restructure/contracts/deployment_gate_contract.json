@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeploymentGateContract",
+  "type": "object",
+  "description": "Auditable gate artifact for Blue-Green cutover, data migration, and decommission. One artifact is stored per gate under bteam/migration/approvals/.",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "gate_type": {
+      "type": "string",
+      "enum": [
+        "CUTOVER_APPROVED",
+        "BACKUP_READY",
+        "DATA_MIGRATION_READY",
+        "DECOMMISSION_APPROVED"
+      ]
+    },
+    "decision": { "type": "string", "const": "APPROVED" },
+    "environment": { "type": "string", "minLength": 1 },
+    "recorded_by": { "type": "string", "minLength": 1 },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approval_authority": {
+      "type": "string",
+      "enum": ["HUMAN_CHANGE_AUTHORITY", "EXTERNAL_CHANGE_SYSTEM"]
+    },
+    "approval_reference": { "type": "string", "minLength": 1 },
+    "recorded_at": { "type": "string", "format": "date-time" },
+    "blue_inventory_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "green_gate_bundle_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "cutover_approval_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "backup_ready_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "data_migration_ready_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "backup_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "migration_result_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "delta_checkpoint": { "type": "string", "minLength": 1 },
+    "delta_lag": { "type": "integer", "const": 0 },
+    "chroma_v1_lag": { "type": "integer", "const": 0 },
+    "chroma_v2_lag": { "type": "integer", "const": 0 },
+    "legacy_cache_policy_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "rollback_response_policy": {
+      "type": "string",
+      "enum": ["CITED", "ABSTENTION_FOR_UNVERIFIED"]
+    },
+    "rollback_compatible": { "type": "boolean", "const": true },
+    "soak_result_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "rollback_rehearsal_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "gate_type",
+    "decision",
+    "environment",
+    "recorded_by",
+    "recorded_at"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "gate_type": { "const": "CUTOVER_APPROVED" } },
+        "required": ["gate_type"]
+      },
+      "then": {
+        "required": [
+          "approved_by",
+          "approval_authority",
+          "approval_reference",
+          "blue_inventory_sha256",
+          "green_gate_bundle_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": { "gate_type": { "const": "BACKUP_READY" } },
+        "required": ["gate_type"]
+      },
+      "then": {
+        "required": [
+          "blue_inventory_sha256",
+          "cutover_approval_sha256",
+          "backup_manifest_sha256"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": { "gate_type": { "const": "DATA_MIGRATION_READY" } },
+        "required": ["gate_type"]
+      },
+      "then": {
+        "required": [
+          "backup_manifest_sha256",
+          "cutover_approval_sha256",
+          "backup_ready_sha256",
+          "migration_result_sha256",
+          "delta_checkpoint",
+          "delta_lag",
+          "chroma_v1_lag",
+          "chroma_v2_lag",
+          "legacy_cache_policy_sha256",
+          "rollback_response_policy",
+          "rollback_compatible"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": { "gate_type": { "const": "DECOMMISSION_APPROVED" } },
+        "required": ["gate_type"]
+      },
+      "then": {
+        "required": [
+          "approved_by",
+          "approval_authority",
+          "approval_reference",
+          "blue_inventory_sha256",
+          "green_gate_bundle_sha256",
+          "data_migration_ready_sha256",
+          "soak_result_sha256",
+          "rollback_rehearsal_sha256"
+        ]
+      }
+    }
+  ]
+}

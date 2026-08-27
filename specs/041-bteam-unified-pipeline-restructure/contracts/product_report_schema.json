@@ -2,48 +2,199 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "ProductReportSchema",
   "type": "object",
-  "description": "Structured JSON & Markdown schema for generated LLM executive improvement reports",
+  "description": "Structured API projection for generated LLM executive improvement reports. The adapter combines the preserved report tables, additive claim/citation tables, and read-only product/statistics projections.",
+  "additionalProperties": false,
   "properties": {
-    "report_id": { "type": "integer" },
-    "product_id": { "type": "string" },
+    "schema_version": { "type": "integer", "const": 2 },
+    "report_id": { "type": "integer", "minimum": 1 },
+    "product_id": { "type": "integer", "minimum": 1 },
+    "product_code": { "type": "string", "minLength": 1, "maxLength": 30 },
     "product_name": { "type": "string" },
     "brand_name": { "type": "string" },
     "category": { "type": "string" },
-    "total_reviews_analyzed": { "type": "integer" },
+    "report_status": {
+      "type": "string",
+      "enum": ["grounded", "abstained"],
+      "description": "grounded requires persisted and verified cited claims; abstained is used when facts cannot be safely grounded"
+    },
+    "abstention_reason": {
+      "type": ["string", "null"],
+      "enum": [null, "NO_REVIEWS", "NO_CITABLE_SOURCE", "LEGACY_UNVERIFIED", "GROUNDING_FAILED"]
+    },
+    "total_reviews_analyzed": { "type": "integer", "minimum": 0 },
     "aspect_summary": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "positive_count": { "type": "integer" },
-          "negative_count": { "type": "integer" },
-          "neutral_count": { "type": "integer" },
-          "positive_ratio": { "type": "number" }
+          "positive_count": { "type": "integer", "minimum": 0 },
+          "negative_count": { "type": "integer", "minimum": 0 },
+          "neutral_count": { "type": "integer", "minimum": 0 },
+          "positive_ratio": { "type": "number", "minimum": 0, "maximum": 100, "description": "Positive sentence percentage from 0 to 100" }
         },
-        "required": ["positive_count", "negative_count", "positive_ratio"]
+        "required": ["positive_count", "negative_count", "neutral_count", "positive_ratio"]
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total_sentence_count": { "type": "integer", "minimum": 0 },
+        "positive_count": { "type": "integer", "minimum": 0 },
+        "negative_count": { "type": "integer", "minimum": 0 },
+        "neutral_count": { "type": "integer", "minimum": 0 },
+        "positive_ratio": { "type": "number", "minimum": 0, "maximum": 100 },
+        "negative_ratio": { "type": "number", "minimum": 0, "maximum": 100 }
+      },
+      "required": [
+        "total_sentence_count",
+        "positive_count",
+        "negative_count",
+        "neutral_count",
+        "positive_ratio",
+        "negative_ratio"
+      ]
+    },
+    "attributes": {
+      "type": "array",
+      "description": "Preserved llm_product_attribute_reports rows filtered to the report product",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attribute_report_id": { "type": "integer", "minimum": 1 },
+          "analysis_category_id": { "type": "integer", "minimum": 1 },
+          "display_name": { "type": "string", "minLength": 1 },
+          "positive_summary": { "type": ["string", "null"] },
+          "negative_summary": { "type": ["string", "null"] },
+          "generated_at": { "type": "string", "format": "date-time" }
+        },
+        "required": [
+          "attribute_report_id",
+          "analysis_category_id",
+          "display_name",
+          "positive_summary",
+          "negative_summary",
+          "generated_at"
+        ]
       }
     },
     "key_complaints": {
       "type": "array",
-      "items": { "type": "string" }
+      "description": "Presentation-only claim_id references that must resolve to cited entries in claims; no independent factual text is allowed",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
     },
     "key_praises": {
       "type": "array",
-      "items": { "type": "string" }
+      "description": "Presentation-only claim_id references that must resolve to cited entries in claims; no independent factual text is allowed",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
     },
     "improvement_suggestions": {
       "type": "array",
-      "items": { "type": "string" }
+      "description": "Recommendations derived from cited claims. Cross-reference validation requires every basis_claim_id to resolve within claims.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "suggestion_id": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "basis_claim_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": ["suggestion_id", "text", "basis_claim_ids"]
+      }
     },
-    "markdown_report": { "type": "string" },
-    "created_at": { "type": "string", "format": "date-time" }
+    "markdown_report": {
+      "type": "string",
+      "description": "Deterministic rendering of grounded claims or the defined abstention response"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO 8601 projection of llm_product_reports.generated_at"
+    },
+    "claims": {
+      "type": "array",
+      "description": "Review-fact claims and their source bindings",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": { "type": "string", "minLength": 1 },
+          "text": { "type": "string", "minLength": 1 },
+          "citations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "source_review_id": { "type": "integer", "minimum": 1 },
+                "quote": { "type": "string", "minLength": 1 }
+              },
+              "required": ["source_review_id"]
+            }
+          }
+        },
+        "required": ["claim_id", "text", "citations"]
+      }
+    }
   },
   "required": [
+    "schema_version",
+    "report_id",
     "product_id",
+    "product_code",
     "product_name",
+    "report_status",
+    "abstention_reason",
     "total_reviews_analyzed",
     "aspect_summary",
+    "statistics",
+    "attributes",
+    "key_complaints",
+    "key_praises",
     "improvement_suggestions",
-    "markdown_report"
+    "markdown_report",
+    "created_at",
+    "claims"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "report_status": { "const": "grounded" } },
+        "required": ["report_status"]
+      },
+      "then": {
+        "properties": {
+          "abstention_reason": { "type": "null" },
+          "claims": { "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "report_status": { "const": "abstained" } },
+        "required": ["report_status"]
+      },
+      "then": {
+        "properties": {
+          "abstention_reason": {
+            "type": "string",
+            "enum": ["NO_REVIEWS", "NO_CITABLE_SOURCE", "LEGACY_UNVERIFIED", "GROUNDING_FAILED"]
+          },
+          "claims": { "maxItems": 0 },
+          "key_complaints": { "maxItems": 0 },
+          "key_praises": { "maxItems": 0 },
+          "improvement_suggestions": { "maxItems": 0 }
+        }
+      }
+    }
   ]
 }

@@ -1,0 +1,16 @@
+[project]
+name = "oliview-core"
+version = "2.0.0"
+description = "Shared contracts and runtime primitives for the Oliview B-team stack"
+requires-python = ">=3.12"
+dependencies = [
+    "PyMySQL>=1.1.0,<2",
+    "SQLAlchemy>=2.0.0,<3",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]

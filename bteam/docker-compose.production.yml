@@ -1,0 +1,11 @@
+name: bteam-green
+
+services:
+  pipeline_runner:
+    environment:
+      APP_RUN_MODE: PRODUCTION
+      DEPLOYMENT_STAGE: CUTOVER
+      CRAWLER_ENDPOINT: ${CRAWLER_ENDPOINT:?set CRAWLER_ENDPOINT}
+      GATEWAY_ENDPOINTS: ${GATEWAY_ENDPOINTS:?set two distinct healthy GPU endpoints}
+      REDIS_HA_ENDPOINT: ${REDIS_HA_ENDPOINT:?set Redis Sentinel or managed HA endpoint}
+      REDIS_HA_QUORUM: ${REDIS_HA_QUORUM:?set Redis HA quorum}

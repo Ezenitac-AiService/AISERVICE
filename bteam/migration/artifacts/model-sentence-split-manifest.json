@@ -1,0 +1,169 @@
+{
+  "Oliview_aspect_sentence_split\\models": [
+    {
+      "path": "aspect_span_extractor\\aspects.json",
+      "size": 439,
+      "sha256": "cee4fff5260ad202ec574596738bc9ec987d83d6d1af174d7fa46f50bebc3ba4"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\model.safetensors",
+      "size": 440143228,
+      "sha256": "92f24cd5191a84913671f6f6c6788f22b203d0bca3ceb1329fd4fbd761233d55"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "dd7efbf067a3cd63fd68afdf6365784c8e269833178e72fa9c5eac47cd62f39b"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\rng_state.pth",
+      "size": 14645,
+      "sha256": "3b7d338ca86ace7831b82d7d5d0dee1567934887a1e7157044778838ae68ef43"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\scheduler.pt",
+      "size": 1465,
+      "sha256": "297b3db6e2efa2549b74b9d677218772dbafb845b94393230c70ae93407ab36b"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\trainer_state.json",
+      "size": 74709,
+      "sha256": "472605c555c3849b66e232c28fe121d709f504b17c485df95238acbe0e5e9712"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\model.safetensors",
+      "size": 440143228,
+      "sha256": "31bd7de71ea6c2bc4d8f4c6977c3c6d388b89b11b6b466c9b3250bb2d6cd46d5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "6da4f6f5aaf11b47dd8db26924350b6b013d9b258eb7fb9647458d32cabeb8c0"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\rng_state.pth",
+      "size": 14645,
+      "sha256": "cbe629b121a90039a9746ea213c7cf743730c508ea3a946b38dc74edcf1e9bb7"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\scheduler.pt",
+      "size": 1465,
+      "sha256": "1f3997795328e37b516cc8807851314962bbea1cf67e5e6846000396fbddfbff"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\trainer_state.json",
+      "size": 111677,
+      "sha256": "188c9cff4ac7c36e3ee9b68281d4c52f8dc9794183bbb348f9bbf45d4a7961bc"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\model.safetensors",
+      "size": 440143228,
+      "sha256": "cf3c7eacb001f11a2cb937bc0e5cb102d901f991e5a538486af1b7d9ff659437"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "b5c8eb7625d3a577b6f4075308249c02c74b90a2c6c46c058dcf7a4d29c7fb5f"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\rng_state.pth",
+      "size": 14645,
+      "sha256": "bbd82de089a19b0cf3df5712b598d2aadd9c72b71959cb4c2ed178eaf6b3ebe7"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\scheduler.pt",
+      "size": 1465,
+      "sha256": "aed769c29a33c3730f5e8661cbfbb2e8738e2e15344a17b2843fc01c32879b9e"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\trainer_state.json",
+      "size": 37714,
+      "sha256": "228812cf23bd60dddad5bc723273838a9f31657e1b6729f687871f270d6aeec4"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\model.safetensors",
+      "size": 440143228,
+      "sha256": "92f24cd5191a84913671f6f6c6788f22b203d0bca3ceb1329fd4fbd761233d55"
+    },
+    {
+      "path": "aspect_span_extractor\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    }
+  ]
+}

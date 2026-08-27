@@ -1,0 +1,1 @@
+"""Green ChatA compatibility service."""

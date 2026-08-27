@@ -1,0 +1,22 @@
+{
+  "mode": "VALIDATION_DRY_RUN",
+  "mysql_dump": {
+    "path": "oliview_project_backup_0813.sql",
+    "bytes": 1259911507,
+    "sha256": "5264463bd615d9cd606627911bf5d62e656cb5a0d3b6305e46960acc1e50db9d"
+  },
+  "chroma_snapshot": {
+    "path": "Oliview_chatbot_a\\chroma_db_oliview\\chroma.sqlite3",
+    "bytes": 85413888,
+    "sha256": "c5bb90c0711c7e1f52a5fbe4536ae23690d5b2539745c9b68d50590d65d3f653",
+    "legacy_collection": "oliview_review_sentences",
+    "write": false
+  },
+  "redis": {
+    "profile": "isolated-empty",
+    "legacy_scan": false,
+    "legacy_delete": false
+  },
+  "endpoint_collisions": [],
+  "blue_mutated": false
+}

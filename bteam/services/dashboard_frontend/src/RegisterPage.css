@@ -1,0 +1,172 @@
+/* 전체 컨테이너 정렬 */
+.register-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 50px 20px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+/* 제목 폰트 스타일 */
+.register-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 30px;
+  letter-spacing: 1px;
+}
+
+/* 회색 배경의 메인 폼 */
+.register-form {
+  background-color: #e5e7eb;
+  padding: 50px;
+  border-radius: 15px;
+  width: 100%;
+  max-width: 900px; /* 👈 기존 600px 였던 이 부분을 800px 이나 900px 등으로 늘려주세요! */
+  box-sizing: border-box;
+}
+
+/* 섹션 제목 (브랜드 정보, 담당자 정보) */
+.section-title, .manager-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 25px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ccc;
+}
+
+/* 입력 그룹 (라벨과 인풋창 세로 정렬) */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 25px;
+  text-align: left;
+}
+
+/* 라벨 (입력창 위 텍스트) */
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+/* 둥근 입력창 디자인 */
+.input-field {
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 30px;
+  border: 1px solid #ddd;
+  outline: none;
+  font-size: 1rem;
+  box-sizing: border-box;
+  background-color: #fff;
+  transition: border-color 0.2s ease;
+}
+
+.input-field:focus {
+  border-color: #111;
+}
+
+/* 섹션 간 간격 */
+.divider {
+  margin: 40px 0;
+}
+
+/* 담당자 정보 하얀색 카드 영역 */
+.manager-section {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* 발급 번호 입력창 + 버튼 나란히 정렬 */
+.token-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+/* 읽기 전용 발급 번호 창은 살짝 어둡게 */
+.token-field {
+  background-color: #f3f4f6;
+  color: #666;
+}
+
+/* 발급 받기 버튼 */
+.token-btn {
+  padding: 0 25px;
+  background-color: #111;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.token-btn:hover {
+  background-color: #333;
+}
+
+/* 최종 회원가입 버튼 */
+.submit-btn {
+  width: 100%;
+  padding: 18px;
+  background-color: #111;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.submit-btn:hover {
+  background-color: #333;
+}
+
+/* 뒤로 가기 링크 텍스트 */
+.back-btn {
+  margin-top: 30px;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  color: #666;
+  font-size: 1rem;
+}
+
+/* --- 비밀번호 보기/숨기기 버튼 관련 스타일 --- */
+
+/* 비밀번호 입력창과 버튼을 감싸는 영역 */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* 글자가 버튼에 가려지지 않도록 오른쪽 여백 추가 */
+.password-input-wrapper .input-field {
+  padding-right: 70px;
+}
+
+/* 보기/숨기기 텍스트 버튼 */
+.toggle-pw-btn {
+  position: absolute;
+  right: 20px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toggle-pw-btn:hover {
+  color: #111;
+  text-decoration: underline;
+}

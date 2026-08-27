@@ -1,0 +1,41 @@
+[project]
+name = "bteam-green"
+version = "2.0.0"
+description = "Green workspace for the Oliview B-team services"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "packages/core",
+    "pipelines",
+    "services/dashboard_backend",
+    "services/chatbot_a",
+    "services/chatbot_b",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff.lint]
+ignore = ["EXE002"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10,<2",
+    "pytest>=8,<10",
+    "ruff>=0.8,<1",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+markers = [
+    "performance: controlled performance fixture or benchmark",
+    "security: PII and secret handling checks",
+]

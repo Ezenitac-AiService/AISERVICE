@@ -1,0 +1,15 @@
+{
+  "mode": "synthetic_guardrail_only",
+  "warmup_excluded": 20,
+  "fixture_rows": 100,
+  "measurements": 200,
+  "input_token_cap": 256,
+  "output_token_cap": 512,
+  "p95_ms": 0.001,
+  "mean_ms": 0.001,
+  "environment": {
+    "python": "3.12.12",
+    "platform": "Windows-11-10.0.22631-SP0"
+  },
+  "not_production_sla": true
+}

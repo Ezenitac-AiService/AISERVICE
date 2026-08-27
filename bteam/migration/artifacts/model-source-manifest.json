@@ -1,0 +1,593 @@
+{
+  "Oliview_aspect_sentence_split\\models": [
+    {
+      "path": "aspect_span_extractor\\aspects.json",
+      "size": 439,
+      "sha256": "cee4fff5260ad202ec574596738bc9ec987d83d6d1af174d7fa46f50bebc3ba4"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\model.safetensors",
+      "size": 440143228,
+      "sha256": "92f24cd5191a84913671f6f6c6788f22b203d0bca3ceb1329fd4fbd761233d55"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "dd7efbf067a3cd63fd68afdf6365784c8e269833178e72fa9c5eac47cd62f39b"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\rng_state.pth",
+      "size": 14645,
+      "sha256": "3b7d338ca86ace7831b82d7d5d0dee1567934887a1e7157044778838ae68ef43"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\scheduler.pt",
+      "size": 1465,
+      "sha256": "297b3db6e2efa2549b74b9d677218772dbafb845b94393230c70ae93407ab36b"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\trainer_state.json",
+      "size": 74709,
+      "sha256": "472605c555c3849b66e232c28fe121d709f504b17c485df95238acbe0e5e9712"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-19606\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\model.safetensors",
+      "size": 440143228,
+      "sha256": "31bd7de71ea6c2bc4d8f4c6977c3c6d388b89b11b6b466c9b3250bb2d6cd46d5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "6da4f6f5aaf11b47dd8db26924350b6b013d9b258eb7fb9647458d32cabeb8c0"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\rng_state.pth",
+      "size": 14645,
+      "sha256": "cbe629b121a90039a9746ea213c7cf743730c508ea3a946b38dc74edcf1e9bb7"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\scheduler.pt",
+      "size": 1465,
+      "sha256": "1f3997795328e37b516cc8807851314962bbea1cf67e5e6846000396fbddfbff"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\trainer_state.json",
+      "size": 111677,
+      "sha256": "188c9cff4ac7c36e3ee9b68281d4c52f8dc9794183bbb348f9bbf45d4a7961bc"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-29409\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\model.safetensors",
+      "size": 440143228,
+      "sha256": "cf3c7eacb001f11a2cb937bc0e5cb102d901f991e5a538486af1b7d9ff659437"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\optimizer.pt",
+      "size": 880408267,
+      "sha256": "b5c8eb7625d3a577b6f4075308249c02c74b90a2c6c46c058dcf7a4d29c7fb5f"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\rng_state.pth",
+      "size": 14645,
+      "sha256": "bbd82de089a19b0cf3df5712b598d2aadd9c72b71959cb4c2ed178eaf6b3ebe7"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\scheduler.pt",
+      "size": 1465,
+      "sha256": "aed769c29a33c3730f5e8661cbfbb2e8738e2e15344a17b2843fc01c32879b9e"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\trainer_state.json",
+      "size": 37714,
+      "sha256": "228812cf23bd60dddad5bc723273838a9f31657e1b6729f687871f270d6aeec4"
+    },
+    {
+      "path": "aspect_span_extractor\\checkpoint-9803\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    },
+    {
+      "path": "aspect_span_extractor\\config.json",
+      "size": 879,
+      "sha256": "b08a8987277d8e9a96419cc13cc9bcb1595ef50c81018dddc1f3f89345119a9c"
+    },
+    {
+      "path": "aspect_span_extractor\\model.safetensors",
+      "size": 440143228,
+      "sha256": "92f24cd5191a84913671f6f6c6788f22b203d0bca3ceb1329fd4fbd761233d55"
+    },
+    {
+      "path": "aspect_span_extractor\\tokenizer.json",
+      "size": 752095,
+      "sha256": "067f88297297c41c13e072fb7b80a477a901ec31e91afeeb2e958173b2e404f9"
+    },
+    {
+      "path": "aspect_span_extractor\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_span_extractor\\training_args.bin",
+      "size": 5201,
+      "sha256": "437777f30eee563f59a8aacdf5182b22f5e4f525e5891a6ad53f1154878f35e5"
+    }
+  ],
+  "Oliview_aspect_sentiment\\models": [
+    {
+      "path": "aspect_26\\classification_report.csv",
+      "size": 1909,
+      "sha256": "b01a70d751f24f11cbf17163bb4bf08abe4d35576198250b1bf35096c1d1b02b"
+    },
+    {
+      "path": "aspect_26\\config.json",
+      "size": 2572,
+      "sha256": "938be294dd2f2a62de9fe3758256962afc0e334dc4727bd59dcdfe7ab2f479ad"
+    },
+    {
+      "path": "aspect_26\\metrics.csv",
+      "size": 590,
+      "sha256": "20f3c5ea0f69d3b6cf6d0f7a8d60c5c32f32f31159153dbe94b6526b9a32025b"
+    },
+    {
+      "path": "aspect_26\\model.safetensors",
+      "size": 442576568,
+      "sha256": "7dba052a53ef294ac71cd81b431b4c6d56faf018de38e3fdb10a48356226ebab"
+    },
+    {
+      "path": "aspect_26\\test_predictions.csv",
+      "size": 1831308,
+      "sha256": "fc76b45a8558a142ac682c6cfc3c8b7631b32101679c352f22efa2799508e7ed"
+    },
+    {
+      "path": "aspect_26\\test_wrong_predictions.csv",
+      "size": 74067,
+      "sha256": "91ed8fc9f147b9a45edaa4914ab07b39b98412896b1b2b1bd7c57abfeac500df"
+    },
+    {
+      "path": "aspect_26\\tokenizer.json",
+      "size": 752096,
+      "sha256": "5eebbce20f3196cbe82aa65376cd211151a0635614999a9191b0cb8f1b04f86b"
+    },
+    {
+      "path": "aspect_26\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\classification_report.csv",
+      "size": 2055,
+      "sha256": "6db0337786c16db3105eed0510452ab0d0ada3f7fda2b1142145c7f748122823"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\config.json",
+      "size": 2560,
+      "sha256": "4b36942f60f4aed01636f57b0ba0a903e58ffca6c0f7fca12182b1308ad6cc86"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\metrics.csv",
+      "size": 591,
+      "sha256": "cab4c93993dc2178add98872d4fbdcac4b3ab2f35306bdeb0d59eedc938f0be6"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\model.safetensors",
+      "size": 442576568,
+      "sha256": "47e7cb8a3a34586602fce0d9310c7fff7afca3fe23a196aa76c86c347b2cea02"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\test_wrong_predictions.csv",
+      "size": 261444,
+      "sha256": "2622c7febac7fa1fced47ac46695cf25ec742bc1798acbdf65d6c1210751cda9"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\tokenizer.json",
+      "size": 752096,
+      "sha256": "5eebbce20f3196cbe82aa65376cd211151a0635614999a9191b0cb8f1b04f86b"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\training_args.bin",
+      "size": 5265,
+      "sha256": "e34050b75e9313c8a98982aad6419f072bc5e5e454e3d8855c53c1fccf5874ed"
+    },
+    {
+      "path": "sentiment\\config.json",
+      "size": 948,
+      "sha256": "aa047e39c7cba78e03dcaa4d756c1f05b529b9959d1524de8a35b5e77ae4a611"
+    },
+    {
+      "path": "sentiment\\model.safetensors",
+      "size": 442505820,
+      "sha256": "c84d7fe272a750ec2378bb8aa85b5ff44ba9efa2da0956c81310072bb0c18ec7"
+    },
+    {
+      "path": "sentiment\\tokenizer.json",
+      "size": 752262,
+      "sha256": "76a4f9761ab869dc04194cd12f26de1b69dda8315f239a1dd9720e252b52e5fa"
+    },
+    {
+      "path": "sentiment\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "sentiment\\training_args.bin",
+      "size": 5201,
+      "sha256": "d682828eac5335d98aa5a4e74d2f6306e38eb3640850ed2f09f9d9abbf039ee0"
+    }
+  ],
+  "Oliview_chatbot_a\\models": [
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\.gitignore",
+      "size": 1,
+      "sha256": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\CACHEDIR.TAG",
+      "size": 195,
+      "sha256": "e8893e2dcb3f4545ef67a0a5b7b769113d38eef1aa61c7c7ba14659b02af955f"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\.gitattributes.metadata",
+      "size": 104,
+      "sha256": "8d0cb73f76b4ce9cf3bfe61c1307e9a0bf6b6aec774ce05c6a5fc22dcb9b11e6"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\1_Pooling\\config.json.metadata",
+      "size": 104,
+      "sha256": "42474fde296cf1686db1c3286eaf1bdd896caad9ba5aaf88df3e6446d19f3aa9"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\colbert_linear.pt.metadata",
+      "size": 128,
+      "sha256": "03f6621a3338f385ddf6efb66f61b388ff55d54484bcfe2809dd43a1c1316fa0"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\config.json.metadata",
+      "size": 104,
+      "sha256": "2e1c10a37c7336fc629856c84cee9548a894751a1b7c7483f5314379924d0113"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\config_sentence_transformers.json.metadata",
+      "size": 104,
+      "sha256": "c8b3c68eb1fa419309d3be6629ffe8085eb50fde27e5239337c2decfa2e0a5fc"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\.DS_Store.metadata",
+      "size": 104,
+      "sha256": "c07953935b062984020c97d9b053485430c7d8e3f661f25f7dd23c4b65fd46fe"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\bm25.jpg.metadata",
+      "size": 103,
+      "sha256": "d5355749131d7052a5c0f7b917d10bd3f9b2b47ed8eda556d09158d7b6fa8707"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\long.jpg.metadata",
+      "size": 104,
+      "sha256": "53463b9bb7fc93eb3cd3adf5bd7e03108959413b8adf89afdfddc626eb8306b2"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\miracl.jpg.metadata",
+      "size": 103,
+      "sha256": "d098874df1783dcc3a7ac60266b4cd25aa187a14d78502cb73c9b14dc354624b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\mkqa.jpg.metadata",
+      "size": 104,
+      "sha256": "fe53f29e598f01d159b2c33345744e0d33f1c6f4d70e54dc6f9ce62afcdcd19f"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\nqa.jpg.metadata",
+      "size": 104,
+      "sha256": "e5b182e16ac9c3d916e9854fed9cf3c03114f2d190aa59db8df0ba731d5f9a9f"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\imgs\\others.webp.metadata",
+      "size": 104,
+      "sha256": "fcf3f0a7a15def12f83029c646b935bcad702641662e8f0e445234348f58120b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\long.jpg.metadata",
+      "size": 104,
+      "sha256": "5e1b3c1307461cd2c51f2da70168ec28f22c7ef1f6e09027aee7f3fb46f9fb78"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\modules.json.metadata",
+      "size": 104,
+      "sha256": "fb62f64fd548aeeb9fa559aa3a20749f414ee108c0262476e9c96f85b7ac80b8"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\config.json.metadata",
+      "size": 104,
+      "sha256": "3041e149387580b6c689a23748801cc004fff7a9af0fbed9f8302c66669fde3d"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\Constant_7_attr__value.metadata",
+      "size": 104,
+      "sha256": "ebb53ba8632e21b4dd40105370cc0afde05aee0658efdb0faf7f435719dbc64c"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\model.onnx.metadata",
+      "size": 128,
+      "sha256": "20fb82ef37b26e9c40f4edfedf091e8070f1e431f01e037f11ed02becb847958"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\model.onnx_data.metadata",
+      "size": 128,
+      "sha256": "52ee177c6695402322e9bbade095bc0a7e8db29c1c015854763fad4743748e40"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\sentencepiece.bpe.model.metadata",
+      "size": 127,
+      "sha256": "b6b65b25bec02ecd8282bffe56cc3b28b5d81cd8f6f4b304db41db7c45d26fce"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\special_tokens_map.json.metadata",
+      "size": 104,
+      "sha256": "3be528eab4ed6be8fd80239ca8b6ca39c365545f04e0b0bc1eb7bf16226e202c"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\tokenizer.json.metadata",
+      "size": 128,
+      "sha256": "3dbc0d3a218b77d8cf5abfa599f57d99ed39c9ace79f130f30b61fd6c2916b9b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\onnx\\tokenizer_config.json.metadata",
+      "size": 103,
+      "sha256": "248afe87c529682965b0cc82460882e62f80a72fd61c785d2b990c222b1df75c"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\pytorch_model.bin.metadata",
+      "size": 128,
+      "sha256": "5dea8fae8fe2d35a469cf00dfddf7776360d8ba358ed5bcf672040eccd44650d"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\README.md.metadata",
+      "size": 104,
+      "sha256": "3811874940ac1a6fe737f35cfeb311c5bd84e6d82932f6b79df3fb345c63eee5"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\sentence_bert_config.json.metadata",
+      "size": 103,
+      "sha256": "c4b2fee7e8e33e97971c473ce290630fbbf516e5e39a483bed2e4039f834d5f6"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\sentencepiece.bpe.model.metadata",
+      "size": 127,
+      "sha256": "0316eaa5345835e5e88b9c4b6125f5e0c64a3d3d13378805a419581d090e9122"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\sparse_linear.pt.metadata",
+      "size": 128,
+      "sha256": "cce9307b3dd9771b7b2a547d364f64d30fa08a3f1b7509b9662997956812e69d"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\special_tokens_map.json.metadata",
+      "size": 104,
+      "sha256": "b73e4f2319123544967638e249bc06c7830f1ee4654e2450a42f69619f070e41"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\tokenizer.json.metadata",
+      "size": 128,
+      "sha256": "f3407b55a147dcafdb3140404244132f0501913f6802370f20bbfc4de6b5ccd1"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\download\\tokenizer_config.json.metadata",
+      "size": 104,
+      "sha256": "2360f1697e6be3ea59c5cfcf7ad448eb0e83eb714a0bd5f142c5eefa7c069f2b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.cache\\huggingface\\trees\\5617a9f61b028005a4858fdac845db406aefb181.json",
+      "size": 5107,
+      "sha256": "ac6ca8029902de127d9a870d2712776240dc51eb9156b5d35844ea462c46db9d"
+    },
+    {
+      "path": "embeddings\\bge-m3\\.gitattributes",
+      "size": 1627,
+      "sha256": "7363a8ebd782ede400e72bb3e88c19248478eb6f280a7376d398fc2f22707b9a"
+    },
+    {
+      "path": "embeddings\\bge-m3\\1_Pooling\\config.json",
+      "size": 191,
+      "sha256": "e54c164a07274f2eb45bb724f54a79d1efcc90c41573887cd9a29aeee0597352"
+    },
+    {
+      "path": "embeddings\\bge-m3\\colbert_linear.pt",
+      "size": 2100674,
+      "sha256": "19bfbae397c2b7524158c919d0e9b19393c5639d098f0a66932c91ed8f5f9abb"
+    },
+    {
+      "path": "embeddings\\bge-m3\\config.json",
+      "size": 687,
+      "sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa"
+    },
+    {
+      "path": "embeddings\\bge-m3\\config_sentence_transformers.json",
+      "size": 123,
+      "sha256": "1eef72430e7194a1e59680e635aed81ffa083f05668dbc5bb1c56c04c0999c38"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\.DS_Store",
+      "size": 6148,
+      "sha256": "d65165279105ca6773180500688df4bdc69a2c7b771752f0a46ef120b7fd8ec3"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\bm25.jpg",
+      "size": 131849,
+      "sha256": "4d88d1c224dc6dae62b76547e1e79ed12e1085b94dc1fe0c50440a948277d89a"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\long.jpg",
+      "size": 485432,
+      "sha256": "d2a44539154d2cee75abd032fe773d5514f1129b741c4641cde12554762709a6"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\miracl.jpg",
+      "size": 576482,
+      "sha256": "a48c10a1be83aa7a92a25d85dbc6d2c0194b59503a2599a9e89bd7e063c32a66"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\mkqa.jpg",
+      "size": 608027,
+      "sha256": "ae331fb64bdceeaafecc2f8cd89a2d55a3e41c429dcc5ba906cb9a7bdb73cf2b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\nqa.jpg",
+      "size": 158358,
+      "sha256": "5385ca9d6af4124932281039e1366d704d10ed81e905526f795f5732352394bb"
+    },
+    {
+      "path": "embeddings\\bge-m3\\imgs\\others.webp",
+      "size": 20984,
+      "sha256": "9222ef69ba79cbd3aa8c659bd3cbbf9d90b3dbb040526f56298ed9ceb05ec9df"
+    },
+    {
+      "path": "embeddings\\bge-m3\\long.jpg",
+      "size": 126894,
+      "sha256": "4ba03433ef54575eeef5a291abd81661eb53c432677934dc4050565893e7a8a9"
+    },
+    {
+      "path": "embeddings\\bge-m3\\modules.json",
+      "size": 349,
+      "sha256": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\config.json",
+      "size": 698,
+      "sha256": "f24afd5de914fba8c668426c43d208a1a54022500c63b2c160be20891686fce8"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\Constant_7_attr__value",
+      "size": 65552,
+      "sha256": "cdf16f72c5d07b36484056e601ed9687f78477e5d85cee85a34f2406b7fb5906"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\model.onnx",
+      "size": 724923,
+      "sha256": "f84251230831afb359ab26d9fd37d5936d4d9bb5d1d5410e66442f630f24435b"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\model.onnx_data",
+      "size": 2266820608,
+      "sha256": "1eebfb28493f67bba03ce0ef64bfdc7fc5a3bd9d7493f818bb1d78cd798416b4"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\sentencepiece.bpe.model",
+      "size": 5069051,
+      "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\special_tokens_map.json",
+      "size": 964,
+      "sha256": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\tokenizer.json",
+      "size": 17082821,
+      "sha256": "6710678b12670bc442b99edc952c4d996ae309a7020c1fa0096dd245c2faf790"
+    },
+    {
+      "path": "embeddings\\bge-m3\\onnx\\tokenizer_config.json",
+      "size": 1173,
+      "sha256": "7e4c1cc848840aeccdd763458c18dd525eb0f795c992e00ebe9c28554e7db2d4"
+    },
+    {
+      "path": "embeddings\\bge-m3\\pytorch_model.bin",
+      "size": 2271145830,
+      "sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38"
+    },
+    {
+      "path": "embeddings\\bge-m3\\README.md",
+      "size": 15822,
+      "sha256": "0b81ccf9134e5874d620a86e6905062ea999e779c34eb1a7e65eaeb7fe00e450"
+    },
+    {
+      "path": "embeddings\\bge-m3\\sentence_bert_config.json",
+      "size": 54,
+      "sha256": "eb9b44b13c0f52a3b3685c3b1cbdea1ba8b04bea123b98f61610048940776eb1"
+    },
+    {
+      "path": "embeddings\\bge-m3\\sentencepiece.bpe.model",
+      "size": 5069051,
+      "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"
+    },
+    {
+      "path": "embeddings\\bge-m3\\sparse_linear.pt",
+      "size": 3516,
+      "sha256": "45c93804d2142b8f6d7ec6914ae23a1eee9c6a1d27d83d908a20d2afb3595ad9"
+    },
+    {
+      "path": "embeddings\\bge-m3\\special_tokens_map.json",
+      "size": 964,
+      "sha256": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835"
+    },
+    {
+      "path": "embeddings\\bge-m3\\tokenizer.json",
+      "size": 17098108,
+      "sha256": "21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08"
+    },
+    {
+      "path": "embeddings\\bge-m3\\tokenizer_config.json",
+      "size": 444,
+      "sha256": "a62b2b6784f990259fddef5f16388693a8043be4f69179e6a5257eeb3f9abac4"
+    }
+  ]
+}

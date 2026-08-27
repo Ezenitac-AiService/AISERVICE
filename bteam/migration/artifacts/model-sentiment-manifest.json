@@ -1,0 +1,109 @@
+{
+  "Oliview_aspect_sentiment\\models": [
+    {
+      "path": "aspect_26\\classification_report.csv",
+      "size": 1909,
+      "sha256": "b01a70d751f24f11cbf17163bb4bf08abe4d35576198250b1bf35096c1d1b02b"
+    },
+    {
+      "path": "aspect_26\\config.json",
+      "size": 2572,
+      "sha256": "938be294dd2f2a62de9fe3758256962afc0e334dc4727bd59dcdfe7ab2f479ad"
+    },
+    {
+      "path": "aspect_26\\metrics.csv",
+      "size": 590,
+      "sha256": "20f3c5ea0f69d3b6cf6d0f7a8d60c5c32f32f31159153dbe94b6526b9a32025b"
+    },
+    {
+      "path": "aspect_26\\model.safetensors",
+      "size": 442576568,
+      "sha256": "7dba052a53ef294ac71cd81b431b4c6d56faf018de38e3fdb10a48356226ebab"
+    },
+    {
+      "path": "aspect_26\\test_predictions.csv",
+      "size": 1831308,
+      "sha256": "fc76b45a8558a142ac682c6cfc3c8b7631b32101679c352f22efa2799508e7ed"
+    },
+    {
+      "path": "aspect_26\\test_wrong_predictions.csv",
+      "size": 74067,
+      "sha256": "91ed8fc9f147b9a45edaa4914ab07b39b98412896b1b2b1bd7c57abfeac500df"
+    },
+    {
+      "path": "aspect_26\\tokenizer.json",
+      "size": 752096,
+      "sha256": "5eebbce20f3196cbe82aa65376cd211151a0635614999a9191b0cb8f1b04f86b"
+    },
+    {
+      "path": "aspect_26\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\classification_report.csv",
+      "size": 2055,
+      "sha256": "6db0337786c16db3105eed0510452ab0d0ada3f7fda2b1142145c7f748122823"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\config.json",
+      "size": 2560,
+      "sha256": "4b36942f60f4aed01636f57b0ba0a903e58ffca6c0f7fca12182b1308ad6cc86"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\metrics.csv",
+      "size": 591,
+      "sha256": "cab4c93993dc2178add98872d4fbdcac4b3ab2f35306bdeb0d59eedc938f0be6"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\model.safetensors",
+      "size": 442576568,
+      "sha256": "47e7cb8a3a34586602fce0d9310c7fff7afca3fe23a196aa76c86c347b2cea02"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\test_wrong_predictions.csv",
+      "size": 261444,
+      "sha256": "2622c7febac7fa1fced47ac46695cf25ec742bc1798acbdf65d6c1210751cda9"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\tokenizer.json",
+      "size": 752096,
+      "sha256": "5eebbce20f3196cbe82aa65376cd211151a0635614999a9191b0cb8f1b04f86b"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "aspect_26_all_categories_v2\\training_args.bin",
+      "size": 5265,
+      "sha256": "e34050b75e9313c8a98982aad6419f072bc5e5e454e3d8855c53c1fccf5874ed"
+    },
+    {
+      "path": "sentiment\\config.json",
+      "size": 948,
+      "sha256": "aa047e39c7cba78e03dcaa4d756c1f05b529b9959d1524de8a35b5e77ae4a611"
+    },
+    {
+      "path": "sentiment\\model.safetensors",
+      "size": 442505820,
+      "sha256": "c84d7fe272a750ec2378bb8aa85b5ff44ba9efa2da0956c81310072bb0c18ec7"
+    },
+    {
+      "path": "sentiment\\tokenizer.json",
+      "size": 752262,
+      "sha256": "76a4f9761ab869dc04194cd12f26de1b69dda8315f239a1dd9720e252b52e5fa"
+    },
+    {
+      "path": "sentiment\\tokenizer_config.json",
+      "size": 452,
+      "sha256": "f9051b19e43e2a1be479bc0ed9e27e1e40a43a2a32f4bd6d585b3e7045f62654"
+    },
+    {
+      "path": "sentiment\\training_args.bin",
+      "size": 5201,
+      "sha256": "d682828eac5335d98aa5a4e74d2f6306e38eb3640850ed2f09f9d9abbf039ee0"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "copy_mode": "checksum_verified_non_destructive",
+  "destination_root": "bteam/models",
+  "sources": [
+    {"source": "bteam/Oliview_aspect_sentence_split/models", "destination": "sentence_split"},
+    {"source": "bteam/Oliview_aspect_sentiment/models", "destination": "sentiment"},
+    {"source": "bteam/Oliview_chatbot_a/models", "destination": "embeddings", "optional": true}
+  ],
+  "blue_mutation": false,
+  "docker_build_context": false,
+  "operator_note": "Run prepare_models.py after storage capacity and checksum review; do not move or rename Blue paths."
+}
+

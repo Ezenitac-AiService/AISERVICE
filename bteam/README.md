@@ -1,6 +1,33 @@
-# Oliview B-Team 통합 개발 환경 (Unified Docker Environment)
+# Oliview B-Team 통합 개발 환경 (Blue / Green)
 
-본 프로젝트는 윈도우 환경에 분산되어 있던 B팀의 커머스 분석 플랫폼(`Oliview_Project`), RAG 챗봇 서비스 2종(`Oliview_chatbot_a`, `Oliview_chatbot_b`), ML 파이프라인(`Oliview_aspect_*`, `Oliview_LLM`)을 단일 도커 오케스트레이션(`docker-compose.yml`)으로 통합한 표준 개발 환경입니다.
+기존 `docker-compose.yml`과 원본 폴더는 **Blue** 기준선으로 유지한다. Feature 041의
+Green은 코드·계약·공유 `packages/core`·uv workspace를 통합하지만 단일 컨테이너로
+합치지 않는다. `pipeline_runner`, Dashboard backend/frontend, ChatA, ChatB 및
+MySQL·Redis·ChromaDB는 각각 독립 컨테이너/의존 서비스다.
+
+Green을 새로 만들고 검증·rollback rehearsal·최소 24시간 soak가 끝날 때까지 Blue
+컨테이너, 네트워크, 볼륨, active Nginx upstream, 운영 데이터 endpoint는 유지한다.
+외부 `CUTOVER_APPROVED` 없이는 운영 전환하지 않으며, 별도
+`DECOMMISSION_APPROVED` 없이는 Blue를 중지·archive·삭제하지 않는다.
+
+## Feature 041 Green 실행
+
+```bash
+cd bteam
+# secret 값을 출력하지 않는 topology 검사
+docker compose -f docker-compose.green.yml config --no-interpolate
+# 외부 승인 전에는 VALIDATION만 사용하고, Green 전용 secret을 주입한다
+docker compose -p bteam-green -f docker-compose.green.yml up -d --build
+```
+
+Green candidate 포트는 `127.0.0.1:15050`, `15173`, `18501`, `18002`이며 Blue의
+운영 포트와 겹치지 않는다. candidate Nginx는 `deployment/nginx.green.conf`만
+검증하고 active `gateway/nginx.conf`는 수정하지 않는다.
+
+Green pipeline의 실제 리뷰 수집은 `CRAWLER_ENDPOINT`, 보고서 생성은
+`MODEL_GATEWAY_ENDPOINTS` JSON 배열을 주입해야 한다. 기존 설정과의 호환을 위해
+`GATEWAY_ENDPOINTS`도 alias로 허용하지만, 의존성이 없을 때는 fail-closed로
+`FAILED` run만 남기고 성공으로 기록하지 않는다.
 
 ---
 
@@ -85,12 +112,13 @@ docker compose ps
 
 ## 🧪 데이터베이스 접속 정보 (DB Credentials)
 
-- **호스트**: `127.0.0.1` (컨테이너 내부 통신 시 `bteam_db`)
-- **포트**: `3306`
-- **데이터베이스명**: `oliview_project`
-- **서비스 계정**: `GP` / `GP123!`
-- **관리자 계정**: `root` / `ezen123!`
+- **호스트**: 환경변수 `DB_HOST` (컨테이너 내부 Blue 기본값 `bteam_db`)
+- **포트**: 환경변수 `DB_PORT`
+- **데이터베이스명**: 환경변수 `DB_NAME`
+- **서비스/관리자 계정**: 로컬 ignored `.env` 또는 외부 secret manager에서 주입
 - **문자셋/콜레이션**: `utf8mb4` / `utf8mb4_0900_ai_ci`
+
+비밀번호·토큰은 문서, 로그, inventory, checksum manifest에 기록하지 않는다.
 
 ---
 
@@ -120,6 +148,8 @@ uv run python 02_llm_one_product_test_db.py
 # 컨테이너 중지 (DB 볼륨 데이터는 영구 보존됨)
 docker compose --profile all down
 
-# 컨테이너 및 볼륨 완전 초기화
+# Blue 운영 볼륨을 포함한 `down -v`는 사용하지 않는다. Green 검증 볼륨을
+# 폐기해야 할 때에도 승인된 Green project와 명시된 Green volume만 대상으로 한다.
+# 컨테이너 및 볼륨 완전 초기화 (operator 승인 범위에서만)
 docker compose --profile all down -v
 ```

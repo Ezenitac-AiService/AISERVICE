@@ -1,0 +1,24 @@
+{
+  "artifact_version": 1,
+  "recorded_at": "2026-08-27T10:28:13+09:00",
+  "environment": "Green VALIDATION",
+  "endpoint": "http://127.0.0.1:15050/bteam/oliview/api/reports/1",
+  "http_status": 200,
+  "schema_validation": "passed",
+  "schema_version": 2,
+  "grounded_http_contract_test": "passed",
+  "same_product_citation_validation": "passed",
+  "report_status": "abstained",
+  "abstention_reason": "LEGACY_UNVERIFIED",
+  "attribute_row_count": 6,
+  "attribute_product_filter": "report.product_id",
+  "aspect_summary_keys": [
+    "기능/효과",
+    "발림성",
+    "수분감",
+    "자극성",
+    "향",
+    "흡수력"
+  ],
+  "blue_traffic_changed": false
+}

@@ -1,0 +1,44 @@
+{
+  "recorded_at": "2026-08-27",
+  "blue_mutated": false,
+  "green_compose_project": "bteam-green",
+  "test_gate": {
+    "command_scope": "bteam/tests",
+    "passed": 77,
+    "failed": 0
+  },
+  "compatibility": [
+    {
+      "service": "chatbot_a",
+      "sync_route": "/api/v1/chat",
+      "stream_route": "/bteam/chata/api/v1/chat/stream",
+      "sync_status": "grounded",
+      "citation_source_review_ids": [4656, 7308, 45957],
+      "stream_http_status": 200,
+      "stream_events": ["step_update", "token", "complete"],
+      "session_history_count_before_clear": 4,
+      "session_clear_status": 200,
+      "citation_validation": "Green read-only MySQL source review exists, same product_id, normalized PII-safe quote substring"
+    },
+    {
+      "service": "chatbot_b",
+      "sync_route": "/api/v1/chat",
+      "stream_route": "/bteam/chatb/api/v1/search/stream",
+      "sync_status": "grounded",
+      "citation_source_review_ids": [4656, 7308, 45957],
+      "stream_http_status": 200,
+      "stream_events": ["step_update", "token", "complete"],
+      "session_history_count_before_clear": 4,
+      "session_clear_status": 200,
+      "citation_validation": "Green read-only MySQL source review exists, same product_id, normalized PII-safe quote substring"
+    }
+  ],
+  "chroma_v2_probe": {
+    "collection": "oliview_review_sentences_v2",
+    "embedding_dimension": 1024,
+    "rows_returned": 3,
+    "chatbot_a_status": "grounded",
+    "chatbot_a_citation_count": 3
+  },
+  "implementation_note": "Shared Core adapter preserves the legacy four-stage event ordering, hybrid lexical/vector retrieval, deterministic reranking, session lifecycle, finite SSE compatibility, citation grounding, and PII masking. The full bteam/tests gate passed 77 tests."
+}
