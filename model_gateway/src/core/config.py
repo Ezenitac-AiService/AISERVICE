@@ -41,5 +41,8 @@ def get_supported_models() -> dict:
 
 SUPPORTED_MODELS = get_supported_models()
 
+VRAM_SAFETY_LIMIT_MB = int(os.environ.get("VRAM_SAFETY_LIMIT_MB", "5000"))
+
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
+

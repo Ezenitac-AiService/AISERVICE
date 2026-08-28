@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MigrationManifestV2",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "created_at",
+    "source_environment",
+    "target_environment",
+    "migration_mode",
+    "zero_config_ready",
+    "target_hardware_profile",
+    "databases",
+    "volumes",
+    "ddns_config",
+    "services",
+    "checksums"
+  ],
+  "properties": {
+    "manifest_version": { "type": "string", "enum": ["2.0.0"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source_environment": {
+      "type": "object",
+      "properties": {
+        "os": { "type": "string" },
+        "platform": { "type": "string" },
+        "hostname": { "type": "string" }
+      }
+    },
+    "target_environment": { "type": "string" },
+    "migration_mode": { "type": "string", "enum": ["DEV_PLATFORM_TRANSFER"] },
+    "zero_config_ready": { "type": "boolean" },
+    "target_hardware_profile": {
+      "type": "object",
+      "required": ["cpu", "gpu", "ram_mb", "vram_mb", "llama_cpp_flags"],
+      "properties": {
+        "cpu": { "type": "string" },
+        "gpu": { "type": "string" },
+        "ram_mb": { "type": "integer" },
+        "vram_mb": { "type": "integer" },
+        "llama_cpp_flags": { "type": "string" },
+        "vram_safety_limit_mb": { "type": "integer" }
+      }
+    },
+    "clean_os_prerequisites": {
+      "type": "object",
+      "properties": {
+        "docker_apt_repo": { "type": "string" },
+        "nvidia_container_toolkit": { "type": "boolean" }
+      }
+    },
+    "databases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "dump_file", "size_bytes", "sha256", "row_count"],
+        "properties": {
+          "name": { "type": "string" },
+          "dump_file": { "type": "string" },
+          "size_bytes": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "row_count": { "type": "integer" }
+        }
+      }
+    },
+    "volumes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["volume_name", "archive_file", "size_bytes", "sha256"],
+        "properties": {
+          "volume_name": { "type": "string" },
+          "archive_file": { "type": "string" },
+          "size_bytes": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "is_sparse": { "type": "boolean" }
+        }
+      }
+    },
+    "ddns_config": {
+      "type": "object",
+      "required": ["domain", "token", "cron_interval_minutes"],
+      "properties": {
+        "domain": { "type": "string" },
+        "token": { "type": "string" },
+        "cron_interval_minutes": { "type": "integer" }
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "checksums": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}
