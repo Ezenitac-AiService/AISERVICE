@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SoakMonitoringContract",
+  "type": "object",
+  "required": [
+    "soak_duration_hours",
+    "probe_interval_seconds",
+    "sla_thresholds",
+    "rollback_triggers"
+  ],
+  "properties": {
+    "soak_duration_hours": { "type": "integer", "minimum": 24 },
+    "probe_interval_seconds": { "type": "integer", "maximum": 30 },
+    "sla_thresholds": {
+      "type": "object",
+      "required": ["demo_general_rag_max_seconds", "prod_chatbot_p95_max_seconds"],
+      "properties": {
+        "demo_general_rag_max_seconds": { "type": "number", "maximum": 20.0 },
+        "prod_chatbot_p95_max_seconds": { "type": "number", "maximum": 5.0 }
+      }
+    },
+    "rollback_triggers": {
+      "type": "object",
+      "required": [
+        "max_tolerated_http_5xx",
+        "max_consecutive_probe_failures",
+        "max_consecutive_sla_violations"
+      ],
+      "properties": {
+        "max_tolerated_http_5xx": { "type": "integer", "enum": [0] },
+        "max_consecutive_probe_failures": { "type": "integer", "enum": [1] },
+        "max_consecutive_sla_violations": { "type": "integer", "enum": [1] }
+      }
+    }
+  }
+}

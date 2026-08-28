@@ -1,0 +1,13 @@
+{
+  "gate_type": "BACKUP_READY",
+  "status": "COMPLETED",
+  "created_at": "2026-08-28T04:52:32.110333+00:00",
+  "mysql_dump_path": "C:\\AISERVICE\\bteam\\migration\\snapshots\\mysql_blue_pre_cutover.sql",
+  "mysql_dump_sha256": "e21a60ee939fe4b5b2a348a86dbb7e73245ce8a4d20a3b6fc7c51f81a0735ee2",
+  "row_counts": {
+    "products": 246,
+    "reviews": 15420,
+    "llm_product_reports": 246
+  },
+  "in_flight_drain_seconds": 0.12
+}

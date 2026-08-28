@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NginxRouteContract",
+  "type": "object",
+  "required": ["routes", "proxy_retry_policy"],
+  "properties": {
+    "routes": {
+      "type": "object",
+      "required": ["dashboard_ui", "dashboard_api", "chatbot_a", "chatbot_b"],
+      "properties": {
+        "dashboard_ui": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:15173" },
+        "dashboard_api": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:15050" },
+        "chatbot_a": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:18501" },
+        "chatbot_b": { "type": "string", "pattern": "^http://127\\.0\\.0\\.1:18002" }
+      }
+    },
+    "proxy_retry_policy": {
+      "type": "object",
+      "required": ["next_upstream", "tries"],
+      "properties": {
+        "next_upstream": { "type": "string", "enum": ["error timeout http_502 http_503"] },
+        "tries": { "type": "integer", "minimum": 3 }
+      }
+    }
+  }
+}

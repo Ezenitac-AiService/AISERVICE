@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CutoverGateContract",
+  "type": "object",
+  "required": [
+    "gate_type",
+    "approved_by",
+    "approval_authority",
+    "approval_reference",
+    "approved_at",
+    "previous_gate_sha256"
+  ],
+  "properties": {
+    "gate_type": {
+      "type": "string",
+      "enum": ["CUTOVER_APPROVED", "BACKUP_READY", "DATA_MIGRATION_READY", "DECOMMISSION_APPROVED"]
+    },
+    "approved_by": { "type": "string", "minLength": 3 },
+    "approval_authority": { "type": "string", "minLength": 3 },
+    "approval_reference": { "type": "string", "minLength": 3 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "previous_gate_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "target_environment": { "type": "string", "enum": ["DEMO", "PRODUCTION"] }
+  }
+}
