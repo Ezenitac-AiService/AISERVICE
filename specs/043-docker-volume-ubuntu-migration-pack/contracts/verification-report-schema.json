@@ -39,7 +39,7 @@
           "status_code": { "type": "integer" },
           "latency_ms": { "type": "number" },
           "status": { "type": "string", "enum": ["PASS", "FAIL"] },
-          "error": { "type": "string" }
+          "error": { "type": ["string", "null"] }
         }
       }
     }

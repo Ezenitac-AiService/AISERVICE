@@ -11,6 +11,12 @@ volumes:
     name: ateam_db_data
   redis_data:
     name: aiservice_redis_data
+  green_mysql_data:
+    external: true
+    name: green_mysql_data
+  green_chroma_data:
+    external: true
+    name: green_chroma_data
 
 services:
   # ============================================================================
@@ -80,6 +86,12 @@ services:
       - "8091:8091"
     networks:
       - aiservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=2)\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
 
   # ============================================================================
   # 1.1 공통 Redis 인메모리 캐시 & 세션/큐 인프라 (Redis 7 - aiservice-redis)
@@ -118,10 +130,10 @@ services:
       - --innodb_flush_log_at_trx_commit=2
       - --init-file=/docker-entrypoint-initdb.d/00_reset.sql
     environment:
-      MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:-GP123!}
+      MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:?set BTEAM_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${BTEAM_DB_NAME:-cosmetic_db}
       MYSQL_USER: ${BTEAM_DB_USER:-gp123}
-      MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
     volumes:
       - bteam_mysql_data:/var/lib/mysql
       - ./bteam/reset_pass.sql:/docker-entrypoint-initdb.d/00_reset.sql:ro
@@ -129,7 +141,7 @@ services:
     networks:
       - aiservice-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${BTEAM_DB_ROOT_PASSWORD:-GP123!}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -149,7 +161,7 @@ services:
       DB_HOST: bteam_db
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
-      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       DB_NAME3: ${BTEAM_DB_NAME:-oliview_project}
       SMTP_SERVER: ${SMTP_SERVER:-smtp.gmail.com}
@@ -200,7 +212,7 @@ services:
       DB_HOST: bteam_db
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
-      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
       MAIN_PORT: 8081
@@ -240,7 +252,7 @@ services:
       DB_HOST: bteam_db
       DB_PORT: 3306
       DB_USER: ${BTEAM_DB_USER:-gp123}
-      DB_PASSWORD: ${BTEAM_DB_PASSWORD:-GP123!}
+      DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
       MAIN_PORT: 8081
@@ -274,10 +286,10 @@ services:
       - --default-authentication-plugin=mysql_native_password
       - --max_allowed_packet=512M
     environment:
-      MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:-pilos_root_pass}
+      MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:?set PILOS_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos_v2}
       MYSQL_USER: ${PILOS_DB_USER:-pilos_user}
-      MYSQL_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      MYSQL_PASSWORD: ${PILOS_DB_PASSWORD:?set PILOS_DB_PASSWORD}
       TZ: Asia/Seoul
     volumes:
       - ateam_db_data:/var/lib/mysql
@@ -287,7 +299,7 @@ services:
     networks:
       - aiservice-network
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD:-pilos_root_pass} || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -307,7 +319,7 @@ services:
       DB_HOST: pilos-db
       DB_PORT: 3306
       DB_USER: ${PILOS_DB_USER:-pilos_user}
-      DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      DB_PASSWORD: ${PILOS_DB_PASSWORD:?set PILOS_DB_PASSWORD}
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
@@ -332,7 +344,7 @@ services:
       KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY:-}
       KIWOOM_HOST: ${KIWOOM_HOST:-https://api.kiwoom.com}
       SUPPLY_DEMAND_DB_WRITE_ENABLED: ${SUPPLY_DEMAND_DB_WRITE_ENABLED:-true}
-      FLASK_SECRET_KEY: pilos_sentiment_dev_secret_key_2026
+      FLASK_SECRET_KEY: ${FLASK_APP_SECRET:?set FLASK_APP_SECRET}
     volumes:
       - ./ateam/pilos-sentiment-index/pilos:/app/pilos
       - ./ateam/pilos-sentiment-index/tests:/app/tests
@@ -361,7 +373,7 @@ services:
       DB_HOST: pilos-db
       DB_PORT: 3306
       DB_USER: ${PILOS_DB_USER:-pilos_user}
-      DB_PASSWORD: ${PILOS_DB_PASSWORD:-pilos_password}
+      DB_PASSWORD: ${PILOS_DB_PASSWORD:?set PILOS_DB_PASSWORD}
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
@@ -377,8 +389,8 @@ services:
       REPORT_LLM_OUTPUT_MODE: ${REPORT_LLM_OUTPUT_MODE:-json_object}
       SERVICE_KNOWLEDGE_VERSION: "1.0"
       PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-600}
-      SECRET_SALT: pilos_sentiment_salt_1
-      SECRET_SALT2: pilos_sentiment_salt_2
+      SECRET_SALT: ${SECRET_SALT:-${FLASK_APP_SECRET:?set FLASK_APP_SECRET}}
+      SECRET_SALT2: ${SECRET_SALT2:-${FLASK_APP_SECRET:?set FLASK_APP_SECRET}}
       KIWOOM_APP_KEY: ${KIWOOM_APP_KEY:-}
       KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY:-}
       KIWOOM_HOST: ${KIWOOM_HOST:-https://api.kiwoom.com}

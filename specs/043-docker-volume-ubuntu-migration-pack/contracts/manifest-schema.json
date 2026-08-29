@@ -9,6 +9,9 @@
     "target_environment",
     "migration_mode",
     "zero_config_ready",
+    "archive_format",
+    "archive_encrypted",
+    "secrets",
     "target_hardware_profile",
     "databases",
     "volumes",
@@ -30,6 +33,17 @@
     "target_environment": { "type": "string" },
     "migration_mode": { "type": "string", "enum": ["DEV_PLATFORM_TRANSFER"] },
     "zero_config_ready": { "type": "boolean" },
+    "archive_format": { "type": "string", "enum": ["tar.gz", "zip"] },
+    "archive_encrypted": { "type": "boolean" },
+    "secrets": {
+      "type": "object",
+      "required": ["encrypted", "key_source", "plaintext_excluded"],
+      "properties": {
+        "encrypted": { "type": "boolean", "const": true },
+        "key_source": { "type": "string", "enum": ["external_protected_path", "external_secret_injection"] },
+        "plaintext_excluded": { "type": "boolean", "const": true }
+      }
+    },
     "target_hardware_profile": {
       "type": "object",
       "required": ["cpu", "gpu", "ram_mb", "vram_mb", "llama_cpp_flags"],
@@ -82,7 +96,7 @@
       "required": ["domain", "token", "cron_interval_minutes"],
       "properties": {
         "domain": { "type": "string" },
-        "token": { "type": "string" },
+        "token": { "type": "string", "pattern": "^(<redacted>|MASKED|\\*{3,})$", "description": "마스킹 값만 허용하며 원문 토큰은 기록하지 않는다." },
         "cron_interval_minutes": { "type": "integer" }
       }
     },

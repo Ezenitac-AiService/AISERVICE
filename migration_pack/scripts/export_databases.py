@@ -1,78 +1,158 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AISERVICE Cross-Platform Database Lossless Export Engine (export_databases.py)
------------------------------------------------------------------------------
-Streams mysqldump from running MySQL containers directly into gzip-compressed
-.sql.gz files, validates integrity, and generates SHA-256 checksums.
-"""
+"""환경 변수 기반 MySQL 안전 스트리밍 덤프 생성기."""
 
-import sys
-import os
-import time
+from __future__ import annotations
+
 import gzip
 import hashlib
 import json
 import subprocess
-from datetime import datetime, timezone
+import sys
+import time
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
 
-# Windows Console UTF-8 safety
-if sys.platform.startswith("win"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PACK_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-DB_DIR = os.path.join(PACK_ROOT, "database")
+from migration_pack.scripts.env_utils import load_environment, required_environment
 
-os.makedirs(DB_DIR, exist_ok=True)
+SCRIPT_DIR = Path(__file__).resolve().parent
+PACK_ROOT = SCRIPT_DIR.parent
+PROJECT_ROOT = PACK_ROOT.parent
+DB_DIR = PACK_ROOT / "database"
+DB_DIR.mkdir(parents=True, exist_ok=True)
 
-TARGETS = [
-    {
-        "db_name": "pilos_v2",
-        "container": "pilos-db",
-        "user": "pilos_user",
-        "password": "pilos_password",
-        "output_file": os.path.join(DB_DIR, "pilos_v2.sql.gz"),
-    },
-    {
-        "db_name": "oliview_project",
-        "container": "bteam_db",
-        "user": "gp123",
-        "password": "GP123!",
-        "output_file": os.path.join(DB_DIR, "oliview_project.sql.gz"),
-    },
-]
+
+class DatabaseExportError(RuntimeError):
+    """DB export contract failure."""
+
+
+def get_database_targets(
+    environment: Mapping[str, str] | None = None,
+) -> list[dict[str, str]]:
+    """현재 번들의 `.env`에서 두 MySQL 대상과 자격 증명을 구성합니다."""
+    env = dict(environment or load_environment(PROJECT_ROOT))
+    required = [
+        "PILOS_DB_USER",
+        "PILOS_DB_PASSWORD",
+        "PILOS_DB_ROOT_PASSWORD",
+        "PILOS_DB_NAME",
+        "BTEAM_DB_USER",
+        "BTEAM_DB_PASSWORD",
+        "BTEAM_DB_ROOT_PASSWORD",
+        "BTEAM_DB_NAME",
+    ]
+    missing = required_environment(env, required)
+    if missing:
+        raise DatabaseExportError("필수 DB 환경 변수 누락: " + ", ".join(missing))
+    targets = [
+        {
+            "db_name": env["PILOS_DB_NAME"],
+            "container": env.get("PILOS_DB_CONTAINER", "pilos-db"),
+            "user": env["PILOS_DB_USER"],
+            "password": env["PILOS_DB_PASSWORD"],
+            "root_password": env["PILOS_DB_ROOT_PASSWORD"],
+            "output_file": str(DB_DIR / f"{env['PILOS_DB_NAME']}.sql.gz"),
+        },
+        {
+            "db_name": env["BTEAM_DB_NAME"],
+            "container": env.get("BTEAM_DB_CONTAINER", "bteam_db"),
+            "user": env["BTEAM_DB_USER"],
+            "password": env["BTEAM_DB_PASSWORD"],
+            "root_password": env["BTEAM_DB_ROOT_PASSWORD"],
+            "output_file": str(DB_DIR / f"{env['BTEAM_DB_NAME']}.sql.gz"),
+        },
+    ]
+    if "GREEN_DB_NAME" in env and check_container_running(env.get("GREEN_DB_CONTAINER", "mysql-green")):
+        targets.append(
+            {
+                "db_name": env["GREEN_DB_NAME"],
+                "container": env.get("GREEN_DB_CONTAINER", "mysql-green"),
+                "user": env.get("GREEN_DB_USER", "bteam_green"),
+                "password": env.get("GREEN_DB_PASSWORD", ""),
+                "root_password": env.get(
+                    "GREEN_DB_ROOT_PASSWORD", env.get("GREEN_DB_PASSWORD", "")
+                ),
+                "output_file": str(DB_DIR / f"{env['GREEN_DB_NAME']}.sql.gz"),
+            }
+        )
+    return targets
+
+
+def _docker_env(password: str) -> list[str]:
+    # MYSQL_PWD를 사용해 비밀번호가 명령행 인자/일반 로그에 노출되지 않게 합니다.
+    return ["-e", f"MYSQL_PWD={password}"]
 
 
 def check_container_running(container_name: str) -> bool:
     try:
-        res = subprocess.run(
+        result = subprocess.run(
             ["docker", "ps", "--format", "{{.Names}}"],
             capture_output=True,
             text=True,
             check=True,
         )
-        return container_name in res.stdout.split()
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         return False
+    return container_name in result.stdout.split()
 
 
-def dump_database(target: dict) -> tuple[int, str]:
-    db = target["db_name"]
+def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
+    """information_schema의 엔진별 추정 행 수를 측정합니다.
+
+    정확한 전체 COUNT(*)는 대형 DB에서 패키징 시간을 폭발시키므로, manifest에는
+    측정 방식도 함께 기록합니다.
+    """
+    query = (
+        "SELECT COALESCE(SUM(TABLE_ROWS),0) "
+        "FROM information_schema.tables WHERE table_schema='"
+        + target["db_name"].replace("'", "''")
+        + "';"
+    )
+    command = [
+        "docker",
+        "exec",
+        *_docker_env(target["root_password"]),
+        target["container"],
+        "mysql",
+        "-uroot",
+        "-s",
+        "-N",
+        "-e",
+        query,
+    ]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=True, timeout=30
+        )
+        value = result.stdout.strip()
+        return (
+            (int(value), "information_schema.TABLE_ROWS")
+            if value.isdigit()
+            else (0, "unavailable")
+        )
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0, "unavailable"
+
+
+def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
+    """MySQL dirty-page 정합성을 확보한 뒤 gzip 스트리밍 덤프를 생성합니다."""
     container = target["container"]
-    user = target["user"]
-    pw = target["password"]
-    out_path = target["output_file"]
+    if not check_container_running(container):
+        raise DatabaseExportError(f"컨테이너가 실행 중이 아닙니다: {container}")
 
-    cmd = [
-        "docker", "exec", container,
+    db_name = target["db_name"]
+    output_path = Path(target["output_file"])
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        "docker",
+        "exec",
+        *_docker_env(target["password"]),
+        container,
         "mysqldump",
-        f"-u{user}",
-        f"-p{pw}",
+        f"-u{target['user']}",
         "--single-transaction",
         "--quick",
         "--routines",
@@ -81,95 +161,71 @@ def dump_database(target: dict) -> tuple[int, str]:
         "--hex-blob",
         "--default-character-set=utf8mb4",
         "--max_allowed_packet=512M",
-        db,
+        "--net_buffer_length=16384",
+        db_name,
     ]
 
-    print(f"\n▶ Exporting '{db}' from container '{container}'...")
-    start_time = time.time()
-    sha256_hash = hashlib.sha256()
+    row_count, row_source = count_database_rows(target)
+    flush_cmd = [
+        "docker",
+        "exec",
+        *_docker_env(target["root_password"]),
+        container,
+        "mysql",
+        "-uroot",
+        "-e",
+        "FLUSH TABLES WITH READ LOCK;",
+    ]
+    flush = subprocess.run(
+        flush_cmd, capture_output=True, text=True, timeout=30, check=False
+    )
+    if flush.returncode != 0:
+        raise DatabaseExportError(f"MySQL 안전 flush 실패: {container}")
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    total_bytes = 0
-
-    with gzip.open(out_path, "wb", compresslevel=9) as gz_out:
-        while True:
-            chunk = proc.stdout.read(1024 * 1024)  # 1MB buffer
-            if not chunk:
-                break
+    start = time.time()
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None
+    with gzip.open(output_path, "wb", compresslevel=9) as gz_out:
+        while chunk := proc.stdout.read(1024 * 1024):
             gz_out.write(chunk)
-            total_bytes += len(chunk)
-
-    proc.wait()
+    _, stderr = proc.communicate()
     if proc.returncode != 0:
-        stderr_msg = proc.stderr.read().decode("utf-8", errors="ignore")
-        # Note: mysqldump password warning on stderr is expected, ignore if code 0
-        if proc.returncode != 0 and "ERROR" in stderr_msg:
-            raise RuntimeError(f"mysqldump failed with code {proc.returncode}: {stderr_msg}")
-
-    # Calculate sha256 of the compressed output file
-    with open(out_path, "rb") as f:
-        while chunk := f.read(1024 * 1024):
-            sha256_hash.update(chunk)
-
-    elapsed = time.time() - start_time
-    file_size_mb = os.path.getsize(out_path) / (1024 * 1024)
-    raw_size_mb = total_bytes / (1024 * 1024)
-    sha256_hex = sha256_hash.hexdigest()
-
-    print(f"  ✓ Exported raw {raw_size_mb:.1f}MB -> compressed {file_size_mb:.1f}MB ({file_size_mb/max(raw_size_mb,1)*100:.1f}%) in {elapsed:.1f}s")
-    print(f"  ✓ SHA-256: {sha256_hex}")
-
-    return os.path.getsize(out_path), sha256_hex
-
-
-def main():
-    print("=" * 75)
-    print(" [AISERVICE] DATABASE LOSSLESS EXPORT ENGINE")
-    print(f" Timestamp: {datetime.now().isoformat()}")
-    print(f" Output Directory: {DB_DIR}")
-    print("=" * 75)
-
-    manifest_db_info = {}
-    checksum_lines = []
-
-    for target in TARGETS:
-        if not check_container_running(target["container"]):
-            print(f"❌ Error: Container '{target['container']}' is not running.")
-            sys.exit(1)
-
-        size_bytes, sha256_hex = dump_database(target)
-        rel_path = f"database/{os.path.basename(target['output_file'])}"
-        manifest_db_info[target["db_name"]] = {
-            "dump_file": rel_path,
-            "compressed_size_bytes": size_bytes,
-            "sha256": sha256_hex,
-        }
-        checksum_lines.append(f"{sha256_hex}  {rel_path}\n")
-
-    # Write checksums.sha256
-    checksum_path = os.path.join(DB_DIR, "checksums.sha256")
-    with open(checksum_path, "w", encoding="utf-8") as f:
-        f.writelines(checksum_lines)
-    print(f"\n✓ Generated '{checksum_path}'")
-
-    # Write migration_manifest.json
-    manifest_path = os.path.join(PACK_ROOT, "migration_manifest.json")
-    manifest = {
-        "manifest_version": "1.0.0",
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "source_environment": {
-            "os": sys.platform,
-        },
-        "databases": manifest_db_info,
+        message = stderr.decode("utf-8", errors="replace")[-1000:]
+        raise DatabaseExportError(
+            f"mysqldump 실패({db_name}, code={proc.returncode}): {message}"
+        )
+    digest = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    print(
+        f"  ✓ {db_name}: {output_path.name}, SHA-256 {digest[:12]}..., {time.time() - start:.1f}s"
+    )
+    return {
+        "name": db_name,
+        "dump_file": f"database/{output_path.name}",
+        "size_bytes": output_path.stat().st_size,
+        "sha256": digest,
+        "row_count": row_count,
+        "row_count_source": row_source,
     }
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2, ensure_ascii=False)
-    print(f"✓ Generated '{manifest_path}'")
 
-    print("\n" + "=" * 75)
-    print(" [SUCCESS] ALL DATABASES LOSSLESSLY EXPORTED AND VERIFIED")
-    print("=" * 75)
+
+def main() -> int:
+    try:
+        environment = load_environment(PROJECT_ROOT)
+        targets = get_database_targets(environment)
+        metadata = [dump_database(target) for target in targets]
+        (DB_DIR / "database_export_manifest.json").write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        checksums = [f"{item['sha256']}  {item['dump_file']}" for item in metadata]
+        (DB_DIR / "checksums.sha256").write_text(
+            "\n".join(checksums) + "\n", encoding="utf-8"
+        )
+        print(f"완료: {len(metadata)}개 DB 덤프 생성")
+        return 0
+    except DatabaseExportError as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

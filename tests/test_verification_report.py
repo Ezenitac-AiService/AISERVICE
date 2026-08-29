@@ -20,14 +20,17 @@ from migration_pack.scripts.verify_migration import ENDPOINTS, build_verificatio
 def test_endpoints_count_and_keys():
     assert len(ENDPOINTS) == 11
     names = [ep["name"] for ep in ENDPOINTS]
-    assert "Nginx Gateway Root" in names
+    assert "Nginx Gateway Root (80)" in names
+    assert "Nginx Gateway Secondary (8080)" in names
     assert "Model Gateway (LLM)" in names
     assert "BGE-M3 Embedding" in names
     assert "BGE Reranker" in names
     assert "Pilos Web" in names
     assert "Oliview Frontend" in names
-    assert "A-Team MySQL (3307)" in names
-    assert "B-Team MySQL (3306)" in names
+    assert "Oliview Backend API" in names
+    assert "Oliview Chatbot A (Streamlit)" in names
+    assert "Oliview Chatbot B (FastAPI)" in names
+    assert "Redis Session Store (PING-PONG)" in names
 
 
 

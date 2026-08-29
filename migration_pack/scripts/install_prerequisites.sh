@@ -11,6 +11,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 DPKG_OPTS=(-o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold")
+ASSUME_YES="${AISERVICE_ASSUME_YES:-0}"
 
 log_info() {
     echo -e "\033[1;32m[INFO]\033[0m $*"
@@ -35,6 +36,7 @@ TARGET_USER="${SUDO_USER:-$USER}"
 log_info "================================================================"
 log_info "AISERVICE Ubuntu 24.04 LTS Infrastructure Auto-Provisioner"
 log_info "Target User: ${TARGET_USER}"
+log_info "Non-interactive install: ${ASSUME_YES}"
 log_info "================================================================"
 
 # 2. Snap Docker 감지 및 경고/제거 가드레일 (Snap Docker는 GPU 접근을 차단함)
@@ -60,7 +62,9 @@ apt-get install -y "${DPKG_OPTS[@]}" \
     python-is-python3 \
     tar \
     gzip \
-    pciutils
+    pciutils \
+    cron \
+    ubuntu-drivers-common
 
 # 4. 공식 Docker Engine & Docker Compose 플러그인 설치
 if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null; then
@@ -96,7 +100,7 @@ fi
 # 5. NVIDIA GPU 하드웨어 감지 및 NVIDIA Container Toolkit 설치
 log_info "[3/4] Checking for NVIDIA GPU Hardware..."
 HAS_NVIDIA_GPU=false
-if lspci 2>/dev/null | grep -i nvidia &>/dev/null; then
+if [[ "${AISERVICE_SKIP_GPU:-0}" != "1" ]] && lspci 2>/dev/null | grep -i nvidia &>/dev/null; then
     HAS_NVIDIA_GPU=true
     GPU_NAME="$(lspci 2>/dev/null | grep -i nvidia | head -n1)"
     log_info "NVIDIA GPU hardware detected: ${GPU_NAME}"
@@ -106,7 +110,11 @@ if [[ "${HAS_NVIDIA_GPU}" == "true" ]]; then
     # NVIDIA 드라이버 존재 확인
     if ! command -v nvidia-smi &>/dev/null; then
         log_warn "NVIDIA driver not found. Installing recommended headless server driver..."
-        ubuntu-drivers install --gpgpu || ubuntu-drivers install || true
+        command -v ubuntu-drivers >/dev/null 2>&1 || {
+            log_error "ubuntu-drivers가 설치되지 않았습니다."
+            exit 2
+        }
+        ubuntu-drivers install --gpgpu || ubuntu-drivers install
     fi
 
     # NVIDIA Container Toolkit 설치
@@ -124,6 +132,10 @@ if [[ "${HAS_NVIDIA_GPU}" == "true" ]]; then
     log_info "Configuring Docker runtime for NVIDIA Container Toolkit..."
     nvidia-ctk runtime configure --runtime=docker
     systemctl restart docker
+    docker info >/dev/null 2>&1 || {
+        log_error "NVIDIA runtime 구성 후 Docker daemon 검증에 실패했습니다."
+        exit 2
+    }
     log_info "Docker NVIDIA GPU runtime successfully configured and restarted."
 else
     log_info "No NVIDIA GPU hardware detected. System configured for high-performance CPU serving."

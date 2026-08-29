@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-AISERVICE Cross-Platform Migration Verification Suite v2.0 (verify_migration.py)
----------------------------------------------------------------------------
-Tests 11 core microservice endpoints, AI serving pipelines, and database connectivity.
-Uses standard library only (zero third-party dependencies required).
-Emits structured verification_report.json.
-"""
+"""마이그레이션 후 정확히 11개 endpoint와 하드웨어를 검증합니다."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
+import socket
 import ssl
 import sys
 import time
@@ -20,22 +13,25 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-# Windows Console UTF-8 safety
-if sys.platform.startswith("win"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 SSL_CTX = ssl._create_unverified_context()
 
-ENDPOINTS: List[Dict[str, Any]] = [
+ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "gateway_root",
-        "name": "Nginx Gateway Root",
+        "name": "Nginx Gateway Root (80)",
+        "url": "http://127.0.0.1/",
+        "method": "GET",
+        "category": "HTTP",
+        "expected_status": [200, 301, 302],
+    },
+    {
+        "id": "gateway_secondary",
+        "name": "Nginx Gateway Secondary (8080)",
         "url": "http://127.0.0.1:8080/",
         "method": "GET",
         "category": "HTTP",
@@ -55,7 +51,7 @@ ENDPOINTS: List[Dict[str, Any]] = [
         "url": "http://127.0.0.1:8090/health",
         "method": "GET",
         "category": "AI",
-        "expected_status": [200, 404, 405],  # 405 is fine for GET on POST endpoint
+        "expected_status": [200],
     },
     {
         "id": "bge_reranker",
@@ -63,28 +59,20 @@ ENDPOINTS: List[Dict[str, Any]] = [
         "url": "http://127.0.0.1:8091/health",
         "method": "GET",
         "category": "AI",
-        "expected_status": [200, 404, 405],
+        "expected_status": [200],
     },
     {
         "id": "pilos_web",
         "name": "Pilos Web",
-        "url": "http://127.0.0.1:8080/ateam/pilos/",
+        "url": "http://127.0.0.1/ateam/pilos/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200, 301, 302],
     },
     {
-        "id": "pilos_api",
-        "name": "Pilos Web API (/api/stocks)",
-        "url": "http://127.0.0.1:8080/api/stocks",
-        "method": "GET",
-        "category": "HTTP",
-        "expected_status": [200, 301, 302, 404],
-    },
-    {
         "id": "oliview_frontend",
         "name": "Oliview Frontend",
-        "url": "http://127.0.0.1:8080/bteam/oliview/",
+        "url": "http://127.0.0.1/bteam/oliview/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200, 301, 302],
@@ -92,181 +80,195 @@ ENDPOINTS: List[Dict[str, Any]] = [
     {
         "id": "oliview_backend",
         "name": "Oliview Backend API",
-        "url": "http://127.0.0.1:8080/bteam/oliview/api/health",
+        "url": "http://127.0.0.1/bteam/oliview/api/health",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302, 404],
+        "expected_status": [200],
     },
     {
         "id": "oliview_chatbot_a",
-        "name": "Oliview Chatbot A",
-        "url": "http://127.0.0.1:8080/bteam/chata/",
+        "name": "Oliview Chatbot A (Streamlit)",
+        "url": "http://127.0.0.1/bteam/chata/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200, 301, 302],
     },
     {
-        "id": "ateam_mysql",
-        "name": "A-Team MySQL (3307)",
-        "url": "http://127.0.0.1:3307",
+        "id": "oliview_chatbot_b",
+        "name": "Oliview Chatbot B (FastAPI)",
+        "url": "http://127.0.0.1/bteam/chatb/",
         "method": "GET",
-        "category": "DATABASE",
-        "expected_status": [200, 502, 0],
+        "category": "HTTP",
+        "expected_status": [200, 301, 302],
     },
     {
-        "id": "bteam_mysql",
-        "name": "B-Team MySQL (3306)",
-        "url": "http://127.0.0.1:3306",
-        "method": "GET",
-        "category": "DATABASE",
-        "expected_status": [200, 502, 0],
+        "id": "redis",
+        "name": "Redis Session Store (PING-PONG)",
+        "url": "tcp://127.0.0.1:6379",
+        "method": "PING",
+        "category": "REDIS",
+        "expected_status": [200],
     },
 ]
 
 
-
-def test_endpoint(ep: Dict[str, Any], timeout: int = 15) -> Dict[str, Any]:
-    url = ep["url"]
-    method = ep.get("method", "GET")
-    headers = ep.get("headers", {})
-    payload = ep.get("payload")
-    data_bytes = json.dumps(payload).encode("utf-8") if payload else None
-
-    # 포트 소켓 연결 테스트 (MySQL / Redis 등 TCP 전용 서비스)
-    if ep.get("category") == "DATABASE":
-        import socket
-        try:
-            port = int(url.split(":")[-1])
-            with socket.create_connection(("127.0.0.1", port), timeout=2):
-                return {
-                    "id": ep["id"],
-                    "name": ep["name"],
-                    "url": url,
-                    "category": ep.get("category", "DATABASE"),
-                    "status": "PASS",
-                    "status_code": 200,
-                    "latency_ms": 2.0,
-                    "passed": True,
-                    "message": "TCP port is listening and responsive.",
-                    "error": None,
-                }
-        except Exception as e:
-            return {
-                "id": ep["id"],
-                "name": ep["name"],
-                "url": url,
-                "category": ep.get("category", "DATABASE"),
-                "status": "FAIL",
-                "status_code": 0,
-                "latency_ms": 0.0,
-                "passed": False,
-                "message": str(e),
-                "error": str(e),
-            }
-
-    req = urllib.request.Request(url=url, data=data_bytes, headers=headers, method=method)
-    start_time = time.time()
-
+def _tcp_probe(host: str, port: int, *, redis: bool = False) -> tuple[bool, str]:
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=SSL_CTX) as response:
-            latency_ms = round((time.time() - start_time) * 1000, 2)
+        with socket.create_connection((host, port), timeout=3) as conn:
+            if redis:
+                conn.sendall(b"*1\r\n$4\r\nPING\r\n")
+                response = conn.recv(64)
+                return response.startswith(b"+PONG"), response.decode(
+                    "utf-8", errors="replace"
+                ).strip()
+            return True, "TCP port is listening and responsive."
+    except OSError as exc:
+        return False, str(exc)
+
+
+def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
+    started = time.perf_counter()
+    if ep.get("category") in {"DATABASE", "REDIS"}:
+        parsed = ep["url"].split(":")
+        passed, message = _tcp_probe(
+            parsed[1].lstrip("/"), int(parsed[2]), redis=ep["category"] == "REDIS"
+        )
+        return {
+            "id": ep["id"],
+            "name": ep["name"],
+            "url": ep["url"],
+            "status_code": 200 if passed else 0,
+            "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+            "status": "PASS" if passed else "FAIL",
+            "passed": passed,
+            "message": message,
+            "error": None if passed else message,
+        }
+
+    request = urllib.request.Request(ep["url"], method=ep.get("method", "GET"))
+    try:
+        with urllib.request.urlopen(
+            request, timeout=timeout, context=SSL_CTX
+        ) as response:
             status_code = response.getcode()
-            passed = status_code in ep["expected_status"]
+            body = response.read(4096)
+            passed = status_code in ep["expected_status"] and (
+                status_code != 200 or bool(body) or ep.get("allow_empty_body", False)
+            )
+            message = (
+                "HTTP response and payload accepted"
+                if passed
+                else "HTTP response payload was empty or status was unexpected"
+            )
             return {
                 "id": ep["id"],
                 "name": ep["name"],
-                "url": url,
-                "category": ep.get("category", "HTTP"),
-                "status": "PASS" if passed else "FAIL",
+                "url": ep["url"],
                 "status_code": status_code,
-                "latency_ms": latency_ms,
+                "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+                "status": "PASS" if passed else "FAIL",
                 "passed": passed,
-                "message": "OK",
-                "error": None,
+                "message": message,
+                "error": None if passed else message,
             }
-    except urllib.error.HTTPError as e:
-        latency_ms = round((time.time() - start_time) * 1000, 2)
-        passed = e.code in ep["expected_status"]
+    except urllib.error.HTTPError as exc:
         return {
             "id": ep["id"],
             "name": ep["name"],
-            "url": url,
-            "category": ep.get("category", "HTTP"),
-            "status": "PASS" if passed else "FAIL",
-            "status_code": e.code,
-            "latency_ms": latency_ms,
-            "passed": passed,
-            "message": f"HTTP {e.code}: {e.reason}",
-            "error": f"HTTP {e.code}: {e.reason}" if not passed else None,
-        }
-    except Exception as e:
-        latency_ms = round((time.time() - start_time) * 1000, 2)
-        return {
-            "id": ep["id"],
-            "name": ep["name"],
-            "url": url,
-            "category": ep.get("category", "HTTP"),
+            "url": ep["url"],
+            "status_code": exc.code,
+            "latency_ms": round((time.perf_counter() - started) * 1000, 2),
             "status": "FAIL",
-            "status_code": 0,
-            "latency_ms": latency_ms,
             "passed": False,
-            "message": str(e),
-            "error": str(e),
+            "message": f"HTTP {exc.code}: {exc.reason}",
+            "error": f"HTTP {exc.code}: {exc.reason}",
+        }
+    except (OSError, urllib.error.URLError) as exc:
+        return {
+            "id": ep["id"],
+            "name": ep["name"],
+            "url": ep["url"],
+            "status_code": 0,
+            "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+            "status": "FAIL",
+            "passed": False,
+            "message": str(exc),
+            "error": str(exc),
         }
 
 
-def build_verification_report(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    passed = sum(1 for r in results if r.get("passed", False) or r.get("status") == "PASS")
+def _hardware_detected() -> dict[str, Any]:
+    try:
+        from model_gateway.scripts.probe_hardware import (
+            probe_cpu_features,
+            probe_gpu_features,
+        )
+
+        cpu = probe_cpu_features()
+        gpu = probe_gpu_features()
+        return {
+            "cpu_model": cpu.get("model_name", "Unknown CPU"),
+            "avx_supported": bool(cpu.get("avx", False)),
+            "gpu_model": gpu.get("name", "None"),
+            "vram_mb": int(gpu.get("vram_total_mb", 0)),
+            "compute_capability": gpu.get("compute_capability", "none"),
+        }
+    except (OSError, ImportError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        return {"error": str(exc)}
+
+
+def build_verification_report(
+    results: list[dict[str, Any]], hardware_detected: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    passed = sum(
+        1
+        for result in results
+        if result.get("status") == "PASS" or result.get("passed") is True
+    )
     total = len(results)
     failed = total - passed
-    pass_rate = round((passed / max(total, 1)) * 100, 1)
-
-    return {
-        "report_version": "2.0.0",
+    status = "PASS" if failed == 0 and total == 11 else "FAIL"
+    report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": status,
+        "total_endpoints": total,
+        "passed_endpoints": passed,
+        "failed_endpoints": failed,
+        "duration_seconds": round(
+            sum(float(result.get("latency_ms", 0)) for result in results) / 1000, 3
+        ),
+        "hardware_detected": hardware_detected or {},
+        "results": results,
+        # 이전 소비자와의 하위 호환 필드
+        "report_version": "2.0.0",
         "total_checks": total,
         "passed_checks": passed,
         "failed_checks": failed,
-        "pass_rate_pct": pass_rate,
-        "overall_status": "HEALTHY" if failed == 0 else "DEGRADED",
-        "results": results,
+        "pass_rate_pct": round((passed / max(total, 1)) * 100, 1),
+        "overall_status": "HEALTHY" if status == "PASS" else "DEGRADED",
     }
+    return report
 
 
-def main():
-    parser = argparse.ArgumentParser(description="AISERVICE Cross-Platform Migration Verification Suite v2.0")
-    parser.add_argument("--json-report", type=str, default="verification_report.json", help="Path to save JSON report")
-    parser.add_argument("--timeout", type=int, default=15, help="Per-endpoint timeout in seconds")
-    args = parser.parse_args()
-
-    print("=" * 75)
-    print(" [AISERVICE] 11-ENDPOINT CROSS-PLATFORM VERIFICATION SUITE v2.0")
-    print(f" Timestamp: {datetime.now().isoformat()}")
-    print("=" * 75)
-
-    results = []
-    for ep in ENDPOINTS:
-        res = test_endpoint(ep, timeout=args.timeout)
-        results.append(res)
-        status_icon = "✓" if res["passed"] else "✗"
-        print(f"  {status_icon} [{res['category']:<8}] {res['name']:<40} : {res['message']} ({res['latency_ms']}ms)")
-
-    report = build_verification_report(results)
-
-    print("-" * 75)
-    print(f" Summary: Total {report['total_checks']} | Passed: {report['passed_checks']} | Failed: {report['failed_checks']} ({report['pass_rate_pct']}%)")
-    print(f" Status: {report['overall_status']}")
-    print("=" * 75)
-
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="AISERVICE 11-endpoint migration verification"
+    )
+    parser.add_argument("--json-report", default="verification_report.json")
+    parser.add_argument("--timeout", type=int, default=15)
+    args = parser.parse_args(argv)
+    started = time.perf_counter()
+    results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in ENDPOINTS]
+    report = build_verification_report(results, _hardware_detected())
+    report["duration_seconds"] = round(time.perf_counter() - started, 3)
     if args.json_report:
-        out_path = Path(args.json_report)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, indent=2, ensure_ascii=False)
-        print(f" Report written to: {out_path.resolve()}")
-
-    sys.exit(0 if report["failed_checks"] == 0 else 1)
+        target = Path(args.json_report)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    return 0 if report["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

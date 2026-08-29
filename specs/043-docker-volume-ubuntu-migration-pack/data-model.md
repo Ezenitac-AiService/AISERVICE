@@ -17,10 +17,13 @@ classDiagram
         +TargetEnvironment target_environment
         +string migration_mode
         +bool zero_config_ready
+        +string archive_format
+        +bool archive_encrypted
         +HardwareProfile target_hardware_profile
         +CleanOSPrerequisites clean_os_prerequisites
         +List~DatabaseDumpSpec~ databases
         +List~VolumeArchiveSpec~ volumes
+        +object secrets
         +DDNSConfig ddns_config
         +List~string~ services
         +Dict~string, string~ checksums
@@ -84,12 +87,15 @@ classDiagram
 - `source_environment` (object): 소스 OS, 플랫폼, 호스트명.
 - `target_environment` (string): 대상 OS (`"Ubuntu Linux 24.04 LTS (x86_64)"`).
 - `migration_mode` (string): 마이그레이션 모드 (`"DEV_PLATFORM_TRANSFER"`).
-- `zero_config_ready` (bool): `.env` 실사용 시크릿 완비 여부 (`true`).
+- `zero_config_ready` (bool): 암호화 아카이브와 외부 키 주입 경로가 준비되어 사용자 프롬프트 없이 복원 가능한지 여부 (`true`).
+- `archive_format` (string): 기본 `tar.gz` 또는 선택 `zip` 아카이브 형식.
+- `archive_encrypted` (bool): 배포 아카이브 암호화 여부 (`true`).
 - `target_hardware_profile` (HardwareProfile): 타겟 CPU/GPU/RAM 사양 및 빌드 플래그.
 - `clean_os_prerequisites` (object): Docker, NVIDIA driver, toolkit 자동 설치 설정.
 - `databases` (list of DatabaseDumpSpec): 논리 덤프 메타데이터 목록.
 - `volumes` (list of VolumeArchiveSpec): Docker named volume 물리 아카이브 메타데이터.
-- `ddns_config` (DDNSConfig): DuckDNS 연동 설정.
+- `secrets` (object): 암호화 여부와 외부 키 주입 방식만 기록하며 원문 시크릿은 포함하지 않음.
+- `ddns_config` (DDNSConfig): DuckDNS 연동 설정. `token`은 매니페스트에서 `<redacted>` 등 마스킹 값만 허용.
 - `services` (list of string): 번들된 10개 서비스 목록.
 - `checksums` (dict): SHA-256 해시 매핑.
 
@@ -109,7 +115,7 @@ classDiagram
   - `sha256`: SHA-256 체크섬.
   - `row_count`: 총 레코드 수.
 - `VolumeArchiveSpec`:
-  - `volume_name`: 대상 Docker 볼륨 명칭 (`"ateam_db_data"`, `"bteam_mysql_data"`, `"green_chroma_data"`, `"redis_data"`).
+  - `volume_name`: 대상 Docker 볼륨 명칭 (`"ateam_db_data"`, `"bteam_bteam_mysql_data"`, `"green_mysql_data"`, `"green_chroma_data"`, `"aiservice_redis_data"`).
   - `archive_file`: 볼륨 아카이브 파일 경로 (`"volumes/ateam_db_data.tar.gz"`).
   - `size_bytes`: 파일 크기.
   - `sha256`: SHA-256 체크섬.
@@ -126,7 +132,7 @@ stateDiagram-v2
     EXPORTING_DB --> EXPORTING_VOLUMES: Docker Volume tarball 생성 (sparse)
     EXPORTING_VOLUMES --> BUNDLING_SOURCE: .env 및 소스 1:1 클린 어셈블리
     BUNDLING_SOURCE --> GENERATING_MANIFEST: SHA-256 체크섬 & 매니페스트 v2.0
-    GENERATING_MANIFEST --> ARCHIVING: 단일 .tar.gz 압축 패키징
+    GENERATING_MANIFEST --> ARCHIVING: 기본 .tar.gz 또는 선택 .zip 압축 패키징
     ARCHIVING --> TRANSFER_READY: 마이그레이션 팩 생성 완료
 
     TRANSFER_READY --> TARGET_UNPACK: 우분투 서버로 SCP 전송 및 압축 해제
@@ -136,7 +142,7 @@ stateDiagram-v2
     RESTORING_VOLUMES --> SYNCING_DDNS: DuckDNS IPv4 갱신 & 5분 크론 등록
     SYNCING_DDNS --> COMPOSE_NORMALIZE: WSL2 경로 제거 & GPU 디렉티브 정규화
     COMPOSE_NORMALIZE --> STARTING_SERVICES: 인프라 Healthy 확인 후 앱 순차 기동
-    STARTING_SERVICES --> VERIFYING: verify_migration.py 11개 엔드포인트 E2E 검증
+    STARTING_SERVICES --> VERIFYING: verify_migration.py 10개 HTTP + Redis TCP PING 11개 검사
     VERIFYING --> MIGRATION_COMPLETE: 100% Pass (Exit 0)
 ```
 
@@ -147,4 +153,4 @@ stateDiagram-v2
 4. **PROVISIONING_INFRA $\rightarrow$ RESTORING_VOLUMES**: Docker daemon 및 `nvidia` 런타임 활성화 확인 후 진입.
 5. **RESTORING_VOLUMES $\rightarrow$ STARTING_SERVICES**: 물리 볼륨 추출 성공 시 SQL 중복 덤프 복원을 건너뛰는 Mutex 규칙 적용.
 6. **STARTING_SERVICES $\rightarrow$ VERIFYING**: DB, Redis, Model Gateway 인프라 Healthy 상태 확인 후 웹/API 컨테이너 기동.
-7. **VERIFYING $\rightarrow$ MIGRATION_COMPLETE**: 11개 엔드포인트 전수 200 OK 및 `verification_report.json` 저장 완료.
+7. **VERIFYING $\rightarrow$ MIGRATION_COMPLETE**: 10개 HTTP의 200 OK와 Redis TCP PING을 포함한 11개 검사 및 `verification_report.json` 저장 완료.

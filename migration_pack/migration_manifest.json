@@ -1,19 +1,78 @@
 {
-  "manifest_version": "1.0.0",
-  "exported_at": "2026-08-20T13:29:56.509684+00:00",
+  "manifest_version": "2.0.0",
+  "created_at": "2026-08-28T00:00:00+00:00",
   "source_environment": {
-    "os": "win32"
+    "os": "Windows",
+    "platform": "Windows/WSL2",
+    "hostname": "source-host"
   },
-  "databases": {
-    "pilos_v2": {
+  "target_environment": "Ubuntu Linux 24.04 LTS (i7-930 Nehalem, 24GB RAM, GTX 1070 8GB sm_61)",
+  "migration_mode": "DEV_PLATFORM_TRANSFER",
+  "zero_config_ready": true,
+  "archive_format": "tar.gz",
+  "archive_encrypted": true,
+  "secrets": {
+    "encrypted": true,
+    "key_source": "external_protected_path",
+    "plaintext_excluded": true
+  },
+  "target_hardware_profile": {
+    "cpu": "Intel Core i7-930 (SSE4.2, Non-AVX)",
+    "gpu": "NVIDIA GeForce GTX 1070 8GB (Pascal sm_61)",
+    "ram_mb": 24576,
+    "vram_mb": 8192,
+    "llama_cpp_flags": "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=61 -DGGML_AVX=OFF -DGGML_AVX2=OFF",
+    "vram_safety_limit_mb": 5000
+  },
+  "clean_os_prerequisites": {
+    "docker_apt_repo": "https://download.docker.com/linux/ubuntu",
+    "nvidia_container_toolkit": true,
+    "snap_docker_forbidden": true
+  },
+  "databases": [
+    {
+      "name": "pilos_v2",
       "dump_file": "database/pilos_v2.sql.gz",
-      "compressed_size_bytes": 504569163,
-      "sha256": "50ddf67ea31aad03d7f8a1b293af0a234f91a2f6a8b36a5a0880668179cacbed"
+      "size_bytes": 504569163,
+      "sha256": "50ddf67ea31aad03d7f8a1b293af0a234f91a2f6a8b36a5a0880668179cacbed",
+      "row_count": 0,
+      "row_count_source": "unavailable"
     },
-    "oliview_project": {
+    {
+      "name": "oliview_project",
       "dump_file": "database/oliview_project.sql.gz",
-      "compressed_size_bytes": 537276691,
-      "sha256": "3ab81f98900b6cbf72ac909a242f5101b6033a9f5ade87aef07224451b1bce8d"
+      "size_bytes": 537276691,
+      "sha256": "3ab81f98900b6cbf72ac909a242f5101b6033a9f5ade87aef07224451b1bce8d",
+      "row_count": 0,
+      "row_count_source": "unavailable"
     }
+  ],
+  "volumes": [],
+  "ddns_config": {
+    "domain": "ezenitac",
+    "token": "<redacted>",
+    "token_present": true,
+    "cron_interval_minutes": 5
+  },
+  "services": [
+    "gateway",
+    "vllm-serv",
+    "redis",
+    "bteam_db",
+    "oliview_backend",
+    "oliview_frontend",
+    "oliview_chatbot_a",
+    "oliview_chatbot_b",
+    "pilos_db",
+    "pilos_web",
+    "pilos_worker"
+  ],
+  "checksums": {
+    "database/pilos_v2.sql.gz": "50ddf67ea31aad03d7f8a1b293af0a234f91a2f6a8b36a5a0880668179cacbed",
+    "database/oliview_project.sql.gz": "3ab81f98900b6cbf72ac909a242f5101b6033a9f5ade87aef07224451b1bce8d"
+  },
+  "source_bundle": {
+    "file_count": 0,
+    "sha256": "unavailable"
   }
 }

@@ -19,6 +19,8 @@ python make_migration_pack.py [OPTIONS]
 | `--target-os` | String | `ubuntu` | 타겟 OS 플랫폼 (`ubuntu`, `linux`, `generic`) |
 | `--target-cpu` | String | `i7-930` | 타겟 CPU 아키텍처 (`i7-930`, `avx2`, `native`) |
 | `--target-gpu` | String | `gtx1070` | 타겟 GPU 아키텍처 (`gtx1070`, `sm_61`, `sm_80`, `sm_89`, `none`) |
+| `--format` | String | `tar.gz` | 아카이브 형식 (`tar.gz`, `zip`, `both`). `both`는 두 형식을 병렬 생성 |
+| `--key-file` | Path | `MIGRATION_PACK_KEY_FILE` | 아카이브 암호화 키 경로. 키는 결과 아카이브에 포함하지 않음 |
 | `--dry-run` | Flag | `False` | 실제 압축 없이 사전 요구사항, DB 연결, 볼륨 크기, 디스크 공간 점검 |
 | `--force` | Flag | `False` | 기존 아카이브 덮어쓰기 및 비대화형 강제 실행 |
 
@@ -32,6 +34,7 @@ python make_migration_pack.py [OPTIONS]
 - `3`: Docker 볼륨 아카이빙 실패.
 - `4`: 디스크 공간 부족 (최소 25GB 미만).
 - `5`: SHA-256 해시 생성 불일치.
+- `6`: 아카이브 암호화 또는 외부 키 경로 검증 실패.
 
 ---
 
@@ -48,16 +51,17 @@ python make_migration_pack.py [OPTIONS]
 [INFO]   - oliview_project: 48,210 rows -> database/oliview_project.sql.gz (SHA256: 7f83b165...)
 [INFO] [2/5] Exporting Docker Named Volumes (Sparse Mode)...
 [INFO]   - ateam_db_data -> volumes/ateam_db_data.tar.gz
-[INFO]   - bteam_mysql_data -> volumes/bteam_mysql_data.tar.gz
+[INFO]   - bteam_bteam_mysql_data -> volumes/bteam_bteam_mysql_data.tar.gz
+[INFO]   - green_mysql_data -> volumes/green_mysql_data.tar.gz
 [INFO]   - green_chroma_data -> volumes/green_chroma_data.tar.gz (WAL Checkpointed)
-[INFO]   - redis_data -> volumes/redis_data.tar.gz (BGSAVE Complete)
-[INFO] [3/5] Assembling Clean Source Bundle (Zero-Config .env)...
-[INFO]   - Bundled root .env and ddns/.env with 100% active secrets
+[INFO]   - aiservice_redis_data -> volumes/aiservice_redis_data.tar.gz (BGSAVE Complete)
+[INFO] [3/5] Assembling Clean Source Bundle (Encrypted Zero-Config .env)...
+[INFO]   - Bundled root .env and ddns/.env inside the encrypted archive
 [INFO]   - Excluded .git, .venv, node_modules, __pycache__ (0 cached items)
 [INFO] [4/5] Generating Manifest v2.0 & Checksums...
 [INFO]   - migration_manifest.json (v2.0.0, 10 services registered)
 [INFO]   - checksums.sha256 generated
 [INFO] [5/5] Compressing Final Migration Archive...
-[INFO] Archive Created: dist/AISERVICE_Migration_Pack_20260828_163500.tar.gz
+[INFO] Archive Created: dist/AISERVICE_Migration_Pack_20260828_163500.tar.gz.enc
 [INFO] Status: SUCCESS (Exit Code 0)
 ```

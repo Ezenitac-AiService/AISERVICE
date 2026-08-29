@@ -16,7 +16,7 @@
 - **Q2: 우분투 타겟 서버에서 DuckDNS DDNS 동적 도메인 연동을 어떤 방식으로 자동 구성하고 유지할까요?**  
   $\rightarrow$ **A: 호스트 Cron 자동 등록 + 즉시 갱신**: `.env`에 `DUCKDNS_DOMAIN` 및 `DUCKDNS_TOKEN`이 설정된 경우 `bootstrap_restore.sh`가 우분투 `cron` 및 백그라운드 갱신 스크립트(`ddns/duck.sh`)를 5분 주기로 자동 등록하고 초기 IP 갱신을 즉시 수행.
 - **Q3: 환경 변수(`.env`) 및 시크릿(DB 비밀번호, API 키, DuckDNS 토큰 등)의 이전 및 복원 정책을 어떻게 처리할까요?**  
-  $\rightarrow$ **A: 실사용 환경 변수 100% 완전 이전 및 Zero-Config 무인 배포 (개발-to-개발 플랫폼 이전)**: 본 마이그레이션은 보안 마스킹이 요구되는 외부 배포가 아닌 **동일 개발 환경의 Windows $\rightarrow$ Ubuntu Linux 전면 이전**이므로, 현재 작업 폴더의 실사용 `.env`(루트 및 `ddns/.env` 등)의 모든 실제 값(DB 계정/비밀번호, Kiwoom API 키, DuckDNS 토큰, SMTP 암호 등)을 100% 누락 없이 번들링하여 타겟 우분투 서버에서 압축 해제 즉시 사용자 수동 입력/편집 0회(Zero-Config)로 즉시 동작하도록 보장. 플랫폼별로 동적 조정이 필요한 설정(호스트 IP, GPU 디바이스 설정 등)만 부트스트랩 스크립트가 자동 감지하여 주입.
+  $\rightarrow$ **A: 실사용 환경 변수 100% 보존 및 암호화된 Zero-Config 무인 배포 (개발-to-개발 플랫폼 이전)**: 현재 작업 폴더의 실사용 `.env`(루트 및 `ddns/.env` 등)는 실제 값(DB 계정/비밀번호, Kiwoom API 키, DuckDNS 토큰, SMTP 암호 등)을 누락 없이 **암호화된 아카이브 안에** 포함한다. 복호화 키는 아카이브에 포함하지 않고 타겟 호스트의 보호된 경로 또는 동등한 비밀 주입 경로(`MIGRATION_PACK_KEY_FILE`)에서 제공하며, 키가 없으면 복원을 실패시킨다. 따라서 타겟 서버에서 사용자의 수동 입력/편집 없이 동작하되(Zero-Config), 원문 시크릿은 로그·매니페스트·체크섬·평문 전송에 노출하지 않고 압축 해제 후 `.env`에 `chmod 600`을 적용한다. 플랫폼별로 동적 조정이 필요한 설정(호스트 IP, GPU 디바이스 설정 등)만 부트스트랩 스크립트가 자동 감지하여 주입.
 - **Q4: 완전 클린한 Ubuntu 24.04 LTS 환경에서 NVIDIA GPU 하드웨어가 감지되었으나 GPU 드라이버, CUDA Toolkit, `nvidia-container-toolkit`이 전혀 설치되어 있지 않은 경우, `bootstrap_restore.sh`가 어떻게 대응하도록 할까요?**  
   $\rightarrow$ **A: 부트스트랩 중 대화형/자동화 GPU 드라이버 & 툴킷 설치 (Option B 확정)**: 본 마이그레이션은 서비스 운영 모드가 아니므로 무중단보다 완전한 환경 구축이 우선임. 클린 Ubuntu 24.04 LTS에서 Docker 및 NVIDIA GPU 하드웨어를 감지하고, 드라이버/`nvidia-container-toolkit` 미설치 시 자동 설치(대화형 확인 또는 `--force`/`-y` 무인 설치)를 수행하여 Docker 데몬 런타임을 구성한 후 컨테이너 복원 및 기동으로 원활히 연결. GPU가 없는 CPU 전용 서버인 경우 CPU 최적화 모드로 자동 전환.
 - **Q5: 5대 페르소나 1차 심층 분석 결과 도출된 6대 강건화 항목을 스펙에 통합 반영할까요?**  
@@ -53,14 +53,14 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 본 피처의 핵심 범위:
 1. **클린 Ubuntu 24.04 LTS 사전 환경 무인 점검 (`DEBIAN_FRONTEND=noninteractive`, Snap Docker 방지) 및 공식 Docker / NVIDIA GPU 드라이버 / `nvidia-container-toolkit` 자동 설치 프로비저닝**
 2. **타겟 하드웨어(i7-930 Non-AVX SSE4.2 CPU + GTX 1070 sm_61 8GB GPU)에 맞춘 `llama.cpp` Pascal/Nehalem 최적화 자동 JIT 컴파일 및 8GB VRAM 내 3대 모델(Qwen 2B + BGE-M3 + Reranker) 100% GPU 가속 서빙**
-3. **실사용 환경 변수(`.env`) 및 시크릿(DB 비밀번호, API 키, 토큰 등) 100% 누락 없는 완전 보존 및 Zero-Config 자동 구성 (`chmod 600` 보안)**
+3. **실사용 환경 변수(`.env`) 및 시크릿(DB 비밀번호, API 키, 토큰 등)의 암호화 보존 및 Zero-Config 자동 구성 (`chmod 600` 보안)**
 4. **MySQL 데이터베이스 논리 덤프 및 물리 도커 볼륨(Docker Volume)의 Mutex 상호 배제 무손실 추출/복원 (InnoDB Dirty Page 플러시 적용)**
 5. **ChromaDB v2 SQLite WAL 체크포인트 보존 및 Redis BGSAVE 상태의 완전 보존**
 6. **현재 작업 폴더 내 모든 서비스 모듈(A-Team, B-Team, Model Gateway, Gateway, Config, Scripts)의 1:1 디렉터리 구조 미러링**
 7. **WSL2 전용 경로(`/dev/dxg`, `/usr/lib/wsl`) 자동 감지 및 Native Ubuntu Compose 디렉티브 자동 정규화**
 8. **DuckDNS DDNS 동적 도메인 IPv4 강제 연동 및 5분 주기 크론 멱등 동기화**
 9. **우분투 환경에 맞춘 줄바꿈(CRLF $\rightarrow$ LF), 실행 권한(`chmod +x`), 소유권 정규화**
-10. **단계적 오케스트레이션(인프라 Healthy 확인 후 앱 기동)을 통한 원클릭 멱등 자동 부트스트랩(`bootstrap_restore.sh`) 및 11개 엔드포인트 무결성 검증**
+10. **단계적 오케스트레이션(인프라 Healthy 확인 후 앱 기동)을 통한 원클릭 멱등 자동 부트스트랩(`bootstrap_restore.sh`) 및 11개 검사 무결성 검증**
 
 ---
 
@@ -92,24 +92,24 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 
 ### User Story 3 - 도커 볼륨 및 DBMS 데이터의 안전 패키징 및 Mutex 복원 (Priority: P1) 🎯 MVP
 
-시스템 운영자 또는 배포 엔지니어는 단일 명령어(`make_migration_pack.py`)를 실행하여, MySQL의 메모리 Dirty Page를 플러시한 상태에서 컨테이너(`pilos_v2`, `cosmetic_db` / `oliview_project`)의 일관성 덤프(`.sql.gz`)와 물리 도커 볼륨 아카이브를 안전하게 추출 압축하고 SHA-256 무결성 체크섬을 자동 생성할 수 있어야 합니다. 타겟 호스트에서는 물리 볼륨 복원 성공 시 중복 SQL 덤프 실행을 건너뛰어 테이블 충돌을 방지합니다.
+시스템 운영자 또는 배포 엔지니어는 단일 명령어(`make_migration_pack.py`)를 실행하여, MySQL의 메모리 Dirty Page를 플러시한 상태에서 기본 스택의 `pilos-db`(`pilos_v2`), `bteam_db`(`oliview_project`) 및 Green 스택의 `mysql-green`(`cosmetic_db`)에 대한 일관성 덤프(`.sql.gz`)와 물리 도커 볼륨 아카이브를 안전하게 추출 압축하고 SHA-256 무결성 체크섬을 자동 생성할 수 있어야 합니다. 타겟 호스트에서는 물리 볼륨 복원 성공 시 중복 SQL 덤프 실행을 건너뛰어 테이블 충돌을 방지합니다.
 
 - **Why this priority**: DBMS 테이블 데이터(430만+ 건의 Pilos 시계열 토큰, 4.8만+ 건의 Oliview 화장품 리뷰 및 분석 보고서) 및 ChromaDB 1024차원 고차원 벡터 볼륨의 무손실 보존과 복원 시 중복 충돌 방지를 위함입니다.
-- **Independent Test**: 패키징 후 `dist/` 내에 덤프와 볼륨 아카이브(`.tar.gz`)가 생성되고, 타겟 서버에서 물리 볼륨 복원 후 MySQL 테이블 중복 충돌 없이 100% 정상 로드되는지 확인합니다.
+- **Independent Test**: 패키징 후 `dist/` 내에 암호화된 기본 아카이브(`.tar.gz`, 필요 시 `.zip`)와 덤프/볼륨 산출물이 생성되고, 타겟 서버에서 키를 보호된 경로로 주입해 복호화한 뒤 물리 볼륨 복원 후 MySQL 테이블 중복 충돌 없이 100% 정상 로드되는지 확인합니다.
 - **Acceptance Scenarios**:
-  1. **Given** MySQL 컨테이너 및 ChromaDB 볼륨이 존재하는 상태에서, **When** `make_migration_pack.py --include-volumes`를 실행하면, **Then** MySQL 2개 DB의 논리 덤프와 ChromaDB/Redis의 물리 볼륨 아카이브가 생성되고 `checksums.sha256`에 등록된다.
+  1. **Given** MySQL 컨테이너(`pilos-db`, `bteam_db`, `mysql-green`) 및 ChromaDB 볼륨이 존재하는 상태에서, **When** `make_migration_pack.py --include-volumes`를 실행하면, **Then** MySQL 논리 덤프와 `green_mysql_data`/`green_chroma_data`를 포함한 지정 물리 볼륨 아카이브가 생성되고 `checksums.sha256`에 등록된다.
   2. **Given** 타겟 우분투에서 물리 볼륨이 정상 복원되었을 때, **When** 부트스트랩 스크립트가 실행되면, **Then** 중복 SQL 덤프 실행을 생략하고 레코드 정합성을 검증한다.
 
 ---
 
 ### User Story 4 - 실사용 환경 변수 완전 이전 및 전체 작업 폴더 클린 번들링 (Priority: P1) 🎯 MVP
 
-엔지니어는 현재 작업 폴더(`c:\AISERVICE`) 내의 모든 활성 서비스(`ateam`, `bteam`, `model_gateway`, `gateway`, `ddns`, `config`, `tests`, `docs`)와 실행 스크립트, 그리고 **실사용 환경 변수 파일(루트 `.env` 및 `ddns/.env`)의 실제 시크릿/설정값 일체**를 누락 없이 1:1 구조 그대로 번들링하되, 불필요한 빌드 캐시(`.git`, `.venv`, `__pycache__`, `node_modules`, `dist`, `.pytest_cache`, 임시 로그)는 완벽히 제거된 클린 패키지를 생성해야 합니다.
+엔지니어는 현재 작업 폴더(`c:\AISERVICE`) 내의 모든 활성 서비스(`ateam`, `bteam`, `model_gateway`, `gateway`, `ddns`, `config`, `tests`, `docs`)와 실행 스크립트, 그리고 **실사용 환경 변수 파일(루트 `.env` 및 `ddns/.env`)의 실제 시크릿/설정값 일체**를 암호화된 아카이브 안에 누락 없이 1:1 구조로 보존하되, 불필요한 빌드 캐시(`.git`, `.venv`, `__pycache__`, `node_modules`, `dist`, `.pytest_cache`, 임시 로그)는 완벽히 제거한 클린 패키지를 생성해야 합니다.
 
-- **Why this priority**: `.env.example`만 복사되어 사용자가 타겟 서버에서 비밀번호, API 키, 포트 등을 일일이 다시 입력해야 하는 번거로움과 누락 실수를 100% 차단하기 위함입니다.
-- **Independent Test**: 번들링 완료 후 생성된 아카이브 내부에 루트 `.env`와 `ddns/.env`가 실제 값과 함께 온전히 포함되어 있고, 불필요한 빌드 아티팩트는 0건인지 검증합니다.
+- **Why this priority**: `.env.example`만 복사되어 사용자가 타겟 서버에서 비밀번호, API 키, 포트 등을 일일이 다시 입력해야 하는 번거로움과 누락 실수를 차단하면서도 전송·보관 중 원문 시크릿 노출을 방지하기 위함입니다.
+- **Independent Test**: 번들링 완료 후 생성된 암호화 아카이브를 승인된 키로 검증했을 때 루트 `.env`와 `ddns/.env`의 실제 값이 복원되고, 평문 아카이브/로그/매니페스트에는 시크릿이 없으며, 불필요한 빌드 아티팩트는 0건인지 검증합니다.
 - **Acceptance Scenarios**:
-  1. **Given** 작업 폴더 전체를 번들링할 때, **When** 패키징을 수행하면, **Then** 루트 `.env`와 `ddns/.env`에 포함된 DB 계정, 키움 API 키, SMTP 암호, DuckDNS 토큰이 100% 온전히 보존되어 번들에 포함된다.
+  1. **Given** 작업 폴더 전체를 번들링할 때, **When** 패키징을 수행하면, **Then** 루트 `.env`와 `ddns/.env`에 포함된 DB 계정, 키움 API 키, SMTP 암호, DuckDNS 토큰이 암호화된 번들에 누락 없이 보존되고 로그와 매니페스트에는 마스킹 값만 기록된다.
   2. **Given** 번들링 결과물을 검사할 때, **When** `.git`, `.venv`, `node_modules`, `__pycache__` 포함 여부를 스캔하면, **Then** 제외 대상 파일/폴더가 0건으로 검출된다.
 
 ---
@@ -139,12 +139,12 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 
 ### User Story 7 - 전수 엔드포인트 E2E 헬스체크 및 마이그레이션 검증 게이트 (Priority: P2)
 
-서비스 기동 완료 즉시 자동화된 검증기(`verify_migration.py`)가 실행되어, 통합 게이트웨이 포털(80/8080), Model Gateway(LLM/임베딩/리랭커), A-Team(Pilos Web/API), B-Team(Oliview UI/API/올리챗/올원챗), Redis 등 11개 주요 엔드포인트를 호출하고 응답 상태(HTTP 200 OK)와 데이터 정합성을 검증하여 구조화된 검증 보고서(`verification_report.json`)를 발행해야 합니다.
+서비스 기동 완료 즉시 자동화된 검증기(`verify_migration.py`)가 실행되어, 정확히 **10개 HTTP 엔드포인트**(게이트웨이 80/8080, Model Gateway 8081/8090/8091, A-Team Pilos 대시보드, B-Team Oliview UI/API 및 올리챗/올원챗)와 **Redis TCP PING 1개**를 호출하고 HTTP 응답 상태(200 OK), Redis 응답 및 데이터 정합성을 검증하여 구조화된 검증 보고서(`verification_report.json`)를 발행해야 합니다.
 
 - **Why this priority**: 마이그레이션 성공 여부를 정량적으로 즉시 판정하여 불완전한 배포나 데이터 유실을 조기에 탐지하기 위함입니다.
-- **Independent Test**: 마이그레이션 완료 후 `verify_migration.py` 실행 시 11개 엔드포인트 검사에서 100% Pass(11/11)를 달성하는지 확인합니다.
+- **Independent Test**: 마이그레이션 완료 후 `verify_migration.py` 실행 시 10개 HTTP + Redis TCP로 구성된 11개 검사에서 100% Pass(11/11)를 달성하는지 확인합니다.
 - **Acceptance Scenarios**:
-  1. **Given** 모든 서비스 컨테이너가 기동된 후, **When** `verify_migration.py`를 실행하면, **Then** 11개 전 엔드포인트의 응답 상태, 지연시간이 기록되고 최종 상태 `PASS`가 반환된다.
+  1. **Given** 모든 서비스 컨테이너가 기동된 후, **When** `verify_migration.py`를 실행하면, **Then** 10개 HTTP 엔드포인트와 Redis TCP PING의 응답 상태, 지연시간 및 데이터 정합성이 기록되고 최종 상태 `PASS`가 반환된다.
   2. **Given** 엔드포인트 중 1개라도 비정상 응답 시, **When** 검증기가 종료되면, **Then** 실패 사유와 엔드포인트 ID가 명시되고 Exit code 1을 반환한다.
 
 ---
@@ -167,12 +167,12 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 
 - **FR-001**: 시스템은 클린 Ubuntu 22.04 / 24.04 LTS 환경을 감지하여 `DEBIAN_FRONTEND=noninteractive` 모드로 Snap이 아닌 공식 APT Docker Engine, Docker Compose, NVIDIA 드라이버, `nvidia-container-toolkit`의 설치 여부를 판별하고 미설치 시 자동 설치 프로비저닝을 수행하는 사전 점검 기능을 제공해야 한다.
 - **FR-002**: 시스템은 타겟 호스트의 하드웨어 사양(Intel i7-930 SSE4.2 CPU, NVIDIA GTX 1070 8GB GPU)을 감지하여, `-march=native` 및 `CMAKE_CUDA_ARCHITECTURES=61` 플래그로 `llama.cpp`를 Pascal/Nehalem에 최적화하여 자동 JIT 컴파일해야 한다.
-- **FR-003**: 시스템은 MySQL 컨테이너(`pilos-db`, `bteam_db` / `mysql-green`)로부터 `FLUSH TABLES WITH READ LOCK` 또는 컨테이너 일시정지 기반으로 InnoDB Dirty Page를 안전하게 플러시한 후 구조, 데이터, 뷰, 트리거, 이벤트를 포함하는 무손실 압축 덤프(`.sql.gz`)를 추출하는 도구를 제공해야 한다.
+- **FR-003**: 시스템은 MySQL 컨테이너(`pilos-db`, `bteam_db`, `mysql-green`)와 Green 스택(`bteam/docker-compose.green.yml`)의 `GREEN_DB_*` 설정을 대상으로 `FLUSH TABLES WITH READ LOCK` 또는 컨테이너 일시정지 기반으로 InnoDB Dirty Page를 안전하게 플러시한 후 구조, 데이터, 뷰, 트리거, 이벤트를 포함하는 무손실 압축 덤프(`.sql.gz`)를 추출하는 도구를 제공해야 한다.
 - **FR-004**: 시스템은 Docker named volume(`ateam_db_data`, `bteam_bteam_mysql_data`, `green_mysql_data`, `green_chroma_data`, `aiservice_redis_data`)의 물리 데이터를 안전하게 백업 및 압축(`.tar.gz`, sparse file 지원)하는 볼륨 추출 기능을 제공해야 한다.
 - **FR-005**: 시스템은 전체 작업 폴더(`c:\AISERVICE`)의 소스 코드와 설정 파일을 1:1로 미러링하되, `.git`, `.venv`, `node_modules`, `__pycache__` 등 불필요한 임시/캐시 디렉터리를 제외하는 클린 어셈블리 기능을 제공해야 한다.
-- **FR-006**: 시스템은 실사용 환경 변수 파일(루트 `.env` 및 `ddns/.env`)의 실제 시크릿/설정값 일체를 100% 누락 없이 번들링하여 타겟 서버에서 사용자의 수동 입력 없이 즉시 기동(Zero-Config)할 수 있도록 보장해야 한다.
+- **FR-006**: 시스템은 실사용 환경 변수 파일(루트 `.env` 및 `ddns/.env`)의 실제 시크릿/설정값 일체를 암호화된 아카이브에 100% 누락 없이 번들링하고, 복호화 키를 아카이브 외부의 보호된 경로 또는 비밀 주입 경로에서 받아 타겟 서버에서 사용자의 수동 입력 없이 즉시 기동(Zero-Config)할 수 있도록 보장해야 한다. 원문 시크릿은 로그, 매니페스트, 체크섬 및 평문 전송에 기록하지 않는다.
 - **FR-007**: 시스템은 번들 압축 해제 시 `.env` 파일에 `chmod 600` 보안 권한을 자동 적용하고, 모든 스크립트에 `chmod +x`를 부여해야 한다.
-- **FR-008**: 시스템은 우분투 리눅스 타겟 환경에 최적화된 단일 아카이브 파일(`.tar.gz` 및 `.zip`)을 생성하는 `make_migration_pack.py` CLI를 제공해야 한다.
+- **FR-008**: 시스템은 우분투 리눅스 타겟 환경에 최적화된 단일 선택 형식 아카이브를 생성하는 `make_migration_pack.py` CLI를 제공해야 한다. 기본 형식은 `.tar.gz`이며 `--format zip`으로 `.zip`을 선택하고 `--format both`로 두 형식을 병렬 생성할 수 있다. 각 배포 아카이브는 시크릿 보호 정책에 따라 암호화되어야 한다.
 - **FR-009**: 시스템은 모든 생성된 덤프 파일, 볼륨 아카이브, 소스 번들에 대한 SHA-256 해시 체크섬을 `migration_manifest.json` 및 `checksums.sha256`에 기록해야 한다.
 - **FR-010**: 시스템은 타겟 우분투 서버에서 원클릭으로 실행 가능한 멱등 복원 및 부트스트랩 스크립트(`bootstrap_restore.sh`)를 제공해야 한다.
 - **FR-011**: 부트스트랩 스크립트는 우분투 환경에서 모든 쉘 스크립트의 CRLF 줄바꿈을 LF로 자동 변환하고 `set -euo pipefail` 에러 트랩을 적용해야 한다.
@@ -181,7 +181,7 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 - **FR-014**: Model Gateway는 8GB VRAM 환경(GTX 1070)에서 Qwen 2B LLM, BGE-M3 임베딩, BGE-Reranker 3종 모델을 OOM 없이 100% GPU 가속 서빙하도록 VRAM 예산(5.0GB)을 파티셔닝해야 한다.
 - **FR-015**: 시스템은 번들된 `.env` 설정에 따라 타겟 우분투 서버에서 DuckDNS 동적 IP 갱신 데몬(`ddns/duck.sh`)을 `curl -4` 옵션과 함께 5분 주기 크론잡으로 자동 등록하고 초기 IP를 즉시 동기화해야 한다.
 - **FR-016**: 부트스트랩 스크립트는 인프라 컨테이너(MySQL, Redis, Model Gateway)의 Healthy 상태를 확인한 후 애플리케이션 컨테이너를 순차 기동하는 단계별 오케스트레이션을 보장해야 한다.
-- **FR-017**: 시스템은 복원 완료 후 즉시 11개 주요 서비스 엔드포인트를 테스트하고 결과를 `verification_report.json`으로 저장하는 자동 검증기(`verify_migration.py`)를 제공해야 한다.
+- **FR-017**: 시스템은 복원 완료 후 즉시 10개 HTTP 엔드포인트와 Redis TCP PING으로 구성된 11개 주요 서비스 검사를 수행하고 결과를 `verification_report.json`으로 저장하는 자동 검증기(`verify_migration.py`)를 제공해야 한다.
 - **FR-018**: 시스템은 마이그레이션 팩 구성, 우분투 서버 사전 요구사항, 복원 절차, GPU 환경 설정, 트러블슈팅을 다루는 `MIGRATION_GUIDE.md`를 포함해야 한다.
 - **FR-019**: 시스템은 사전 검증 모드(`--dry-run`), 볼륨 포함 옵션(`--include-volumes`), 모델 가중치 포함 옵션(`--include-models`), 강제 덮어쓰기 옵션(`--force`)을 지원해야 한다.
 
@@ -192,7 +192,7 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 ### 5.1 마이그레이션 팩 번들 레이아웃
 ```text
 AISERVICE_Migration_Pack/
-├── .env                            # 실사용 전체 환경 변수 및 시크릿 (Zero-Config, chmod 600)
+├── .env                            # 복호화 후 생성되는 실사용 환경 변수 및 시크릿 (Zero-Config, chmod 600)
 ├── ateam/                          # A-Team Pilos 서비스 소스 및 설정
 ├── bteam/                          # B-Team Oliview 통합 파이프라인 및 서비스
 │   ├── packages/core/              # 공통 코어 모듈
@@ -214,9 +214,10 @@ AISERVICE_Migration_Pack/
 │   │   └── checksums.sha256
 │   ├── volumes/                    # Docker Volume 물리 아카이브 (.tar.gz)
 │   │   ├── ateam_db_data.tar.gz
-│   │   ├── bteam_mysql_data.tar.gz
+│   │   ├── bteam_bteam_mysql_data.tar.gz
+│   │   ├── green_mysql_data.tar.gz
 │   │   ├── green_chroma_data.tar.gz
-│   │   └── redis_data.tar.gz
+│   │   └── aiservice_redis_data.tar.gz
 │   ├── scripts/                    # 마이그레이션 & 복원 자동화 스크립트
 │   │   ├── export_databases.py
 │   │   ├── export_docker_volumes.py
@@ -229,6 +230,7 @@ AISERVICE_Migration_Pack/
 │   ├── migration_manifest.json     # 마이그레이션 매니페스트 v2.0
 │   └── MIGRATION_GUIDE.md          # 우분투 마이그레이션 매뉴얼
 ├── docker-compose.yml              # 루트 통합 Compose 파일 (우분투 자동 변환 지원)
+├── bteam/docker-compose.green.yml  # Green MySQL/Chroma 스택 정의
 ├── run_all_services.sh             # 우분투 서비스 통합 기동 스크립트
 ├── bootstrap_restore.sh            # 우분투 원클릭 복원 진입점 스크립트
 └── README.md
@@ -240,7 +242,7 @@ AISERVICE_Migration_Pack/
 - `source_environment`: 소스 OS, 플랫폼, 호스트명
 - `target_environment`: `"Ubuntu Linux 24.04 LTS (i7-930 Nehalem, 24GB RAM, GTX 1070 8GB sm_61)"`
 - `migration_mode`: `"DEV_PLATFORM_TRANSFER"`
-- `zero_config_ready`: `true`
+- `zero_config_ready`: `true` (키는 아카이브 외부의 사전 보호 경로에서 주입되며 사용자 프롬프트는 없음)
 - `target_hardware_profile`:
   - `cpu`: `"Intel Core i7-930 (SSE4.2, Non-AVX)"`
   - `gpu`: `"NVIDIA GeForce GTX 1070 8GB (Compute Capability 6.1 / sm_61)"`
@@ -250,6 +252,7 @@ AISERVICE_Migration_Pack/
 - `clean_os_prerequisites`: Docker, NVIDIA Driver, nvidia-container-toolkit 자동 설치 지원
 - `databases`: DB별 덤프 파일 경로, 크기, SHA-256 해시, 행 수(row counts)
 - `volumes`: 볼륨별 아카이브 파일 경로, 대상 Docker 볼륨 이름, 크기, SHA-256 해시
+- `secrets`: 원문 대신 암호화 상태와 외부 키 주입 방식만 기록하며 실제 토큰/비밀번호는 기록하지 않음
 - `ddns_config`: DuckDNS 도메인 연동 여부 및 갱신 주기
 - `services`: 패키징된 서비스 컴포넌트 목록
 - `checksums`: 전체 아카이브 및 파일 무결성 해시 매트릭스
@@ -261,9 +264,9 @@ AISERVICE_Migration_Pack/
 - **SC-001 (Zero-Configuration 복원)**: 타겟 우분투 서버에서 사용자가 `.env` 파일을 수동 편집하거나 설정값을 입력하는 횟수가 0회이며, 압축 해제 후 단일 스크립트 실행으로 100% 동작한다.
 - **SC-002 (클린 OS 자동 프로비저닝)**: Docker 및 GPU 드라이버가 없는 클린 Ubuntu 24.04 LTS에서도 사전 점검 스크립트를 통해 `DEBIAN_FRONTEND=noninteractive` 모드로 필수 인프라가 100% 자동 설치 구성된다.
 - **SC-003 (i7-930 / GTX 1070 하드웨어 최적화 무정지 가동)**: AVX를 지원하지 않는 i7-930 CPU와 Pascal GTX 1070 GPU 환경에서 `Illegal instruction` 크래시 없이 3대 AI 모델이 8GB VRAM 내에서 100% GPU 가속 가동된다.
-- **SC-004 (데이터 무손실률 100%)**: MySQL 2개 DB(`pilos_v2`, `cosmetic_db`/`oliview_project`)의 모든 테이블 레코드와 ChromaDB v2(`oliview_review_sentences_v2`)의 48,210+ 건 벡터가 우분투 서버에 100% 무손실 복원된다.
+- **SC-004 (데이터 무손실률 100%)**: 기본 MySQL 2개 DB(`pilos_v2`, `oliview_project`)와 Green 스택 MySQL(`cosmetic_db`)의 대상 테이블 레코드, 그리고 ChromaDB v2(`oliview_review_sentences_v2`)의 48,210+건 벡터가 우분투 서버에 100% 무손실 복원된다.
 - **SC-005 (원클릭 부트스트랩 시간 SLA 달성)**: 사전 인프라 준비 완료 서버에서는 **10분 이내**, 완전 클린 Ubuntu 24.04 LTS 서버(드라이버 및 도커 신규 설치 포함)에서는 **25분 이내**에 전 서비스 기동을 완수한다.
-- **SC-006 (11개 엔드포인트 100% 정상 가동)**: 복원 완료 후 `verify_migration.py` 실행 시 11개 주요 엔드포인트 전수 검사에서 오류율 0% (11/11 Pass)를 달성한다.
+- **SC-006 (11개 검사 100% 정상 가동)**: 복원 완료 후 `verify_migration.py` 실행 시 10개 HTTP 엔드포인트와 Redis TCP PING 전수 검사에서 오류율 0% (11/11 Pass)를 달성한다.
 - **SC-007 (DuckDNS DDNS IPv4 자동 동기화)**: 부트스트랩 완료 즉시 공인 IP 갱신이 성공(`OK`)하고 5분 주기 크론 동기화가 활성화된다.
 - **SC-008 (크로스 플랫폼 호환성)**: Windows에서 생성된 마이그레이션 팩이 Ubuntu 22.04 / 24.04 LTS 환경에서 어떠한 줄바꿈 오류(`\r`)나 권한 오류 없이 즉시 실행된다.
 - **SC-009 (무결성 검증 통과)**: 모든 데이터베이스 덤프 및 볼륨 아카이브의 SHA-256 체크섬이 100% 일치한다.
@@ -272,7 +275,7 @@ AISERVICE_Migration_Pack/
 
 ## 7. 가정 및 제약사항 (Assumptions & Constraints)
 
-- **마이그레이션 성격**: 본 마이그레이션은 동일 개발/실증(DEV/DEMO) 모드의 호스트 환경 이전(Windows $\rightarrow$ Ubuntu Linux)이므로, `.env` 내의 실사용 시크릿이 번들에 포함되며 보안 마스킹으로 인한 기능 중단을 방지합니다.
+- **마이그레이션 성격**: 본 마이그레이션은 동일 개발/실증(DEV/DEMO) 모드의 호스트 환경 이전(Windows $\rightarrow$ Ubuntu Linux)이므로, `.env` 내의 실사용 시크릿을 암호화된 번들에 포함하되 키는 외부 보호 경로에서 주입합니다. 복원 후 기능에는 원문 값을 사용하지만 로그·매니페스트·체크섬·평문 전송에는 기록하지 않습니다.
 - **타겟 하드웨어 프로파일**: 타겟 서버는 Intel Core i7-930 CPU (Non-AVX, SSE4.2), 24GB RAM, NVIDIA GeForce GTX 1070 8GB GPU를 탑재한 Ubuntu 24.04 LTS 환경을 표준으로 합니다.
 - **GPU 가속 환경**: NVIDIA GPU 장착 서버의 경우 부트스트랩 스크립트 또는 자동 설치 도구를 통해 `nvidia-container-toolkit`을 활성화하며, CPU 전용 서버인 경우 CPU 폴백 모드가 적용됩니다.
 - **스토리지 여유 공간**: 덤프 생성 및 볼륨 아카이브 추출/압축 해제를 위해 소스 호스트 및 타겟 우분투 서버에 최소 25GB 이상의 디스크 여유 공간이 확보되어 있어야 합니다.
