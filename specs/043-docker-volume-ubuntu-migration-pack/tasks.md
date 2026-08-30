@@ -21,7 +21,7 @@
 **Purpose**: 모든 User Story가 공통으로 의존하는 기본 라이브러리 및 헬퍼 모듈 구축
 
 - [x] T004 `model_gateway/scripts/probe_hardware.py`에 하드웨어 프로브 유틸리티를 구현
-- [x] T005 [P] `migration_pack/scripts/normalize_compose.py`에 WSL2-to-Native Linux Compose 정규화 도구를 구현
+- [x] T005 [P] `migration_pack/scripts/normalize_compose.py`에 WSL2-to-Native Linux Compose 정규화 도구를 구현(FR-012)
 - [x] T006 [P] `ddns/duck.sh`에 POSIX 호환 DuckDNS IPv4 크론 업데이트 러너를 구현
 - [x] T007 `tests/test_migration_pack.py`에 마이그레이션 테스트 계약 및 픽스처를 구현
 
@@ -94,7 +94,7 @@
 
 ### Implementation for User Story 4
 - [x] T021 [US4] `make_migration_pack.py`에 엄격한 제외 필터 기반 클린 소스 어셈블러를 구현
-- [ ] T022 [US4] `make_migration_pack.py` 및 `migration_pack/scripts/bootstrap_restore.sh`에 실사용 `.env` 암호화 보존, 외부 키 주입 및 복호화 후 보안 권한(`chmod 600`) 적용 로직을 구현
+- [x] T022 [US4] `make_migration_pack.py` 및 `migration_pack/scripts/bootstrap_restore.sh`에 실사용 `.env` 암호화 보존, 외부 키 주입 및 복호화 후 보안 권한(`chmod 600`) 적용 로직을 구현
 - [x] T023 [US4] `make_migration_pack.py`에 매니페스트 v2.0 생성기 및 SHA-256 체크섬 매트릭스 빌더를 구현
 
 **Checkpoint**: Zero-Config 실사용 시크릿 100% 보존 및 클린 아카이브 패키징 완료
@@ -111,7 +111,7 @@
 - [x] T024 [P] [US5] `tests/test_bootstrap_restore.py`에 `bootstrap_restore.sh` 인자 파싱 및 실행 파이프라인 계약 테스트를 구현
 
 ### Implementation for User Story 5
-- [x] T025 [US5] `migration_pack/scripts/normalize_compose.py`에 `/dev/dxg`를 Linux 표준 `nvidia` 런타임으로 변환하는 Compose 정규화기를 구현
+- [x] T025 [US5] `migration_pack/scripts/normalize_compose.py`에 `/dev/dxg`를 Linux 표준 `nvidia` 런타임으로 변환하는 Compose 정규화기를 구현(FR-012, US5/AC1)
 - [x] T026 [US5] `migration_pack/scripts/bootstrap_restore.sh`에 단계적 컨테이너 기동 시퀀스(DB/Redis/Model Gateway 준비성 프로브 $\rightarrow$ 앱 기동)를 구현
 - [x] T027 [US5] `migration_pack/scripts/bootstrap_restore.sh` 및 `bootstrap_restore.py`에 멱등 에러 트랩(`set -euo pipefail`) 및 권한 정규화를 구현
 
@@ -129,8 +129,8 @@
 - [x] T028 [P] [US6] `tests/test_duckdns_sync.py`에 DuckDNS 크론 파서 및 curl 실행 단위 테스트를 구현
 
 ### Implementation for User Story 6
-- [x] T029 [US6] `ddns/duck.sh`에 재시도 로직을 포함한 IPv4 강제(`curl -4`) DuckDNS 갱신 스크립트를 구현
-- [x] T030 [US6] `migration_pack/scripts/bootstrap_restore.sh`에 자동 crontab 등록 및 초기 IP 갱신 호출을 통합
+- [x] T029 [US6] `ddns/duck.sh`에 재시도 로직을 포함한 IPv4 강제(`curl -4`) DuckDNS 갱신 스크립트를 구현(FR-015, SC-007, US6/AC1)
+- [x] T030 [US6] `migration_pack/scripts/bootstrap_restore.sh`에 자동 crontab 등록 및 초기 IP 갱신 호출을 통합(FR-015, SC-007, US6/AC1)
 
 **Checkpoint**: DuckDNS DDNS 5분 주기 동적 도메인 동기화 완성
 
@@ -147,7 +147,7 @@
 
 ### Implementation for User Story 7
 - [x] T032 [US7] `migration_pack/scripts/verify_migration.py`에 하드웨어 프로브 기록을 포함한 10개 HTTP + Redis TCP PING 11개 검사 E2E 검증 스위트를 고도화
-- [x] T033 [US7] `migration_pack/MIGRATION_GUIDE.md`에 우분투 마이그레이션 종합 매뉴얼 및 트러블슈팅 가이드를 작성
+- [x] T033 [US7] `migration_pack/MIGRATION_GUIDE.md`에 우분투 마이그레이션 종합 매뉴얼 및 트러블슈팅 가이드를 작성(FR-018, US7)
 
 **Checkpoint**: 10개 HTTP + Redis TCP PING 11개 검사 E2E 검증 게이트 및 마이그레이션 매뉴얼 완성
 
@@ -257,3 +257,26 @@ graph TD
 
 - [x] T066 [CRITICAL] `tests/test_migration_convergence.py`에 암호화 아카이브, 외부 `MIGRATION_PACK_KEY_FILE` 주입, 평문 시크릿 제외, `--format tar.gz|zip|both`, 보안 매니페스트 필드 계약의 Red 테스트를 추가하고 T022/T065 구현 전에 실패를 확인한다(Constitution II, FR-006/008, 완료).
 - [x] T067 [HIGH] `migration_pack/scripts/export_databases.py`의 대상 탐색에 `GREEN_DB_*`, `mysql-green`, `cosmetic_db`를 포함하고 Green MySQL 논리 덤프·행 수 측정·매니페스트 연결을 구현한다(FR-003, US3/AC1, 완료).
+
+## Phase 15: Convergence
+
+- [x] T068 [CRITICAL] `migration_pack/scripts/bootstrap_restore.sh`의 옵션 파싱 `while`/`case` 블록을 올바르게 닫아 `bash -n`, `--help`, `--dry-run` smoke test가 통과하고 FR-010/FR-011 및 US5의 원클릭 진입점이 실제 실행 가능하도록 복구한다(FR-010/011, US5/AC2, contradicts).
+- [x] T069 [CRITICAL] `make_migration_pack.py`, `migration_pack/scripts/bootstrap_restore.sh`, `migration_pack/scripts/bootstrap_restore.py`에 승인된 암호화 provider/envelope, 외부 `MIGRATION_PACK_KEY_FILE` 또는 `--key-file`, `.tar.gz.enc`/`.zip.enc` 생성·복호화, 평문 `.env` 비노출, 보안 매니페스트 필드 및 checksum 처리를 실제로 연결하고 계약 Red/Green 테스트를 통과시킨다(FR-006/008, US4/AC1, missing).
+- [x] T070 [HIGH] `make_migration_pack.py`와 `bootstrap_restore.py`의 dry-run 및 사전검사를 실제 DB 연결, 대상 Docker volume 존재·크기, Docker daemon, root/포트/최소 25GB 디스크 조건까지 수행하도록 완성하고 migration CLI/bootstrap 계약의 종료 코드를 정확히 반환한다(FR-019, EC-004/006, partial).
+- [x] T071 [HIGH] `bootstrap_restore.py`에 `bteam/docker-compose.green.yml` 기반 Green MySQL/Chroma staged startup, 모든 기본·Green DB readiness 대기, `GREEN_DB_*` 대상 복원 및 매니페스트/무결성 연결을 구현한다(FR-003/004, SC-004, US3/AC1, partial).
+- [x] T072 [HIGH] `migration_pack/scripts/export_databases.py`의 MySQL 일관성 lock을 dump 스트림과 동일 세션에서 유지·해제하고 Green DB의 정확한 행 수를 수집하며, `export_docker_volumes.py`에서 Chroma SQLite WAL checkpoint와 Redis BGSAVE 완료·성공 상태를 검증한 뒤 아카이브를 생성하도록 보완한다(FR-003, EC-001/003, partial).
+- [x] T073 [HIGH] `migration_pack/scripts/verify_migration.py`를 Quickstart의 정확한 10개 HTTP + Redis TCP PING 계약에 맞춰 HTTP 200과 PONG만 성공으로 판정하고, 기본 bundle 보고서 경로·조건부 error 필드·최신 schema 및 종료 코드를 일치시킨다(FR-017/018, SC-006, partial).
+- [x] T074 [HIGH] 복원 후 검증에서 기본 2개 및 Green MySQL의 전체 행 수와 ChromaDB `oliview_review_sentences_v2` 벡터 수를 원본 측정값과 비교하고 측정 방법·결과를 `verification_report.json`에 기록하도록 구현한다(SC-004, partial).
+- [x] T075 [HIGH] Model Gateway의 vLLM → CUDA llama.cpp → CPU OpenBLAS fallback을 실제 runtime 선택·health/readiness 결과에 연결하고 모든 설정 경로의 VRAM safety limit을 5,000MB 이하로 clamp하여 Non-AVX/GTX 1070 조건을 보장한다(FR-002/014, SC-003, partial).
+- [x] T076 [HIGH] `migration_pack/scripts/install_prerequisites.sh`에서 Snap Docker 제거 실패를 명시적으로 전파하고 공식 APT Docker 전환을 확인하며, NVIDIA 설정 후 `docker run --gpus all`과 cron daemon 활성 상태를 검증하도록 보완한다(FR-001, SC-002/007, partial).
+
+## Phase 16: Convergence
+
+- [x] T077 [HIGH] Green DB를 선택적 대상이 아니라 필수 구성으로 처리하고 `GREEN_DB_*`, `cosmetic_db`, `mysql-green`을 패키징·복원·사전검사·매니페스트에 일관되게 연결한다(FR-003, SC-004, US3/AC1, 완료).
+- [ ] T078 [HIGH] 체크인된 `migration_manifest.json`과 `verification_report.json`을 현재 3개 DB·5개 볼륨·11개 엔드포인트 계약에 맞춰 실제 측정값, Redis 결과, `data_integrity`, 현재 schema 필드로 재생성한다(FR-009, SC-009, partial).
+- [x] T079 [HIGH] DB 연결 사전검사를 볼륨 검사와 분리하여 `--no-volumes` 및 dry-run에서도 DB/Docker/디스크 검사가 명세된 조건과 종료 코드로 수행되도록 정리한다(FR-019, EC-006, 완료).
+- [x] T080 [HIGH] Chroma WAL checkpoint 이후 canonical 컬렉션의 벡터 수를 필수 측정하고 측정값이 없거나 불안정하면 패키징을 차단하며 원본 수치를 매니페스트에 기록한다(FR-004, SC-004, 완료).
+- [x] T081 [HIGH] Model Gateway에 vLLM → CUDA llama.cpp → CPU OpenBLAS 순서의 실제 런타임 시도·health/readiness·CUDA/Illegal instruction 오류 감지 및 fallback을 연결하고 Non-AVX/GTX 1070 경로를 검증한다(FR-002, SC-003, 완료).
+- [x] T082 [MEDIUM] 계획서·데이터 모델·manifest·Quickstart·코드의 서비스 inventory를 대조하여 10개와 11개 불일치를 해소하고 엔드포인트 매핑을 단일 기준으로 정리한다(서비스 inventory, 완료).
+- [x] T083 [HIGH] `bootstrap_restore.py --archive` 직접 실행 경로에서도 `.env`와 `ddns/.env`를 600으로 설정하고 복원 스크립트의 실행 권한을 정규화하여 shell wrapper와 동일한 보안 보장을 제공한다(FR-007, SC-008, US5/AC1, 완료).
+- [x] T084 [MEDIUM] 최신 TDD 테스트 증적을 반영하여 `plan.md` Constitution Check의 Principle II 상태와 검증 근거를 갱신한다(Constitution II, 완료).

@@ -11,9 +11,11 @@ import shutil
 import socket
 import subprocess
 import sys
+import tarfile
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -21,6 +23,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from migration_pack.scripts.env_utils import load_environment, required_environment
+from migration_pack.scripts.archive_crypto import decrypt_file, load_key_file
 from migration_pack.scripts.export_docker_volumes import get_managed_volumes_map
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -104,7 +107,93 @@ def _docker_mount_path(path: Path) -> str:
     return resolved.replace("\\", "/")
 
 
-def check_preflight_system(project_root: Path | str = PROJECT_ROOT) -> tuple[bool, list[str]]:
+def _safe_extract_archive(archive_path: Path, destination: Path) -> None:
+    """압축 경로 탈출과 링크를 차단한 뒤 아카이브를 풉니다."""
+    root = destination.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    def safe_target(name: str) -> Path:
+        target = (root / name).resolve()
+        if os.path.commonpath([str(root), str(target)]) != str(root):
+            raise RestoreError(f"압축 경로가 대상 디렉터리를 벗어납니다: {name}", 6)
+        return target
+
+    if archive_path.name.endswith(".tar.gz"):
+        with tarfile.open(archive_path, "r:gz") as archive:
+            members = archive.getmembers()
+            for member in members:
+                if member.issym() or member.islnk():
+                    raise RestoreError(f"압축 링크는 허용하지 않습니다: {member.name}", 6)
+                target = safe_target(member.name)
+                if member.isdir():
+                    target.mkdir(parents=True, exist_ok=True)
+                elif member.isfile():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with archive.extractfile(member) as source, target.open("wb") as output:
+                        if source is not None:
+                            shutil.copyfileobj(source, output)
+                else:
+                    raise RestoreError(f"지원하지 않는 tar 항목입니다: {member.name}", 6)
+        return
+
+    if archive_path.name.endswith(".zip"):
+        with zipfile.ZipFile(archive_path) as archive:
+            for member in archive.infolist():
+                target = safe_target(member.filename)
+                if member.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+        return
+    raise RestoreError(f"지원하지 않는 복호화 아카이브 확장자입니다: {archive_path}", 6)
+
+
+def normalize_extracted_permissions(destination: Path | str) -> Path:
+    """직접 Python 복원 경로에도 env/스크립트 권한을 적용합니다."""
+    destination_path = Path(destination).resolve()
+    bundle_root = destination_path / "AISERVICE"
+    if not bundle_root.is_dir():
+        bundle_root = destination_path
+
+    for env_path in (bundle_root / ".env", bundle_root / "ddns" / ".env"):
+        if env_path.is_file():
+            env_path.chmod(0o600)
+
+    for script_path in bundle_root.rglob("*"):
+        if script_path.is_file() and script_path.suffix.lower() in {".sh", ".py"}:
+            script_path.chmod(0o755)
+    return bundle_root
+
+
+def decrypt_and_extract_archive(
+    archive_path: Path | str,
+    destination: Path | str,
+    key_file: str | os.PathLike[str] | None,
+) -> Path:
+    """외부 키로 `.enc`를 복호화하고 안전하게 압축 해제합니다."""
+    source = Path(archive_path).resolve()
+    if not source.name.endswith((".tar.gz.enc", ".zip.enc")):
+        raise RestoreError("암호화 아카이브는 .tar.gz.enc 또는 .zip.enc여야 합니다", 6)
+    key = load_key_file(key_file)
+    destination_path = Path(destination).resolve()
+    decrypted_name = source.name.removesuffix(".enc")
+    temporary = destination_path.parent / f".{decrypted_name}"
+    try:
+        decrypt_file(source, temporary, key)
+        _safe_extract_archive(temporary, destination_path)
+        normalize_extracted_permissions(destination_path)
+        return destination_path
+    except ValueError as exc:
+        raise RestoreError(str(exc), 6) from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def check_preflight_system(
+    project_root: Path | str = PROJECT_ROOT, *, check_docker: bool = False
+) -> tuple[bool, list[str]]:
     """Root 권한, 포트 충돌(80, 8080, 3306, 6379), 최소 25GB 디스크 여유 공간을 검사합니다."""
     issues: list[str] = []
     root = Path(project_root).resolve()
@@ -134,6 +223,61 @@ def check_preflight_system(project_root: Path | str = PROJECT_ROOT) -> tuple[boo
             issues.append(
                 f"포트 {port}가 이미 사용 중입니다. 충돌 프로세스를 종료하거나 .env에서 포트를 재매핑하십시오."
             )
+
+    if check_docker:
+        try:
+            result = subprocess.run(
+                ["docker", "info"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if result.returncode != 0:
+                issues.append("DOCKER: Docker daemon에 연결할 수 없습니다")
+        except (OSError, subprocess.SubprocessError) as exc:
+            issues.append(f"DOCKER: Docker daemon 검사 실패: {exc}")
+
+        try:
+            volumes = subprocess.run(
+                ["docker", "volume", "ls", "--format", "{{.Name}}"],
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            existing = set(volumes.stdout.splitlines()) if volumes.returncode == 0 else set()
+            for volume_name in sorted(get_managed_volumes_map()):
+                if volume_name not in existing:
+                    # Clean targets are allowed to create these from bundled archives.
+                    archive = VOL_DIR / f"{volume_name}.tar.gz"
+                    if not archive.is_file():
+                        issues.append(f"DOCKER: 대상 volume/복원 archive가 없습니다: {volume_name}")
+                    continue
+                size = subprocess.run(
+                    [
+                        "docker",
+                        "run",
+                        "--rm",
+                        "-v",
+                        f"{volume_name}:/data:ro",
+                        "alpine",
+                        "du",
+                        "-sb",
+                        "/data",
+                    ],
+                    cwd=root,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+                if size.returncode != 0 or not size.stdout.split():
+                    issues.append(f"DOCKER: volume 크기 검사 실패: {volume_name}")
+        except (OSError, subprocess.SubprocessError) as exc:
+            issues.append(f"DOCKER: volume 검사 실패: {exc}")
 
     return len(issues) == 0, issues
 
@@ -254,6 +398,10 @@ def get_restore_targets(
         "BTEAM_DB_USER",
         "BTEAM_DB_PASSWORD",
         "BTEAM_DB_ROOT_PASSWORD",
+        "GREEN_DB_NAME",
+        "GREEN_DB_USER",
+        "GREEN_DB_PASSWORD",
+        "GREEN_DB_ROOT_PASSWORD",
     ]
     missing = required_environment(env, required)
     if missing:
@@ -278,21 +426,17 @@ def get_restore_targets(
             "dump_path": str(DB_DIR / f"{env['BTEAM_DB_NAME']}.sql.gz"),
         },
     ]
-    # Green DB 지원 (환경 변수 또는 docker-compose.green.yml 연계)
-    if "GREEN_DB_NAME" in env:
-        targets.append(
-            {
-                "container": env.get("GREEN_DB_CONTAINER", "mysql-green"),
-                "db_name": env["GREEN_DB_NAME"],
-                "user": env.get("GREEN_DB_USER", "bteam_green"),
-                "password": env.get("GREEN_DB_PASSWORD", ""),
-                "root_password": env.get(
-                    "GREEN_DB_ROOT_PASSWORD", env.get("GREEN_DB_PASSWORD", "")
-                ),
-                "volume_name": "green_mysql_data",
-                "dump_path": str(DB_DIR / f"{env['GREEN_DB_NAME']}.sql.gz"),
-            }
-        )
+    targets.append(
+        {
+            "container": env.get("GREEN_DB_CONTAINER", "mysql-green"),
+            "db_name": env["GREEN_DB_NAME"],
+            "user": env["GREEN_DB_USER"],
+            "password": env["GREEN_DB_PASSWORD"],
+            "root_password": env["GREEN_DB_ROOT_PASSWORD"],
+            "volume_name": "green_mysql_data",
+            "dump_path": str(DB_DIR / f"{env['GREEN_DB_NAME']}.sql.gz"),
+        }
+    )
     return targets
 
 
@@ -341,6 +485,17 @@ def wait_for_redis(container: str = "aiservice-redis", max_retries: int = 60) ->
 def wait_for_model_gateway(
     url: str = "http://127.0.0.1:8081/health", max_retries: int = 60
 ) -> bool:
+    for _ in range(max_retries):
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                if response.status == 200:
+                    return True
+        except (OSError, urllib.error.URLError):
+            time.sleep(2)
+    return False
+
+
+def wait_for_http(url: str, max_retries: int = 60) -> bool:
     for _ in range(max_retries):
         try:
             with urllib.request.urlopen(url, timeout=3) as response:
@@ -428,9 +583,14 @@ def restore_database_dump(
         return False
 
 
-def _compose_up(services: list[str]) -> None:
-    command = ["docker", "compose", "up", "-d", *services]
-    result = subprocess.run(command, cwd=PROJECT_ROOT, check=False)
+def _compose_up(
+    services: list[str], *, compose_file: Path | None = None, cwd: Path = PROJECT_ROOT
+) -> None:
+    command = ["docker", "compose"]
+    if compose_file is not None:
+        command.extend(["-f", str(compose_file)])
+    command.extend(["up", "-d", *services])
+    result = subprocess.run(command, cwd=cwd, check=False)
     if result.returncode != 0:
         raise RestoreError("Docker Compose 기동 실패", 2)
 
@@ -474,6 +634,20 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-ddns", action="store_true")
     parser.add_argument("--force-dump", action="store_true")
     parser.add_argument("--skip-verification", action="store_true")
+    parser.add_argument(
+        "--key-file",
+        default=os.environ.get("MIGRATION_PACK_KEY_FILE"),
+        help="외부 아카이브 복호화 키 파일",
+    )
+    parser.add_argument(
+        "--archive",
+        help="복호화·압축 해제할 .tar.gz.enc 또는 .zip.enc 경로",
+    )
+    parser.add_argument(
+        "--extract-to",
+        default=".",
+        help="--archive의 압축 해제 대상 디렉터리",
+    )
     return parser
 
 
@@ -481,15 +655,31 @@ def main(argv: list[str] | None = None) -> int:
     args = build_argument_parser().parse_args(argv)
     force = bool(args.force or args.yes)
     try:
-        sys_ok, sys_issues = check_preflight_system(PROJECT_ROOT)
+        if args.archive:
+            destination = decrypt_and_extract_archive(
+                args.archive, args.extract_to, args.key_file
+            )
+            log_info(f"암호화 아카이브 복호화 및 안전한 압축 해제 완료: {destination}")
+            return 0
+        encrypted_archives = list(PROJECT_ROOT.glob("*.enc"))
+        if args.key_file:
+            load_key_file(args.key_file)
+        elif encrypted_archives:
+            raise RestoreError(
+                "암호화 아카이브가 있지만 MIGRATION_PACK_KEY_FILE 또는 --key-file이 없습니다",
+                6,
+            )
+        sys_ok, sys_issues = check_preflight_system(
+            PROJECT_ROOT, check_docker=not args.force_dump
+        )
         if not sys_ok:
             for issue in sys_issues:
                 if args.dry_run or force:
                     log_warn(f"[PREFLIGHT] {issue}")
                 else:
                     log_error(f"[PREFLIGHT] {issue}")
-            if not (args.dry_run or force):
-                raise RestoreError("사전 시스템 검사 실패: 포트/디스크/권한을 확인하십시오", 1)
+            exit_code = 2 if any(issue.startswith("DOCKER:") for issue in sys_issues) else 1
+            raise RestoreError("사전 시스템 검사 실패: 포트/디스크/권한/Docker 상태를 확인하십시오", exit_code)
 
         if not verify_checksums() and not force:
             raise RestoreError("checksum 검증 실패", 1)
@@ -504,15 +694,32 @@ def main(argv: list[str] | None = None) -> int:
         if any(value is False for value in volumes.values()):
             raise RestoreError("하나 이상의 물리 volume 복원이 실패했습니다", 3)
 
+        green_targets = [
+            target for target in targets if target["volume_name"] == "green_mysql_data"
+        ]
         _compose_up(["pilos_db", "bteam_db", "redis", "vllm-serv"])
-        if not wait_for_mysql(targets[0]["container"], targets[0]["root_password"]):
-            raise RestoreError("Pilos MySQL readiness timeout", 2)
-        if not wait_for_mysql(targets[1]["container"], targets[1]["root_password"]):
-            raise RestoreError("B-Team MySQL readiness timeout", 2)
+        if green_targets:
+            green_compose = PROJECT_ROOT / "bteam" / "docker-compose.green.yml"
+            if not green_compose.is_file():
+                raise RestoreError(f"Green Compose 파일이 없습니다: {green_compose}", 3)
+            _compose_up(
+                ["mysql-green", "redis-green", "chroma-green"],
+                compose_file=green_compose,
+            )
+        for target in targets:
+            if not wait_for_mysql(target["container"], target["root_password"]):
+                raise RestoreError(
+                    f"{target['container']} MySQL readiness timeout", 2
+                )
         if not wait_for_redis():
             raise RestoreError("Redis readiness timeout", 2)
         if not wait_for_model_gateway():
             raise RestoreError("Model Gateway readiness timeout", 2)
+        if green_targets:
+            if not wait_for_redis("redis-green"):
+                raise RestoreError("Green Redis readiness timeout", 2)
+            if not wait_for_http("http://127.0.0.1:18000/api/v1/heartbeat"):
+                raise RestoreError("Green Chroma readiness timeout", 2)
 
         restore_databases(targets, volumes, force_dump=args.force_dump)
         _compose_up(
@@ -526,6 +733,11 @@ def main(argv: list[str] | None = None) -> int:
                 "gateway",
             ]
         )
+        if green_targets:
+            _compose_up(
+                ["pipeline_runner", "dashboard_backend", "dashboard_frontend", "chatbot_a", "chatbot_b"],
+                compose_file=PROJECT_ROOT / "bteam" / "docker-compose.green.yml",
+            )
         if not args.skip_verification:
             verify_script = SCRIPT_DIR / "verify_migration.py"
             result = subprocess.run(

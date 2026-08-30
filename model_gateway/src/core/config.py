@@ -44,6 +44,7 @@ SUPPORTED_MODELS = get_supported_models()
 
 try:
     from src.config import (
+        clamp_vram_safety_limit,
         get_model_vram_budget,
         get_runtime_fallback_chain,
         get_runtime_profile,
@@ -52,6 +53,12 @@ except ImportError:
     def get_model_vram_budget() -> dict[str, int]:
         return {"llm": 2600, "embedding": 1200, "reranker": 1200}
 
+    def clamp_vram_safety_limit(value) -> int:
+        try:
+            return max(0, min(int(value), 5000))
+        except (TypeError, ValueError):
+            return 5000
+
     def get_runtime_fallback_chain() -> list[str]:
         return ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
 
@@ -59,13 +66,10 @@ except ImportError:
         return {}
 
 _RUNTIME_PROFILE = get_runtime_profile()
-VRAM_SAFETY_LIMIT_MB = min(
-    int(
-        os.environ.get(
-            "VRAM_SAFETY_LIMIT_MB", _RUNTIME_PROFILE.get("vram_safety_limit_mb", "5000")
-        )
-    ),
-    5000,
+VRAM_SAFETY_LIMIT_MB = clamp_vram_safety_limit(
+    os.environ.get(
+        "VRAM_SAFETY_LIMIT_MB", _RUNTIME_PROFILE.get("vram_safety_limit_mb", "5000")
+    )
 )
 MODEL_VRAM_BUDGET_MB = get_model_vram_budget()
 RUNTIME_FALLBACK_CHAIN = get_runtime_fallback_chain()

@@ -37,7 +37,17 @@ async def get_vram_health():
 
     active_model = llama_manager.process_manager.state.model_id or cm.get_default_model()
     queue_stats = priority_scheduler.get_queue_stats()
-    vram_ceiling = int(os.environ.get("VRAM_SAFETY_LIMIT_MB", 5000))
+    try:
+        from src.config import clamp_vram_safety_limit, select_runtime_backend
+
+        vram_ceiling = clamp_vram_safety_limit(os.environ.get("VRAM_SAFETY_LIMIT_MB", 5000))
+        runtime_backend = select_runtime_backend()
+    except (ImportError, TypeError, ValueError):
+        try:
+            vram_ceiling = max(0, min(int(os.environ.get("VRAM_SAFETY_LIMIT_MB", 5000)), 5000))
+        except (TypeError, ValueError):
+            vram_ceiling = 5000
+        runtime_backend = "unknown"
 
     return {
         "status": "healthy" if used_vram <= vram_ceiling else "degraded",
@@ -55,6 +65,11 @@ async def get_vram_health():
             "primary_resident": "qwen3.5-2b",
             "on_demand_resident": active_model if active_model == "qwen3.5-4b" else None,
             "is_ready": llama_manager.is_ready()
+        },
+        "runtime": {
+            "backend": runtime_backend,
+            "fallback_chain": ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"],
+            "ready": llama_manager.is_ready(),
         },
         "auxiliary_services": {
             "embedding_bge_m3": {
@@ -118,4 +133,3 @@ from src.core.redis_manager import redis_manager
 async def get_redis_health():
     """Spec 019 / FR-007: Real-time Redis in-memory cache and memory stats endpoint."""
     return await redis_manager.get_health_stats()
-

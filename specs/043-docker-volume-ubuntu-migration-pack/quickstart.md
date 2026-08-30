@@ -12,6 +12,13 @@
 ```powershell
 python make_migration_pack.py --dry-run
 ```
+Green 스택까지 포함하는 기능이므로 `.env`에 다음 네 항목을 실제 값으로 미리 설정해야 하며, 누락 시 dry-run이 실패합니다(비밀번호는 문서나 매니페스트에 기록하지 않습니다):
+```text
+GREEN_DB_NAME=cosmetic_db
+GREEN_DB_USER=bteam_green
+GREEN_DB_PASSWORD=<protected-value>
+GREEN_DB_ROOT_PASSWORD=<protected-value>
+```
 
 ### 1.2 마이그레이션 팩 생성
 Docker 볼륨 및 실사용 `.env`가 암호화된 상태로 포함된 단일 아카이브를 생성합니다. 기본 형식은 `.tar.gz`이며, 필요하면 `.zip` 또는 두 형식을 선택합니다:
@@ -31,14 +38,14 @@ scp dist/AISERVICE_Migration_Pack_*.tar.gz.enc ubuntu@<TARGET_UBUNTU_IP>:~/
 ## 2. 타겟 환경 (Ubuntu 24.04 LTS) 원클릭 복원 및 기동
 
 ### 2.1 아카이브 복호화 및 압축 해제
-타겟 호스트의 보호된 키 경로를 `MIGRATION_PACK_KEY_FILE`로 주입하고 승인된 복호화 도구로 배포 아카이브를 복호화합니다. 키가 없으면 복원을 진행하지 않습니다.
+타겟 호스트의 보호된 키 경로를 `MIGRATION_PACK_KEY_FILE`로 주입하고 번들 provider의 버전 고정 envelope로 배포 아카이브를 복호화합니다. 키가 없으면 복원을 진행하지 않습니다.
 ```bash
 export MIGRATION_PACK_KEY_FILE=/etc/aiservice/migration-pack.key
-# 승인된 키 주입/복호화 절차로 <DECRYPTED_ARCHIVE>를 준비한 뒤 실행
+python3 migration_pack/scripts/bootstrap_restore.py \
+  --archive <ENCRYPTED_ARCHIVE> --extract-to . --key-file "$MIGRATION_PACK_KEY_FILE"
 ```
 
 ```bash
-tar -xzf <DECRYPTED_ARCHIVE>
 cd AISERVICE
 ```
 

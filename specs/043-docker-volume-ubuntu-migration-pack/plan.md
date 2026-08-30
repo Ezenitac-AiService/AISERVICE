@@ -30,7 +30,7 @@ AISERVICE의 전체 복합 멀티 에이전트 시스템(A-Team, B-Team, Model G
 **Project Type**: Multi-Service System Migration & Infrastructure Automation Pack  
 **Performance Goals**: 원클릭 복원 완료 시간 $\le 25$분 (클린 OS) / $\le 10$분 (사전 준비 OS), 10개 HTTP + Redis TCP PING 11개 검사 성공률 100% (11/11 Pass), LLM API 지연시간 $\le 3.0$초 (Fast SLM)
 **Constraints**: Zero Manual Configuration (외부 보호 키 사전 주입을 전제로 사용자 `.env` 수동 편집 0회), No `Illegal instruction` crashes on Non-AVX i7-930 CPU, 8GB VRAM 내 100% GPU 서빙, No Snap Docker
-**Scale/Scope**: 10개 Docker 컨테이너, 기본/Green MySQL 스택, 4.8만+ 벡터 임베딩, 10개 HTTP와 Redis TCP PING 1개로 구성된 11개 검사, 기본 `.tar.gz` 아카이브(선택 `.zip`, `both` 병렬 생성)
+**Scale/Scope**: 기본/Green Compose 스택의 서비스 컨테이너 inventory, 4.8만+ 벡터 임베딩, 10개 HTTP와 Redis TCP PING 1개로 구성된 11개 검증 항목, 기본 `.tar.gz` 압축 후 `.tar.gz.enc` 암호화 아카이브(선택 `.zip`, `both` 병렬 생성)
 
 ---
 
@@ -39,7 +39,7 @@ AISERVICE의 전체 복합 멀티 에이전트 시스템(A-Team, B-Team, Model G
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - [x] **원칙 I (Language & Communication Policy)**: 계획서, 명세서, 주석, 가이드 문서 일체 한국어 작성 완료.
-- [ ] **원칙 II (Test-First & Contract Verification)**: `contracts/` 4개 명세와 11개 검사(10개 HTTP + Redis TCP PING) 계약은 정의되어 있으나, Phase 12 수렴 작업의 Red 테스트 선행 및 Green 검증이 남아 있음.
+- [x] **원칙 II (Test-First & Contract Verification)**: `contracts/` 4개 명세와 11개 검사(10개 HTTP + Redis TCP PING) 계약에 대한 Red 테스트 선행 및 Green 회귀 검증을 완료함.
 - [x] **원칙 III (Service Modularity & Environment Isolation)**: A-Team, B-Team, Model Gateway의 독립 볼륨 및 컨테이너 격리 보존.
 - [x] **원칙 IV (Observability & Structured Logging)**: `migration_manifest.json` v2.0 및 `verification_report.json` 구조화 로깅 규격 완비.
 - [x] **원칙 V (Simplicity & YAGNI)**: 복잡한 서드파티 배포 도구 대신 순수 Python/Bash 기반 경량 원클릭 부트스트랩 채택.

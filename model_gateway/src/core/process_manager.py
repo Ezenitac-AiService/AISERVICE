@@ -95,6 +95,7 @@ class LlamaServerBinaryInfo(BaseModel):
     is_cuda_enabled: bool = Field(default=True, description="CUDA 가속 구동 여부")
     build_source: str = Field(default="PATH", description="바이너리 취득 경로 (PATH / CMAKE_BUILD / PYTHON_MODULE)")
     version_info: Optional[str] = Field(default=None, description="바이너리 버전 정보")
+    runtime_backend: str = Field(default="llama.cpp-cuda", description="선택된 runtime backend")
 
 class RealGpuBenchmarkSession(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -213,6 +214,8 @@ class ProcessManager:
         self._log_drain_task: Optional[asyncio.Task] = None
         self._log_file_handle: Optional[Any] = None
         self._tps_history: collections.deque = collections.deque(maxlen=20)
+        self.active_runtime_backend: str | None = None
+        self.runtime_backend_failures: list[str] = []
         register_process_cleanup_hooks()
 
     def record_tps_sample(self, tps: float, model_id: Optional[str] = None) -> None:
@@ -649,16 +652,68 @@ class ProcessManager:
             return False
 
     @staticmethod
-    def verify_and_build_llama_server() -> LlamaServerBinaryInfo:
+    def _runtime_backend_from_profile() -> str:
+        """JIT 프로파일의 실제 probe 결과를 읽어 backend 선택에 사용합니다."""
+        try:
+            from src.config import (
+                attempt_runtime_backends,
+                get_runtime_profile,
+                select_runtime_backend,
+            )
+
+            profile = get_runtime_profile()
+            statuses = profile.get("runtime_backend_status")
+            if isinstance(statuses, dict) and statuses:
+                selected = select_runtime_backend(statuses)
+                if selected != "unavailable":
+                    return selected
+
+            def probe(backend: str) -> bool:
+                if backend == "vllm":
+                    url = os.environ.get(
+                        "VLLM_HEALTH_URL", "http://127.0.0.1:8081/health"
+                    )
+                    response = httpx.get(url, timeout=1.0)
+                    return response.status_code == 200
+                binary = os.environ.get("LLAMA_SERVER_BINARY") or shutil.which(
+                    "llama-server"
+                )
+                if not binary:
+                    return False
+                result = subprocess.run(
+                    [binary, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                    check=False,
+                )
+                return result.returncode == 0
+
+            selected, _failures = attempt_runtime_backends(probe)
+            if selected != "unavailable":
+                return selected
+            selected = str(profile.get("runtime_backend", ""))
+            return selected or "llama.cpp-cuda"
+        except (ImportError, TypeError, ValueError, OSError):
+            return "llama.cpp-cuda"
+
+    @staticmethod
+    def verify_and_build_llama_server(
+        preferred_backend: str | None = None,
+    ) -> LlamaServerBinaryInfo:
         """FR-001 & FR-002: Verifies CUDA llama-server binary existence; compiles via CMake with GGML_CUDA=ON if missing."""
+        runtime_backend = preferred_backend or ProcessManager._runtime_backend_from_profile()
+        cuda_enabled = runtime_backend == "llama.cpp-cuda"
+
         # 1. Check PATH via shutil.which for standalone binary binaries
         for binary_name in ["llama-server", "llama-cpp-server"]:
             candidate = shutil.which(binary_name)
             if candidate and ProcessManager._is_binary_executable_sanity(candidate):
                 return LlamaServerBinaryInfo(
                     binary_path=candidate,
-                    is_cuda_enabled=True,
-                    build_source="PATH"
+                    is_cuda_enabled=cuda_enabled,
+                    build_source="PATH",
+                    runtime_backend=runtime_backend,
                 )
 
         # 2. Check system standalone C++ binary paths (excluding Ollama internal paths)
@@ -671,19 +726,30 @@ class ProcessManager:
             if ProcessManager._is_binary_executable_sanity(path):
                 return LlamaServerBinaryInfo(
                     binary_path=path,
-                    is_cuda_enabled=True,
-                    build_source=build_source
+                    is_cuda_enabled=cuda_enabled,
+                    build_source=build_source,
+                    runtime_backend=runtime_backend,
                 )
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         bin_dir = os.path.join(base_dir, ".bin")
         local_binary = os.path.join(bin_dir, "llama-server")
+        generated_binary = os.path.join(base_dir, "bin", "llama-server")
+
+        if ProcessManager._is_binary_executable_sanity(generated_binary):
+            return LlamaServerBinaryInfo(
+                binary_path=generated_binary,
+                is_cuda_enabled=cuda_enabled,
+                build_source="JIT_BIN",
+                runtime_backend=runtime_backend,
+            )
 
         if ProcessManager._is_binary_executable_sanity(local_binary):
             return LlamaServerBinaryInfo(
                 binary_path=local_binary,
-                is_cuda_enabled=True,
-                build_source="LOCAL_BIN"
+                is_cuda_enabled=cuda_enabled,
+                build_source="LOCAL_BIN",
+                runtime_backend=runtime_backend,
             )
 
         llama_src_dir = os.path.join(base_dir, "llama.cpp")
@@ -718,15 +784,17 @@ class ProcessManager:
                     return LlamaServerBinaryInfo(
                         binary_path=local_binary,
                         is_cuda_enabled=True,
-                        build_source="CMAKE_BUILD"
+                        build_source="CMAKE_BUILD",
+                        runtime_backend=runtime_backend,
                     )
             except Exception as e:
                 print(f"[ProcessManager] Warning: CMake build failed: {e}")
 
         return LlamaServerBinaryInfo(
             binary_path=sys.executable,
-            is_cuda_enabled=True,
-            build_source="PYTHON_MODULE_FALLBACK"
+            is_cuda_enabled=False,
+            build_source="PYTHON_MODULE_FALLBACK",
+            runtime_backend=runtime_backend,
         )
 
     def build_server_command(
@@ -760,7 +828,7 @@ class ProcessManager:
 
         task_type = str(target_preset.get("task_type", "llm")).lower()
         is_aux = task_type in ("embedding", "rerank", "reranking", "tasktypeenum.embedding", "tasktypeenum.rerank") or effective_port in (8090, 8091)
-        ngl_value = "999"
+        ngl_value = "999" if binary_info.is_cuda_enabled else "0"
 
         # Detect hardware profile if not provided
         if hardware_profile is None:
@@ -924,9 +992,6 @@ class ProcessManager:
                 )
                 return self.state
 
-        # FR-001: Resolve CUDA llama-server binary or fallback to python module
-        binary_info = self.verify_and_build_llama_server()
-
         # FR-001 (015-gemma4-model-loading-fix): Resolve MMProj (CLIP vision projector) path if defined in preset
         clip_file = None
         clip_rel = target_preset.get("clip")
@@ -950,60 +1015,129 @@ class ProcessManager:
         env = dict(os.environ)
         env["CUDA_VISIBLE_DEVICES"] = "0"
 
-        server_cfg = self._config_manager.get_server_config()
         bind_host = "0.0.0.0"
 
-        cmd = self.build_server_command(
-            binary_info=binary_info,
-            model_file=model_file,
-            model_id=model_id,
-            n_ctx=n_ctx,
-            target_preset=target_preset,
-            clip_file=clip_file,
-            bind_host=bind_host
-        )
-
-        try:
-            self.state = ProcessState(
-                status=ProcessStatusEnum.LOADING,
-                model_id=model_id,
-                port=self.port
-            )
-
-            # Check if model file exists locally; if not, return clear error message per spec
-            if not os.path.exists(model_file) and not os.environ.get("MOCK_LLAMA_SERVER"):
-                self.state = ProcessState(
-                    status=ProcessStatusEnum.ERROR,
-                    model_id=model_id,
-                    port=self.port,
-                    error_message=f"Model file not found: {model_file}"
-                )
-                return self.state
-
-            self.process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                start_new_session=True,
-                env=env
-            )
-            if self.process and self.process.stdout:
-                self._log_drain_task = asyncio.create_task(self._drain_stdout(self.process.stdout))
-
-            self.state = ProcessState(
-                status=ProcessStatusEnum.LOADING,
-                model_id=model_id,
-                port=self.port,
-                pid=self.process.pid
-            )
-        except Exception as e:
+        # Check if model file exists locally; if not, return clear error message per spec
+        if not os.path.exists(model_file) and not os.environ.get("MOCK_LLAMA_SERVER"):
             self.state = ProcessState(
                 status=ProcessStatusEnum.ERROR,
                 model_id=model_id,
                 port=self.port,
-                error_message=str(e)
+                error_message=f"Model file not found: {model_file}"
             )
+            return self.state
+
+        from src.config import get_runtime_fallback_chain, is_runtime_compatibility_error
+
+        selected_backend = self._runtime_backend_from_profile()
+        backend_order = [selected_backend]
+        backend_order.extend(
+            backend
+            for backend in get_runtime_fallback_chain()
+            if backend not in backend_order
+        )
+        self.runtime_backend_failures = []
+
+        for backend in backend_order:
+            if backend == "vllm":
+                vllm_url = os.environ.get(
+                    "VLLM_HEALTH_URL", "http://127.0.0.1:8081/health"
+                )
+                try:
+                    response = await asyncio.to_thread(httpx.get, vllm_url, timeout=1.0)
+                    if response.status_code == 200:
+                        self.active_runtime_backend = backend
+                        self.state = ProcessState(
+                            status=ProcessStatusEnum.READY,
+                            model_id=model_id,
+                            port=self.port,
+                        )
+                        return self.state
+                    self.runtime_backend_failures.append(
+                        f"{backend}: health status {response.status_code}"
+                    )
+                except Exception as exc:
+                    self.runtime_backend_failures.append(f"{backend}: {exc}")
+                continue
+
+            try:
+                binary_info = self.verify_and_build_llama_server(
+                    preferred_backend=backend
+                )
+                cmd = self.build_server_command(
+                    binary_info=binary_info,
+                    model_file=model_file,
+                    model_id=model_id,
+                    n_ctx=n_ctx,
+                    target_preset=target_preset,
+                    clip_file=clip_file,
+                    bind_host=bind_host
+                )
+                self.state = ProcessState(
+                    status=ProcessStatusEnum.LOADING,
+                    model_id=model_id,
+                    port=self.port
+                )
+                self.active_runtime_backend = backend
+                self.process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdin=asyncio.subprocess.DEVNULL,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    start_new_session=True,
+                    env=env
+                )
+                ready = await poll_server_health(
+                    port=self.port,
+                    timeout=float(os.environ.get("RUNTIME_BACKEND_READY_TIMEOUT", "10")),
+                )
+                if ready:
+                    if self.process and self.process.stdout:
+                        self._log_drain_task = asyncio.create_task(
+                            self._drain_stdout(self.process.stdout)
+                        )
+                    self.state = ProcessState(
+                        status=ProcessStatusEnum.READY,
+                        model_id=model_id,
+                        port=self.port,
+                        pid=self.process.pid
+                    )
+                    return self.state
+
+                output = ""
+                if self.process.returncode is None:
+                    self.process.terminate()
+                    await asyncio.wait_for(self.process.wait(), timeout=2.0)
+                if self.process.stdout:
+                    output = (await self.process.stdout.read()).decode(
+                        "utf-8", errors="replace"
+                    )[-1000:]
+                failure = output or "readiness probe timeout"
+                self.runtime_backend_failures.append(f"{backend}: {failure}")
+                if not is_runtime_compatibility_error(failure):
+                    self.runtime_backend_failures[-1] += " (fallback 계속)"
+                self.close_transport()
+                self.process = None
+            except Exception as exc:
+                self.runtime_backend_failures.append(f"{backend}: {exc}")
+                if self.process:
+                    try:
+                        if self.process.returncode is None:
+                            self.process.terminate()
+                            await asyncio.wait_for(self.process.wait(), timeout=2.0)
+                    except Exception:
+                        pass
+                    self.close_transport()
+                    self.process = None
+
+        self.active_runtime_backend = None
+        self.state = ProcessState(
+            status=ProcessStatusEnum.ERROR,
+            model_id=model_id,
+            port=self.port,
+            error_message="; ".join(self.runtime_backend_failures)
+            or "사용 가능한 runtime backend가 없습니다",
+        )
         return self.state
 
     def close_transport(self) -> None:
@@ -1180,4 +1314,3 @@ class ProcessManager:
 
 # Class alias for compatibility
 LlamaServerProcessManager = ProcessManager
-

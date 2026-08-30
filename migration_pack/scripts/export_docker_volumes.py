@@ -74,11 +74,35 @@ def _container_running(container: str) -> bool:
     return result.returncode == 0 and result.stdout.strip().lower() == "true"
 
 
+def measure_chroma_vector_count(container: str) -> int:
+    """Chroma canonical collection의 원본 vector 수를 SQLite에서 측정합니다."""
+    script = (
+        "import sqlite3; "
+        "db=sqlite3.connect('/data/chroma.sqlite3'); "
+        "collection=db.execute(\"SELECT id FROM collections WHERE name='oliview_review_sentences_v2'\").fetchone(); "
+        "raise SystemExit(3) if collection is None else None; "
+        "print(db.execute('SELECT COUNT(*) FROM embeddings WHERE collection_id=?', (collection[0],)).fetchone()[0]); "
+        "db.close()"
+    )
+    result = subprocess.run(
+        ["docker", "exec", container, "python", "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip().isdigit():
+        raise VolumeExportError(f"Chroma vector 수 측정 실패: {container}")
+    return int(result.stdout.strip())
+
+
 def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bool]:
     """MySQL/Chroma는 pause, Redis는 BGSAVE 후 상태를 반환합니다."""
     container = str(meta.get("associated_container", ""))
     state = {"paused": False}
     if not container or not _container_running(container):
+        if meta.get("snapshot") == "chroma":
+            raise VolumeExportError(f"Chroma 컨테이너가 실행 중이 아닙니다: {container}")
         return state
 
     snapshot = str(meta.get("snapshot", ""))
@@ -101,12 +125,16 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bo
                 timeout=5,
                 check=False,
             )
-            if check.returncode == 0 and "rdb_bgsave_in_progress:0" in check.stdout:
+            if (
+                check.returncode == 0
+                and "rdb_bgsave_in_progress:0" in check.stdout
+                and "rdb_last_bgsave_status:ok" in check.stdout.lower()
+            ):
                 return state
             time.sleep(1)
         raise VolumeExportError(f"Redis BGSAVE 완료 대기 시간 초과: {container}")
 
-    # pause는 MySQL dirty page 및 Chroma SQLite WAL에 대해 동일한 일관성 경계를 제공합니다.
+    # pause는 MySQL dirty page의 추가 변경을 막는 일관성 경계를 제공합니다.
     result = subprocess.run(
         ["docker", "pause", container],
         capture_output=True,
@@ -117,6 +145,50 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bo
     if result.returncode != 0:
         raise VolumeExportError(f"서비스 pause 실패: {container}")
     state["paused"] = True
+
+    if snapshot == "chroma":
+        try:
+            checkpoint = subprocess.run(
+                [
+                    "docker",
+                    "exec",
+                    container,
+                    "python",
+                    "-c",
+                    (
+                        "import pathlib, sqlite3; "
+                        "p=pathlib.Path('/data/chroma.sqlite3'); "
+                        "con=sqlite3.connect(p); "
+                        "result=con.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall(); "
+                        "con.close(); "
+                        "busy=result[0][0] if result else 0; "
+                        "raise SystemExit(1) if busy else SystemExit(0)"
+                    ),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if checkpoint.returncode != 0:
+                raise VolumeExportError(f"Chroma SQLite WAL checkpoint 실패: {container}")
+            first_count = measure_chroma_vector_count(container)
+            second_count = measure_chroma_vector_count(container)
+            if first_count != second_count:
+                raise VolumeExportError(
+                    f"Chroma vector 수가 안정화되지 않았습니다: {first_count} != {second_count}"
+                )
+            meta["vector_count"] = first_count
+        except Exception:
+            subprocess.run(
+                ["docker", "unpause", container],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            state["paused"] = False
+            raise
     return state
 
 
@@ -211,6 +283,12 @@ def export_all_managed_volumes(
         archive_path, size_bytes, digest = export_single_volume(
             source_name, output_dir, meta, archive_name=canonical_name
         )
+        if canonical_name == "green_chroma_data" and not isinstance(
+            meta.get("vector_count"), int
+        ):
+            raise VolumeExportError(
+                "green_chroma_data의 canonical vector 수 측정 없이 아카이브를 생성할 수 없습니다"
+            )
         results.append(
             {
                 "volume_name": canonical_name,
@@ -221,6 +299,8 @@ def export_all_managed_volumes(
                 "is_sparse": True,
             }
         )
+        if "vector_count" in meta:
+            results[-1]["vector_count"] = int(meta["vector_count"])
     if missing and strict:
         raise VolumeExportError("필수 Docker volume 누락: " + ", ".join(missing))
     return results

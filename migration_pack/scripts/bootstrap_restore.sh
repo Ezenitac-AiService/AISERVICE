@@ -20,6 +20,7 @@ SKIP_GPU=false
 SKIP_DDNS=false
 FORCE_DUMP=false
 FORCE=false
+KEY_FILE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -29,12 +30,18 @@ while [[ $# -gt 0 ]]; do
         --skip-ddns) SKIP_DDNS=true; shift ;;
         --force-dump) FORCE_DUMP=true; shift ;;
         --force|-f) FORCE=true; shift ;;
+        --key-file)
+            [[ $# -ge 2 ]] || { log_error "--key-file에는 경로가 필요합니다"; exit 1; }
+            KEY_FILE="$2"
+            shift 2
+            ;;
         -h|--help)
-            echo "Usage: sudo ./bootstrap_restore.sh [-y|--yes] [-d|--dry-run] [--skip-gpu] [--skip-ddns] [--force-dump]"
+            echo "Usage: sudo ./bootstrap_restore.sh [-y|--yes] [-d|--dry-run] [--skip-gpu] [--skip-ddns] [--force-dump] [--key-file PATH]"
             exit 0
             ;;
         *) log_error "알 수 없는 인자: $1"; exit 1 ;;
     esac
+done
 log_info "AISERVICE Ubuntu bootstrap: root=${ROOT_DIR}, non_interactive=${NON_INTERACTIVE}, dry_run=${DRY_RUN}"
 
 # Root 권한 검사 (dry-run이 아닌 실제 실행 시 필수)
@@ -55,7 +62,9 @@ if [[ -f "${ROOT_DIR}/ddns/.env" ]]; then
 fi
 
 if [[ "${DRY_RUN}" == "true" ]]; then
-    python3 "${SCRIPT_DIR}/bootstrap_restore.py" --dry-run
+    RESTORE_ARGS=(--dry-run)
+    if [[ -n "${KEY_FILE}" ]]; then RESTORE_ARGS+=(--key-file "${KEY_FILE}"); fi
+    python3 "${SCRIPT_DIR}/bootstrap_restore.py" "${RESTORE_ARGS[@]}"
     exit $?
 fi
 
@@ -90,6 +99,9 @@ if [[ "${FORCE_DUMP}" == "true" ]]; then
 fi
 if [[ "${SKIP_DDNS}" == "true" ]]; then
     RESTORE_ARGS+=(--skip-ddns)
+fi
+if [[ -n "${KEY_FILE}" ]]; then
+    RESTORE_ARGS+=(--key-file "${KEY_FILE}")
 fi
 python3 "${SCRIPT_DIR}/bootstrap_restore.py" "${RESTORE_ARGS[@]}"
 # bootstrap_restore.py invokes verify_migration.py as the final gate.

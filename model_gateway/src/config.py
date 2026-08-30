@@ -10,11 +10,30 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 DEFAULT_MODEL_VRAM_BUDGET_MB = {"llm": 2600, "embedding": 1200, "reranker": 1200}
 DEFAULT_FALLBACK_CHAIN = ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
-VRAM_SAFETY_LIMIT_MB = int(os.environ.get("VRAM_SAFETY_LIMIT_MB", "5000"))
+RUNTIME_COMPATIBILITY_ERROR_MARKERS = (
+    "illegal instruction",
+    "cuda error",
+    "cuda mismatch",
+    "no kernel image",
+    "out of memory",
+    "oom",
+)
+def clamp_vram_safety_limit(value: Any) -> int:
+    """모든 입력 경로에서 VRAM safety limit을 0..5,000MB로 제한합니다."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = 5000
+    return max(0, min(parsed, 5000))
+
+
+VRAM_SAFETY_LIMIT_MB = clamp_vram_safety_limit(
+    os.environ.get("VRAM_SAFETY_LIMIT_MB", "5000")
+)
 
 
 def _profile_path() -> Path:
@@ -37,7 +56,9 @@ def get_runtime_profile() -> dict[str, Any]:
                 profile.update(loaded)
         except (OSError, json.JSONDecodeError):
             pass
-    profile.setdefault("vram_safety_limit_mb", VRAM_SAFETY_LIMIT_MB)
+    profile["vram_safety_limit_mb"] = clamp_vram_safety_limit(
+        profile.get("vram_safety_limit_mb", VRAM_SAFETY_LIMIT_MB)
+    )
     profile.setdefault("model_vram_budget_mb", dict(DEFAULT_MODEL_VRAM_BUDGET_MB))
     profile.setdefault("runtime_fallback_chain", list(DEFAULT_FALLBACK_CHAIN))
     return profile
@@ -57,3 +78,34 @@ def get_runtime_fallback_chain() -> list[str]:
             "runtime_fallback_chain", DEFAULT_FALLBACK_CHAIN
         )
     ]
+
+
+def is_runtime_compatibility_error(message: object) -> bool:
+    """런타임 출력에서 CPU/CUDA 호환성 fallback이 필요한 오류를 판정합니다."""
+    text = str(message).lower()
+    return any(marker in text for marker in RUNTIME_COMPATIBILITY_ERROR_MARKERS)
+
+
+def attempt_runtime_backends(probe) -> tuple[str, list[str]]:
+    """fallback 순서대로 실제 probe를 수행하고 성공 backend와 실패 사유를 반환합니다."""
+    failures: list[str] = []
+    for backend in get_runtime_fallback_chain():
+        try:
+            if probe(backend):
+                return backend, failures
+        except Exception as exc:
+            failures.append(f"{backend}: {exc}")
+        else:
+            failures.append(f"{backend}: unavailable")
+    return "unavailable", failures
+
+
+def select_runtime_backend(
+    backend_status: Mapping[str, bool] | None = None,
+) -> str:
+    """기록된 실제 probe 결과를 사용해 vLLM -> CUDA -> CPU 순으로 선택합니다."""
+    status = dict(backend_status or get_runtime_profile().get("runtime_backend_status", {}))
+    for backend in get_runtime_fallback_chain():
+        if status.get(backend) is True:
+            return backend
+    return "unavailable"

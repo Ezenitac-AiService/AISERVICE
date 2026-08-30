@@ -27,7 +27,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "gateway_secondary",
@@ -35,7 +35,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1:8080/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "model_gateway_health",
@@ -67,7 +67,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1/ateam/pilos/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "oliview_frontend",
@@ -75,7 +75,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1/bteam/oliview/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "oliview_backend",
@@ -91,7 +91,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1/bteam/chata/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "oliview_chatbot_b",
@@ -99,7 +99,7 @@ ENDPOINTS: list[dict[str, Any]] = [
         "url": "http://127.0.0.1/bteam/chatb/",
         "method": "GET",
         "category": "HTTP",
-        "expected_status": [200, 301, 302],
+        "expected_status": [200],
     },
     {
         "id": "redis",
@@ -133,7 +133,7 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
         passed, message = _tcp_probe(
             parsed[1].lstrip("/"), int(parsed[2]), redis=ep["category"] == "REDIS"
         )
-        return {
+        result = {
             "id": ep["id"],
             "name": ep["name"],
             "url": ep["url"],
@@ -142,8 +142,10 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
             "status": "PASS" if passed else "FAIL",
             "passed": passed,
             "message": message,
-            "error": None if passed else message,
         }
+        if not passed:
+            result["error"] = message
+        return result
 
     request = urllib.request.Request(ep["url"], method=ep.get("method", "GET"))
     try:
@@ -160,7 +162,7 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
                 if passed
                 else "HTTP response payload was empty or status was unexpected"
             )
-            return {
+            result = {
                 "id": ep["id"],
                 "name": ep["name"],
                 "url": ep["url"],
@@ -169,8 +171,10 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
                 "status": "PASS" if passed else "FAIL",
                 "passed": passed,
                 "message": message,
-                "error": None if passed else message,
             }
+            if not passed:
+                result["error"] = message
+            return result
     except urllib.error.HTTPError as exc:
         return {
             "id": ep["id"],
@@ -197,6 +201,11 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
         }
 
 
+# pytest should not treat this public probe helper as a test when imported by
+# contract test modules.
+test_endpoint.__test__ = False
+
+
 def _hardware_detected() -> dict[str, Any]:
     try:
         from model_gateway.scripts.probe_hardware import (
@@ -218,7 +227,9 @@ def _hardware_detected() -> dict[str, Any]:
 
 
 def build_verification_report(
-    results: list[dict[str, Any]], hardware_detected: dict[str, Any] | None = None
+    results: list[dict[str, Any]],
+    hardware_detected: dict[str, Any] | None = None,
+    data_integrity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     passed = sum(
         1
@@ -227,7 +238,9 @@ def build_verification_report(
     )
     total = len(results)
     failed = total - passed
-    status = "PASS" if failed == 0 and total == 11 else "FAIL"
+    integrity = data_integrity or {}
+    integrity_ok = integrity.get("status", "PASS") == "PASS"
+    status = "PASS" if failed == 0 and total == 11 and integrity_ok else "FAIL"
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
@@ -238,6 +251,7 @@ def build_verification_report(
             sum(float(result.get("latency_ms", 0)) for result in results) / 1000, 3
         ),
         "hardware_detected": hardware_detected or {},
+        "data_integrity": integrity,
         "results": results,
         # 이전 소비자와의 하위 호환 필드
         "report_version": "2.0.0",
@@ -250,16 +264,177 @@ def build_verification_report(
     return report
 
 
-def main(argv: list[str] | None = None) -> int:
+def _load_database_export_manifest() -> list[dict[str, Any]]:
+    path = Path(__file__).resolve().parent.parent / "database" / "database_export_manifest.json"
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _measure_database_integrity() -> list[dict[str, Any]]:
+    """원본 매니페스트의 측정 방식으로 복원 대상 DB를 다시 측정합니다."""
+    source = {str(item.get("name")): item for item in _load_database_export_manifest()}
+    if not source:
+        return []
+    try:
+        from migration_pack.scripts.export_databases import (
+            count_database_rows,
+            get_database_targets,
+        )
+
+        targets = get_database_targets()
+    except (OSError, RuntimeError, ValueError, KeyError):
+        return [
+            {"name": name, "status": "FAIL", "error": "DB 측정 대상 환경을 읽을 수 없습니다"}
+            for name in sorted(source)
+        ]
+
+    measurements: list[dict[str, Any]] = []
+    for target in targets:
+        name = target["db_name"]
+        original = source.get(name)
+        if original is None:
+            continue
+        current, method = count_database_rows(target)
+        expected = int(original.get("row_count", -1))
+        passed = method != "unavailable" and expected >= 0 and current == expected
+        item = {
+            "name": name,
+            "expected_row_count": expected,
+            "actual_row_count": current,
+            "measurement_method": method,
+            "status": "PASS" if passed else "FAIL",
+        }
+        if not passed:
+            item["error"] = "복원 후 DB 행 수가 원본 측정값과 다릅니다"
+        measurements.append(item)
+    return measurements
+
+
+def _fetch_json(url: str) -> Any:
+    request = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(request, timeout=5, context=SSL_CTX) as response:
+        if response.status != 200:
+            raise ValueError(f"HTTP {response.status}")
+        return json.loads(response.read(1024 * 1024).decode("utf-8"))
+
+
+def _measure_chroma_integrity() -> dict[str, Any]:
+    """Chroma v2 API에서 canonical collection의 vector 수를 측정합니다."""
+    volume_entry: dict[str, Any] = {}
+    try:
+        manifest = json.loads(
+            (Path(__file__).resolve().parent.parent / "migration_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        volume_entry = next(
+            (
+                item
+                for item in manifest.get("volumes", [])
+                if item.get("volume_name") == "green_chroma_data"
+            ),
+            {},
+        )
+    except (OSError, json.JSONDecodeError):
+        pass
+    expected = volume_entry.get("vector_count")
+    if expected is None:
+        return {
+            "collection": "oliview_review_sentences_v2",
+            "status": "FAIL",
+            "measurement_method": "Chroma v2 collection count API",
+            "error": "원본 Chroma vector_count가 매니페스트에 없습니다",
+        }
+
+    base = "http://127.0.0.1:18000"
+    try:
+        collection_id = None
+        try:
+            collections = _fetch_json(
+                base + "/api/v2/tenants/default_tenant/databases/default_database/collections"
+            )
+            for collection in collections if isinstance(collections, list) else []:
+                if collection.get("name") == "oliview_review_sentences_v2":
+                    collection_id = collection.get("id")
+                    break
+        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+            collections = _fetch_json(base + "/api/v1/collections")
+            for collection in collections if isinstance(collections, list) else []:
+                if collection.get("name") == "oliview_review_sentences_v2":
+                    collection_id = collection.get("id")
+                    break
+        if not collection_id:
+            raise ValueError("canonical Chroma collection이 없습니다")
+        try:
+            count = _fetch_json(
+                base
+                + "/api/v2/tenants/default_tenant/databases/default_database/collections/"
+                + str(collection_id)
+                + "/count"
+            )
+        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError):
+            count = _fetch_json(base + f"/api/v1/collections/{collection_id}/count")
+        actual = int(count if isinstance(count, int) else count.get("count", -1))
+        passed = actual == int(expected)
+        item = {
+            "collection": "oliview_review_sentences_v2",
+            "expected_vector_count": int(expected),
+            "actual_vector_count": actual,
+            "measurement_method": "Chroma v2 collection count API",
+            "status": "PASS" if passed else "FAIL",
+        }
+        if not passed:
+            item["error"] = "복원 후 Chroma vector 수가 원본 측정값과 다릅니다"
+        return item
+    except (OSError, ValueError, TypeError, KeyError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        return {
+            "collection": "oliview_review_sentences_v2",
+            "expected_vector_count": int(expected),
+            "measurement_method": "Chroma v2 collection count API",
+            "status": "FAIL",
+            "error": str(exc),
+        }
+
+
+def collect_data_integrity() -> dict[str, Any]:
+    databases = _measure_database_integrity()
+    chroma = _measure_chroma_integrity()
+    checks = databases + [chroma]
+    return {
+        "status": "PASS" if checks and all(item.get("status") == "PASS" for item in checks) else "FAIL",
+        "databases": databases,
+        "chroma": chroma,
+    }
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="AISERVICE 11-endpoint migration verification"
     )
-    parser.add_argument("--json-report", default="verification_report.json")
+    parser.add_argument(
+        "--json-report",
+        default=str(Path(__file__).resolve().parent.parent / "verification_report.json"),
+    )
     parser.add_argument("--timeout", type=int, default=15)
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--skip-data-integrity",
+        action="store_true",
+        help="대상 DB/Chroma 데이터 수 비교를 생략합니다",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_argument_parser().parse_args(argv)
     started = time.perf_counter()
     results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in ENDPOINTS]
-    report = build_verification_report(results, _hardware_detected())
+    integrity = {} if args.skip_data_integrity else collect_data_integrity()
+    report = build_verification_report(results, _hardware_detected(), integrity)
     report["duration_seconds"] = round(time.perf_counter() - started, 3)
     if args.json_report:
         target = Path(args.json_report)

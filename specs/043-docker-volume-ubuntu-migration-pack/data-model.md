@@ -88,15 +88,17 @@ classDiagram
 - `target_environment` (string): 대상 OS (`"Ubuntu Linux 24.04 LTS (x86_64)"`).
 - `migration_mode` (string): 마이그레이션 모드 (`"DEV_PLATFORM_TRANSFER"`).
 - `zero_config_ready` (bool): 암호화 아카이브와 외부 키 주입 경로가 준비되어 사용자 프롬프트 없이 복원 가능한지 여부 (`true`).
-- `archive_format` (string): 기본 `tar.gz` 또는 선택 `zip` 아카이브 형식.
+- `archive_format` (string): 기본 `tar.gz`, 선택 `zip`, 또는 두 형식을 모두 생성하는 `both`.
 - `archive_encrypted` (bool): 배포 아카이브 암호화 여부 (`true`).
+- `archive_provider` (string): 버전 고정 암호화 provider 식별자 (`stdlib-pbkdf2-hmac-sha256`).
+- `archive_envelope` (string): 복호화 호환성을 위한 envelope 버전 (`AISERVICE-MIGRATION-ARCHIVE-V1`).
 - `target_hardware_profile` (HardwareProfile): 타겟 CPU/GPU/RAM 사양 및 빌드 플래그.
 - `clean_os_prerequisites` (object): Docker, NVIDIA driver, toolkit 자동 설치 설정.
 - `databases` (list of DatabaseDumpSpec): 논리 덤프 메타데이터 목록.
 - `volumes` (list of VolumeArchiveSpec): Docker named volume 물리 아카이브 메타데이터.
 - `secrets` (object): 암호화 여부와 외부 키 주입 방식만 기록하며 원문 시크릿은 포함하지 않음.
 - `ddns_config` (DDNSConfig): DuckDNS 연동 설정. `token`은 매니페스트에서 `<redacted>` 등 마스킹 값만 허용.
-- `services` (list of string): 번들된 10개 서비스 목록.
+- `services` (list of string): 실제 번들된 Compose 서비스 컴포넌트 목록. 검증 항목 수(10개 HTTP + Redis 1개)와는 별도 inventory이다.
 - `checksums` (dict): SHA-256 해시 매핑.
 
 ### 1.2 HardwareProfile (하드웨어 프로파일)

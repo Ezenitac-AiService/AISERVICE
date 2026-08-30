@@ -106,6 +106,11 @@ def build_manifest_v2(
     services: list[str],
     checksums: dict[str, str],
     target_env: str = "Ubuntu Linux 24.04 LTS (i7-930 Nehalem, 24GB RAM, GTX 1070 8GB sm_61)",
+    archive_format: str = "tar.gz",
+    archive_encrypted: bool = True,
+    archive_provider: str = "stdlib-pbkdf2-hmac-sha256",
+    archive_envelope: str = "AISERVICE-MIGRATION-ARCHIVE-V1",
+    secrets: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """마이그레이션 매니페스트 v2.0 JSON 사양에 맞는 구조화된 딕셔너리를 생성합니다."""
     safe_ddns = dict(ddns_config)
@@ -121,6 +126,16 @@ def build_manifest_v2(
         "target_environment": target_env,
         "migration_mode": "DEV_PLATFORM_TRANSFER",
         "zero_config_ready": True,
+        "archive_format": archive_format,
+        "archive_encrypted": archive_encrypted,
+        "archive_provider": archive_provider,
+        "archive_envelope": archive_envelope,
+        "secrets": secrets
+        or {
+            "encrypted": True,
+            "key_source": "external_protected_path",
+            "plaintext_excluded": True,
+        },
         "target_hardware_profile": target_hardware,
         "clean_os_prerequisites": {
             "docker_apt_repo": "https://download.docker.com/linux/ubuntu",
@@ -151,6 +166,11 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         "ddns_config",
         "services",
         "checksums",
+        "archive_format",
+        "archive_encrypted",
+        "archive_provider",
+        "archive_envelope",
+        "secrets",
     ]
     errors: list[str] = []
 
@@ -167,6 +187,27 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         errors.append("migration_mode must be 'DEV_PLATFORM_TRANSFER'")
     if not isinstance(manifest_data.get("zero_config_ready"), bool):
         errors.append("zero_config_ready must be boolean")
+    if manifest_data.get("archive_format") not in {"tar.gz", "zip", "both"}:
+        errors.append("archive_format must be 'tar.gz', 'zip', or 'both'")
+    if manifest_data.get("archive_encrypted") is not True:
+        errors.append("archive_encrypted must be true")
+    if manifest_data.get("archive_provider") != "stdlib-pbkdf2-hmac-sha256":
+        errors.append("archive_provider must identify the approved provider")
+    if manifest_data.get("archive_envelope") != "AISERVICE-MIGRATION-ARCHIVE-V1":
+        errors.append("archive_envelope must identify the versioned envelope")
+    secrets = manifest_data.get("secrets")
+    if not isinstance(secrets, dict):
+        errors.append("secrets must be an object")
+    else:
+        if secrets.get("encrypted") is not True:
+            errors.append("secrets.encrypted must be true")
+        if secrets.get("key_source") not in {
+            "external_protected_path",
+            "external_secret_injection",
+        }:
+            errors.append("secrets.key_source must be external")
+        if secrets.get("plaintext_excluded") is not True:
+            errors.append("secrets.plaintext_excluded must be true")
 
     hw = manifest_data.get("target_hardware_profile", {})
     for hw_k in ["cpu", "gpu", "ram_mb", "vram_mb", "llama_cpp_flags"]:

@@ -43,7 +43,10 @@ log_info "================================================================"
 if command -v snap &>/dev/null && snap list 2>/dev/null | grep -q -E '^docker '; then
     log_warn "Detected Snap-packaged Docker! Snap sandboxing blocks GPU access (/dev/nvidia*)."
     log_warn "Removing Snap Docker and replacing with official APT Docker repository..."
-    snap remove docker || true
+    if ! snap remove docker; then
+        log_error "Snap Docker 제거에 실패했습니다. 공식 APT Docker로 전환하지 않습니다."
+        exit 2
+    fi
 fi
 
 # 3. 기본 빌드 도구 및 필수 패키지 설치
@@ -142,12 +145,39 @@ else
     systemctl restart docker || true
 fi
 
-# 6. 최종 인프라 검증
+# 6. GPU passthrough과 cron daemon은 설치 성공만으로 간주하지 않고 실제 상태를 확인합니다.
+if [[ "${HAS_NVIDIA_GPU}" == "true" ]]; then
+    GPU_TEST_IMAGE="${AISERVICE_GPU_TEST_IMAGE:-nvidia/cuda:12.0.0-base-ubuntu22.04}"
+    log_info "Verifying Docker NVIDIA runtime with docker run --gpus all..."
+    docker run --rm --gpus all "${GPU_TEST_IMAGE}" nvidia-smi >/dev/null || {
+        log_error "docker run --gpus all 검증에 실패했습니다."
+        exit 2
+    }
+fi
+
+if ! systemctl enable --now cron; then
+    log_error "cron daemon 활성화에 실패했습니다."
+    exit 2
+fi
+if ! systemctl is-active --quiet cron; then
+    log_error "cron daemon이 active 상태가 아닙니다."
+    exit 2
+fi
+
+# 7. 최종 인프라 검증
 log_info "[4/4] Verifying Docker environment..."
 docker info >/dev/null 2>&1 || {
     log_error "Docker daemon is not running!"
     exit 1
 }
+if [[ ! -f /etc/apt/sources.list.d/docker.list ]] || ! grep -q "download.docker.com/linux/ubuntu" /etc/apt/sources.list.d/docker.list; then
+    log_error "공식 Docker APT 저장소가 확인되지 않았습니다."
+    exit 2
+fi
+if ! dpkg-query -W -f='${Status}' docker-ce 2>/dev/null | grep -q "install ok installed"; then
+    log_error "공식 docker-ce 패키지가 설치되지 않았습니다."
+    exit 2
+fi
 
 log_info "================================================================"
 log_info "Prerequisites Installation & Verification: COMPLETED SUCCESSFULLY"

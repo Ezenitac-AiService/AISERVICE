@@ -11,6 +11,8 @@
   "zero_config_ready": true,
   "archive_format": "tar.gz",
   "archive_encrypted": true,
+  "archive_provider": "stdlib-pbkdf2-hmac-sha256",
+  "archive_envelope": "AISERVICE-MIGRATION-ARCHIVE-V1",
   "secrets": {
     "encrypted": true,
     "key_source": "external_protected_path",

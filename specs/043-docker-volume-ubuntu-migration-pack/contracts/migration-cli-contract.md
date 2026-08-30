@@ -59,7 +59,7 @@ python make_migration_pack.py [OPTIONS]
 [INFO]   - Bundled root .env and ddns/.env inside the encrypted archive
 [INFO]   - Excluded .git, .venv, node_modules, __pycache__ (0 cached items)
 [INFO] [4/5] Generating Manifest v2.0 & Checksums...
-[INFO]   - migration_manifest.json (v2.0.0, 10 services registered)
+[INFO]   - migration_manifest.json (v2.0.0, bundle service inventory recorded)
 [INFO]   - checksums.sha256 generated
 [INFO] [5/5] Compressing Final Migration Archive...
 [INFO] Archive Created: dist/AISERVICE_Migration_Pack_20260828_163500.tar.gz.enc

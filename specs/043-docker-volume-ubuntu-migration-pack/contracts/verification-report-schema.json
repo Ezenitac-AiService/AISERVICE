@@ -39,9 +39,13 @@
           "status_code": { "type": "integer" },
           "latency_ms": { "type": "number" },
           "status": { "type": "string", "enum": ["PASS", "FAIL"] },
-          "error": { "type": ["string", "null"] }
+          "error": { "type": "string" }
         }
       }
+    },
+    "data_integrity": {
+      "type": "object",
+      "description": "복원 후 DB 행 수와 canonical Chroma vector 수의 원본 측정값 비교 결과"
     }
   }
 }

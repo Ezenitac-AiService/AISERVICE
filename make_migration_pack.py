@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 import zipfile
 from collections.abc import Iterable, Mapping
@@ -24,6 +25,7 @@ from migration_pack.scripts.env_utils import (
     mask_secret,
     required_environment,
 )
+from migration_pack.scripts.archive_crypto import encrypt_file, load_key_file
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 MIGRATION_PACK_DIR = PROJECT_ROOT / "migration_pack"
@@ -77,6 +79,10 @@ REQUIRED_ENV_KEYS = [
     "BTEAM_DB_PASSWORD",
     "BTEAM_DB_ROOT_PASSWORD",
     "BTEAM_DB_NAME",
+    "GREEN_DB_USER",
+    "GREEN_DB_PASSWORD",
+    "GREEN_DB_ROOT_PASSWORD",
+    "GREEN_DB_NAME",
     "DUCKDNS_DOMAIN",
     "DUCKDNS_TOKEN",
 ]
@@ -155,8 +161,13 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--format",
         choices=["tar.gz", "zip", "both"],
-        default="both",
+        default="tar.gz",
         help="아카이브 형식",
+    )
+    parser.add_argument(
+        "--key-file",
+        default=os.environ.get("MIGRATION_PACK_KEY_FILE"),
+        help="외부 아카이브 암호화 키 파일 (기본: MIGRATION_PACK_KEY_FILE)",
     )
     parser.add_argument(
         "--no-archive", action="store_true", help="압축 없이 bundle 디렉터리만 유지"
@@ -171,9 +182,10 @@ def _run(
     env: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(
-            command, cwd=cwd, env=dict(env) if env else None, text=True, check=True
-        )
+        child_env = os.environ.copy()
+        if env:
+            child_env.update(env)
+        return subprocess.run(command, cwd=cwd, env=child_env, text=True, check=True)
     except FileNotFoundError as exc:
         raise MigrationPackError(
             f"필수 실행 파일을 찾을 수 없습니다: {command[0]}", 1
@@ -224,8 +236,8 @@ def preflight_environment(
         issues.append(f"출력 디렉터리 확인 실패: {exc}")
         return 4, issues
 
-    # Docker 데몬 및 볼륨 검사 (Exit Code 3)
-    if not skip_dump and include_volumes and check_docker:
+    # Docker 데몬과 DB 연결 검사는 volume 포함 여부와 독립적으로 수행합니다.
+    if not skip_dump and check_docker:
         try:
             subprocess.run(
                 ["docker", "info"],
@@ -234,9 +246,78 @@ def preflight_environment(
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
-        except (OSError, subprocess.CalledProcessError):
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
             issues.append("Docker daemon에 연결할 수 없습니다")
             return 3, issues
+        from migration_pack.scripts.export_databases import (
+            check_database_connection,
+            check_container_running,
+            get_database_targets,
+        )
+        from migration_pack.scripts.export_docker_volumes import (
+            get_managed_volumes_map,
+            list_existing_docker_volumes,
+        )
+
+        try:
+            targets = get_database_targets(env)
+        except Exception as exc:
+            issues.append(f"DB 대상 환경 검사 실패: {exc}")
+            return 3, issues
+        stopped = [
+            target["container"]
+            for target in targets
+            if not check_container_running(target["container"])
+        ]
+        if stopped:
+            issues.append("실행 중이 아닌 DB 컨테이너: " + ", ".join(stopped))
+            return 2, issues
+
+        disconnected = [
+            target["container"]
+            for target in targets
+            if not check_database_connection(target)
+        ]
+        if disconnected:
+            issues.append("DB 연결 확인 실패: " + ", ".join(disconnected))
+            return 2, issues
+
+        if include_volumes:
+            existing = set(list_existing_docker_volumes())
+            missing_volumes = sorted(set(get_managed_volumes_map()) - existing)
+            if missing_volumes:
+                issues.append("필수 Docker volume 누락: " + ", ".join(missing_volumes))
+                return 3, issues
+            for volume_name in sorted(get_managed_volumes_map()):
+                try:
+                    size_result = subprocess.run(
+                        [
+                            "docker",
+                            "run",
+                            "--rm",
+                            "-v",
+                            f"{volume_name}:/data:ro",
+                            "alpine",
+                            "du",
+                            "-sb",
+                            "/data",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=60,
+                    )
+                except (OSError, subprocess.SubprocessError):
+                    issues.append(f"Docker volume 크기 검사 실패: {volume_name}")
+                    return 3, issues
+                if size_result.returncode != 0:
+                    issues.append(f"Docker volume 크기 검사 실패: {volume_name}")
+                    return 3, issues
+                try:
+                    int(size_result.stdout.split()[0])
+                except (IndexError, ValueError):
+                    issues.append(f"Docker volume 크기 응답 해석 실패: {volume_name}")
+                    return 3, issues
 
     return 0, issues
 
@@ -428,6 +509,7 @@ def build_manifest_inputs(
     target_gpu: str,
     environment: Mapping[str, str] | None = None,
     checksums: dict[str, str] | None = None,
+    archive_format: str = "tar.gz",
 ) -> dict[str, Any]:
     root = Path(project_root).resolve()
     env = dict(environment or load_environment(root))
@@ -438,6 +520,15 @@ def build_manifest_inputs(
             "hostname": platform.node(),
         },
         "target_hardware": _target_hardware(target_cpu, target_gpu),
+        "archive_format": archive_format,
+        "archive_encrypted": True,
+        "archive_provider": "stdlib-pbkdf2-hmac-sha256",
+        "archive_envelope": "AISERVICE-MIGRATION-ARCHIVE-V1",
+        "secrets": {
+            "encrypted": True,
+            "key_source": "external_protected_path",
+            "plaintext_excluded": True,
+        },
         "databases": databases,
         "volumes": volumes,
         "ddns_config": {
@@ -489,6 +580,7 @@ def step_4_generate_manifest(
     target_gpu: str = "gtx1070",
     *,
     environment: Mapping[str, str] | None = None,
+    archive_format: str = "tar.gz",
 ) -> dict[str, Any]:
     log_step("[4/5] Manifest v2 및 전체 산출물 SHA-256 생성")
     from migration_pack.scripts.manifest_utils import (
@@ -509,6 +601,7 @@ def step_4_generate_manifest(
         target_gpu=target_gpu,
         environment=environment,
         checksums=checksum_map,
+        archive_format=archive_format,
     )
     manifest = build_manifest_v2(
         source_env=inputs["source_environment"],
@@ -518,6 +611,11 @@ def step_4_generate_manifest(
         ddns_config=inputs["ddns_config"],
         services=inputs["services"],
         checksums=inputs["checksums"],
+        archive_format=inputs["archive_format"],
+        archive_encrypted=inputs["archive_encrypted"],
+        archive_provider=inputs["archive_provider"],
+        archive_envelope=inputs["archive_envelope"],
+        secrets=inputs["secrets"],
     )
     manifest["source_bundle"] = {
         "file_count": len(checksum_map),
@@ -541,40 +639,63 @@ def step_4_generate_manifest(
 def step_5_create_archive(
     bundle_dir: Path,
     output_dir: Path,
-    fmt: str = "both",
+    fmt: str = "tar.gz",
     *,
     force: bool = False,
+    key_file: str | os.PathLike[str] | None = None,
 ) -> Path | list[Path]:
     log_step("[5/5] 최종 마이그레이션 아카이브 생성")
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     base_name = f"AISERVICE_Migration_Pack_{timestamp}"
     formats = ["tar.gz", "zip"] if fmt == "both" else [fmt]
+    try:
+        key = load_key_file(key_file)
+    except ValueError as exc:
+        raise MigrationPackError(str(exc), 6) from exc
     archives: list[Path] = []
     for archive_format in formats:
-        archive_path = output_dir / f"{base_name}.{archive_format}"
+        archive_path = output_dir / f"{base_name}.{archive_format}.enc"
         if archive_path.exists() and not force:
             raise MigrationPackError(
                 f"기존 아카이브가 있습니다: {archive_path}. --force로 덮어쓸 수 있습니다.",
                 1,
             )
-        if archive_format == "tar.gz":
-            with tarfile.open(archive_path, "w:gz") as tar:
-                tar.add(bundle_dir, arcname="AISERVICE")
-        else:
-            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zip_out:
-                for path in bundle_dir.rglob("*"):
-                    if path.is_file():
-                        zip_out.write(
-                            path,
-                            arcname=str(
-                                Path("AISERVICE") / path.relative_to(bundle_dir)
-                            ),
-                        )
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=f".{archive_format}.plain", dir=output_dir, delete=False
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+        try:
+            if archive_format == "tar.gz":
+                with tarfile.open(temporary_path, "w:gz") as tar:
+                    tar.add(bundle_dir, arcname="AISERVICE")
+            else:
+                with zipfile.ZipFile(
+                    temporary_path, "w", zipfile.ZIP_DEFLATED
+                ) as zip_out:
+                    for path in bundle_dir.rglob("*"):
+                        if path.is_file():
+                            zip_out.write(
+                                path,
+                                arcname=str(
+                                    Path("AISERVICE") / path.relative_to(bundle_dir)
+                                ),
+                            )
+            encrypt_file(temporary_path, archive_path, key)
+        finally:
+            temporary_path.unlink(missing_ok=True)
         archives.append(archive_path)
         print(
             f"  ✓ {archive_path} ({archive_path.stat().st_size / (1024 * 1024):.1f}MB)"
         )
+    checksum_path = output_dir / "checksums.sha256"
+    checksum_path.write_text(
+        "".join(
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+            for path in archives
+        ),
+        encoding="utf-8",
+    )
     return archives[0] if len(archives) == 1 else archives
 
 
@@ -586,12 +707,18 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"AISERVICE Migration Pack v2 | source={PROJECT_ROOT} | target={args.target_os}/{args.target_cpu}/{args.target_gpu}"
     )
+    if not args.dry_run and not args.no_archive:
+        try:
+            load_key_file(args.key_file)
+        except ValueError as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            return 6
     code, issues = preflight_environment(
         PROJECT_ROOT,
         out_dir,
         include_volumes=args.include_volumes,
         skip_dump=args.skip_dump,
-        check_docker=not args.dry_run,
+        check_docker=True,
     )
     if code != 0:
         for issue in issues:
@@ -627,12 +754,17 @@ def main(argv: list[str] | None = None) -> int:
             args.target_cpu,
             args.target_gpu,
             environment=environment,
+            archive_format=args.format,
         )
         result: Path | list[Path] = (
             bundle_dir
             if args.no_archive
             else step_5_create_archive(
-                bundle_dir, out_dir, args.format, force=args.force
+                bundle_dir,
+                out_dir,
+                args.format,
+                force=args.force,
+                key_file=args.key_file,
             )
         )
         print(f"완료: {result} ({time.time() - start:.1f}s)")
