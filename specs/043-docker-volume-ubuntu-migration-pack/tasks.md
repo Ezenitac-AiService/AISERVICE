@@ -273,10 +273,18 @@ graph TD
 ## Phase 16: Convergence
 
 - [x] T077 [HIGH] Green DB를 선택적 대상이 아니라 필수 구성으로 처리하고 `GREEN_DB_*`, `cosmetic_db`, `mysql-green`을 패키징·복원·사전검사·매니페스트에 일관되게 연결한다(FR-003, SC-004, US3/AC1, 완료).
-- [ ] T078 [HIGH] 체크인된 `migration_manifest.json`과 `verification_report.json`을 현재 3개 DB·5개 볼륨·11개 엔드포인트 계약에 맞춰 실제 측정값, Redis 결과, `data_integrity`, 현재 schema 필드로 재생성한다(FR-009, SC-009, partial).
+- [x] T078 [HIGH] 체크인된 `migration_manifest.json`과 `verification_report.json`을 현재 3개 DB·5개 볼륨·11개 엔드포인트 계약에 맞춰 실제 측정값, Redis 결과, `data_integrity`, 현재 schema 필드로 재생성한다(FR-009, SC-009, 완료; Green invalid View 및 서비스 FAIL 결과는 보고서에 기록).
 - [x] T079 [HIGH] DB 연결 사전검사를 볼륨 검사와 분리하여 `--no-volumes` 및 dry-run에서도 DB/Docker/디스크 검사가 명세된 조건과 종료 코드로 수행되도록 정리한다(FR-019, EC-006, 완료).
 - [x] T080 [HIGH] Chroma WAL checkpoint 이후 canonical 컬렉션의 벡터 수를 필수 측정하고 측정값이 없거나 불안정하면 패키징을 차단하며 원본 수치를 매니페스트에 기록한다(FR-004, SC-004, 완료).
 - [x] T081 [HIGH] Model Gateway에 vLLM → CUDA llama.cpp → CPU OpenBLAS 순서의 실제 런타임 시도·health/readiness·CUDA/Illegal instruction 오류 감지 및 fallback을 연결하고 Non-AVX/GTX 1070 경로를 검증한다(FR-002, SC-003, 완료).
 - [x] T082 [MEDIUM] 계획서·데이터 모델·manifest·Quickstart·코드의 서비스 inventory를 대조하여 10개와 11개 불일치를 해소하고 엔드포인트 매핑을 단일 기준으로 정리한다(서비스 inventory, 완료).
 - [x] T083 [HIGH] `bootstrap_restore.py --archive` 직접 실행 경로에서도 `.env`와 `ddns/.env`를 600으로 설정하고 복원 스크립트의 실행 권한을 정규화하여 shell wrapper와 동일한 보안 보장을 제공한다(FR-007, SC-008, US5/AC1, 완료).
 - [x] T084 [MEDIUM] 최신 TDD 테스트 증적을 반영하여 `plan.md` Constitution Check의 Principle II 상태와 검증 근거를 갱신한다(Constitution II, 완료).
+
+## Phase 17: Convergence
+
+- [ ] T085 [HIGH] `export_docker_volumes.py`가 Windows Docker 런타임의 실제 호스트 bind mount 표기와 GNU tar 지원 이미지를 자동 선택하고, Chroma 이미지에 Python/SQLite CLI가 없어도 지원 컨테이너 또는 Chroma API fallback으로 WAL checkpoint와 vector count를 수행하도록 보완한다(FR-004, SC-008, partial).
+- [ ] T086 [HIGH] `export_databases.py`와 `export_docker_volumes.py`의 Compose 컨테이너 탐색을 exact name에만 의존하지 않도록 service label/name suffix 기반으로 구현하여 `mysql-green`/`chroma-green`을 실제 프로젝트 접두사 컨테이너에 자동 매핑하고 DB·Chroma staged snapshot을 표준 CLI에서 통과시킨다(FR-003/004, SC-004, partial).
+- [ ] T087 [HIGH] Green `cosmetic_db`의 invalid View definer를 dump 전에 탐지하고, 안전한 View DDL 보존·복구 또는 명시적 실패 정책을 적용하여 구조·데이터·뷰·트리거·이벤트를 포함한 무손실 dump만 성공 산출물로 기록하도록 보완한다(FR-003, SC-004, partial).
+- [ ] T088 [HIGH] `make_migration_pack.py`의 clean source bundle을 실제 생성한 뒤 source bundle 파일 수·SHA-256을 `migration_manifest.json`과 `checksums.sha256`에 연결하고, 최종 암호화 아카이브 생성 경로에서 동일 메타데이터를 검증한다(FR-009, plan: source bundle, partial).
+- [ ] T089 [HIGH] `verify_migration.py`의 11개 endpoint 계약과 현재 gateway/AI/앱 라우팅을 정렬하고, 복원 후 실제 서비스 기동 상태에서 10개 HTTP 200과 Redis PONG 전수 PASS를 달성하도록 수정·검증한다(FR-017, SC-006, partial).

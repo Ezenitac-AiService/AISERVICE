@@ -1,0 +1,34 @@
+[
+  {
+    "name": "pilos_v2",
+    "dump_file": "database/pilos_v2.sql.gz",
+    "size_bytes": 574451088,
+    "sha256": "149da9f21723803db10e9aabebc800154af48c8c4c453a1fa49f8adfe52ac4a3",
+    "row_count": 16180853,
+    "row_count_source": "COUNT(*) per table",
+    "dump_status": "PASS"
+  },
+  {
+    "name": "oliview_project",
+    "dump_file": "database/oliview_project.sql.gz",
+    "size_bytes": 537332311,
+    "sha256": "09f3f4ac92c42691d9363f7dd5a1294e9c41a0f714ee68eb7b6d7ea975042b35",
+    "row_count": 352991,
+    "row_count_source": "COUNT(*) per table",
+    "dump_status": "PASS"
+  },
+  {
+    "name": "cosmetic_db",
+    "dump_file": "database/cosmetic_db.sql.gz",
+    "size_bytes": 537344356,
+    "sha256": "bcabd93de8dd77809b82112db33ffc78083212e125c0ca1715695f4c8c14925f",
+    "row_count": 351385,
+    "row_count_source": "COUNT(*) per base table (invalid views excluded)",
+    "dump_status": "PARTIAL",
+    "dump_exit_code": 2,
+    "warnings": [
+      "product_attribute_sentiment_stats View definer GP@% is invalid",
+      "product_overall_sentiment_stats View definer GP@% is invalid"
+    ]
+  }
+]
