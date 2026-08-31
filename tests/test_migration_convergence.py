@@ -21,6 +21,7 @@ from make_migration_pack import (
     build_argument_parser,
     build_manifest_inputs,
     preflight_environment,
+    should_exclude_path,
     step_5_create_archive,
 )
 from migration_pack.scripts.archive_crypto import decrypt_file, encrypt_file
@@ -34,9 +35,14 @@ from migration_pack.scripts.env_utils import load_environment, mask_secret
 from migration_pack.scripts.export_docker_volumes import get_managed_volumes_map
 from migration_pack.scripts.export_docker_volumes import (
     VolumeExportError,
+    build_volume_archive_command,
     pre_flush_service_state,
 )
-from migration_pack.scripts.export_databases import get_database_targets
+from migration_pack.scripts.export_databases import (
+    count_database_rows,
+    find_invalid_view_definers,
+    get_database_targets,
+)
 from migration_pack.scripts.verify_migration import (
     ENDPOINTS,
     build_argument_parser as build_verify_argument_parser,
@@ -353,7 +359,7 @@ def test_chroma_checkpoint_precedes_vector_measurement_and_requires_running_cont
     )
     monkeypatch.setattr(
         "migration_pack.scripts.export_docker_volumes.measure_chroma_vector_count",
-        lambda _container: events.append("measure") or 48210,
+        lambda _container, _volume="green_chroma_data": events.append("measure") or 48210,
     )
 
     class Result:
@@ -546,3 +552,172 @@ def test_runtime_fallback_attempts_health_in_order_and_detects_compatibility_err
     assert len(failures) == 2
     assert is_runtime_compatibility_error("CUDA mismatch: no kernel image") is True
     assert is_runtime_compatibility_error("normal startup message") is False
+
+
+def test_resolve_running_container_supports_labels_and_prefixes(monkeypatch):
+    from migration_pack.scripts.export_databases import resolve_running_container as db_resolve
+    from migration_pack.scripts.export_docker_volumes import resolve_running_container as vol_resolve
+
+    class PsResult:
+        returncode = 0
+        stdout = (
+            "aiservice-mysql-green-1\tcom.docker.compose.service=mysql-green\n"
+            "bteam_chroma_1\tcom.docker.compose.service=chroma-green\n"
+            "standalone-redis\t\n"
+        )
+
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: PsResult())
+    assert db_resolve("mysql-green") == "aiservice-mysql-green-1"
+    assert vol_resolve("chroma-green") == "bteam_chroma_1"
+
+
+def test_inspect_view_definers_identifies_definers(monkeypatch):
+    from migration_pack.scripts.export_databases import inspect_view_definers
+
+    class ViewResult:
+        returncode = 0
+        stdout = "v_product_summary\troot@localhost\tNO\nv_review_stats\tuser@%\tYES\n"
+
+    monkeypatch.setattr("subprocess.run", lambda *args, **kwargs: ViewResult())
+    target = {"db_name": "cosmetic_db", "root_password": "secret"}
+    views = inspect_view_definers(target, "mysql-green")
+    assert len(views) == 2
+    assert views[0]["table_name"] == "v_product_summary"
+    assert views[0]["definer"] == "root@localhost"
+
+
+def test_clean_source_bundle_metadata_recorded_in_manifest(tmp_path: Path):
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "file1.txt").write_text("content1", encoding="utf-8")
+    (bundle_dir / "file2.txt").write_text("content2", encoding="utf-8")
+
+    from make_migration_pack import step_4_generate_manifest
+
+    manifest = step_4_generate_manifest(
+        bundle_dir=bundle_dir,
+        databases=[],
+        volumes=[],
+        target_cpu="i7-930",
+        target_gpu="gtx1070",
+    )
+    assert "source_bundle" in manifest
+    assert manifest["source_bundle"]["file_count"] >= 2
+    assert len(manifest["source_bundle"]["sha256"]) == 64
+
+
+def test_clean_source_bundle_excludes_generated_database_artifacts():
+    assert should_exclude_path("migration_pack/database/example.sql") is True
+    assert should_exclude_path("migration_pack/database/example.sql.gz") is True
+    assert should_exclude_path("migration_pack/volumes/example.tar.gz") is True
+    assert should_exclude_path("migration_pack/chroma.sqlite3") is True
+
+
+def test_volume_archive_command_uses_native_host_mount_and_sparse_tar(tmp_path: Path):
+    command = build_volume_archive_command("green_mysql_data", "green.tar.gz", tmp_path)
+
+    assert f"{tmp_path.resolve()}:/backup" in command
+    assert "/c/" not in " ".join(command)
+    assert "ubuntu:24.04" in command
+    assert "--sparse" in command
+
+
+def test_chroma_checkpoint_falls_back_to_helper_before_pause(monkeypatch: pytest.MonkeyPatch):
+    events: list[str] = []
+
+    monkeypatch.setattr(
+        "migration_pack.scripts.export_docker_volumes._container_running",
+        lambda _container: True,
+    )
+
+    class Result:
+        def __init__(self, returncode: int, stdout: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = "missing python"
+
+    def fake_run(command, **_kwargs):
+        if command[:3] == ["docker", "volume", "ls"]:
+            return Result(0, "green_chroma_data\n")
+        if command[:2] == ["docker", "inspect"]:
+            return Result(0, "green_chroma_data|/data\n")
+        if command[:2] == ["docker", "exec"]:
+            events.append("exec")
+            return Result(127)
+        if command[:2] == ["docker", "run"]:
+            events.append("helper")
+            return Result(0, "")
+        if command[:2] == ["docker", "pause"]:
+            events.append("pause")
+            return Result(0)
+        raise AssertionError(command)
+
+    monkeypatch.setattr("migration_pack.scripts.export_docker_volumes.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "migration_pack.scripts.export_docker_volumes.measure_chroma_vector_count",
+        lambda _container, _volume: events.append("measure") or 57435,
+    )
+
+    meta = {"associated_container": "chroma-green", "snapshot": "chroma"}
+    state = pre_flush_service_state("green_chroma_data", meta)
+
+    assert state["paused"] is True
+    assert meta["vector_count"] == 57435
+    assert events.index("helper") < events.index("pause")
+    assert events.index("measure") < events.index("pause")
+
+
+def test_count_database_rows_uses_resolved_container_for_each_query(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    calls: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+        stderr = ""
+
+        def __init__(self, stdout: str):
+            self.stdout = stdout
+
+    monkeypatch.setattr(
+        "migration_pack.scripts.export_databases.resolve_running_container",
+        lambda _name: "project-mysql-green-1",
+    )
+
+    def fake_run(command, **_kwargs):
+        calls.append(list(command))
+        if "COUNT(*)" in command[-1]:
+            return Result("7\n")
+        return Result("orders\n")
+
+    monkeypatch.setattr("migration_pack.scripts.export_databases.subprocess.run", fake_run)
+    total, source = count_database_rows(
+        {"container": "mysql-green", "db_name": "cosmetic_db", "root_password": "secret"}
+    )
+
+    assert (total, source) == (7, "COUNT(*) per table")
+    assert all("project-mysql-green-1" in call for call in calls)
+    assert all("mysql-green" not in call for call in calls)
+
+
+def test_invalid_view_definers_are_detected_with_wildcard_accounts(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class Result:
+        returncode = 0
+        stdout = "root@localhost\ngp123@%\n"
+        stderr = ""
+
+    monkeypatch.setattr(
+        "migration_pack.scripts.export_databases.subprocess.run",
+        lambda *_args, **_kwargs: Result(),
+    )
+    target = {"db_name": "cosmetic_db", "root_password": "secret"}
+    views = [
+        {"table_name": "valid_view", "definer": "gp123@localhost"},
+        {"table_name": "invalid_view", "definer": "GP@%"},
+    ]
+
+    invalid = find_invalid_view_definers(target, "project-mysql-green-1", views)
+
+    assert [view["table_name"] for view in invalid] == ["invalid_view"]

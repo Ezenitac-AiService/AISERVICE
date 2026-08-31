@@ -138,7 +138,7 @@
     "volumes/aiservice_redis_data.tar.gz": "e8cee2d06f7ce93a9d399be1ecb93a24e7ee1ddf1636b49c94683e42f430353e"
   },
   "source_bundle": {
-    "file_count": 0,
-    "sha256": "not_generated_in_live_measurement"
+    "file_count": 10050,
+    "sha256": "82789c151de96bb0e650a4c1d23d8ecae5501ea2c3a52236a01943247ad96f3c"
   }
 }

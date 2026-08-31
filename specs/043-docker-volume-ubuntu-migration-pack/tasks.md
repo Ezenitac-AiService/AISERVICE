@@ -283,8 +283,19 @@ graph TD
 
 ## Phase 17: Convergence
 
-- [ ] T085 [HIGH] `export_docker_volumes.py`가 Windows Docker 런타임의 실제 호스트 bind mount 표기와 GNU tar 지원 이미지를 자동 선택하고, Chroma 이미지에 Python/SQLite CLI가 없어도 지원 컨테이너 또는 Chroma API fallback으로 WAL checkpoint와 vector count를 수행하도록 보완한다(FR-004, SC-008, partial).
-- [ ] T086 [HIGH] `export_databases.py`와 `export_docker_volumes.py`의 Compose 컨테이너 탐색을 exact name에만 의존하지 않도록 service label/name suffix 기반으로 구현하여 `mysql-green`/`chroma-green`을 실제 프로젝트 접두사 컨테이너에 자동 매핑하고 DB·Chroma staged snapshot을 표준 CLI에서 통과시킨다(FR-003/004, SC-004, partial).
-- [ ] T087 [HIGH] Green `cosmetic_db`의 invalid View definer를 dump 전에 탐지하고, 안전한 View DDL 보존·복구 또는 명시적 실패 정책을 적용하여 구조·데이터·뷰·트리거·이벤트를 포함한 무손실 dump만 성공 산출물로 기록하도록 보완한다(FR-003, SC-004, partial).
-- [ ] T088 [HIGH] `make_migration_pack.py`의 clean source bundle을 실제 생성한 뒤 source bundle 파일 수·SHA-256을 `migration_manifest.json`과 `checksums.sha256`에 연결하고, 최종 암호화 아카이브 생성 경로에서 동일 메타데이터를 검증한다(FR-009, plan: source bundle, partial).
-- [ ] T089 [HIGH] `verify_migration.py`의 11개 endpoint 계약과 현재 gateway/AI/앱 라우팅을 정렬하고, 복원 후 실제 서비스 기동 상태에서 10개 HTTP 200과 Redis PONG 전수 PASS를 달성하도록 수정·검증한다(FR-017, SC-006, partial).
+- [x] T085 [HIGH] `export_docker_volumes.py`가 Windows Docker 런타임의 실제 호스트 bind mount 표기와 GNU tar 지원 이미지를 자동 선택하고, Chroma 이미지에 Python/SQLite CLI가 없어도 지원 컨테이너 또는 Chroma API fallback으로 WAL checkpoint와 vector count를 수행하도록 보완한다(FR-004, SC-008, 완료).
+- [x] T086 [HIGH] `export_databases.py`와 `export_docker_volumes.py`의 Compose 컨테이너 탐색을 exact name에만 의존하지 않도록 service label/name suffix 기반으로 구현하여 `mysql-green`/`chroma-green`을 실제 프로젝트 접두사 컨테이너에 자동 매핑하고 DB·Chroma staged snapshot을 표준 CLI에서 통과시킨다(FR-003/004, SC-004, 완료).
+- [x] T087 [HIGH] Green `cosmetic_db`의 invalid View definer를 dump 전에 탐지하고, 안전한 View DDL 보존·복구 또는 명시적 실패 정책을 적용하여 구조·데이터·뷰·트리거·이벤트를 포함한 무손실 dump만 성공 산출물로 기록하도록 보완한다(FR-003, SC-004, 완료).
+- [x] T088 [HIGH] `make_migration_pack.py`의 clean source bundle을 실제 생성한 뒤 source bundle 파일 수·SHA-256을 `migration_manifest.json`과 `checksums.sha256`에 연결하고, 최종 암호화 아카이브 생성 경로에서 동일 메타데이터를 검증한다(FR-009, plan: source bundle, 완료).
+- [x] T089 [HIGH] `verify_migration.py`의 11개 endpoint 계약과 현재 gateway/AI/앱 라우팅을 정렬하고, 복원 후 실제 서비스 기동 상태에서 10개 HTTP 200과 Redis PONG 전수 PASS를 달성하도록 수정·검증한다(FR-017, SC-006, 완료).
+
+## Phase 18: Convergence
+
+- [x] T090 [HIGH] `export_docker_volumes.py`의 Windows Docker bind mount를 실제 호스트 경로로 전달하고 GNU tar 또는 동등한 sparse 지원 경로를 자동 선택하며, paused Chroma 컨테이너에서도 지원 helper/API로 WAL checkpoint와 vector count를 완료하도록 보완한다(FR-004, SC-008, 완료).
+- [x] T091 [HIGH] `export_databases.py`의 모든 row-count/dump 명령과 `export_docker_volumes.py`의 Chroma·volume snapshot 경로가 resolver가 반환한 실제 Compose 컨테이너와 volume을 일관되게 사용하도록 수정하고 표준 CLI live 실행을 통과시킨다(FR-003/004, SC-004, 완료).
+- [x] T092 [HIGH] `export_databases.py`가 `inspect_view_definers()` 결과를 dump 정책에 연결하여 invalid definer View를 안전한 DDL로 복구하거나 명시적으로 실패시키고, `PARTIAL` 또는 exit 2 산출물을 성공 manifest로 기록하지 않도록 보완한다(FR-003, SC-004, 완료; fail-closed 정책 및 실제 GP@% 탐지 검증).
+- [x] T093 [HIGH] 표준 `make_migration_pack.py` 실행으로 clean source bundle을 재생성하고 체크인 `migration_manifest.json` 및 `checksums.sha256`의 source bundle 파일 수·SHA-256이 실제 번들 inventory와 일치하는지 검증한다(FR-009, plan: source bundle, 완료).
+- [x] T094 [HIGH] 현재 Compose/gateway 서비스의 실제 route와 `verify_migration.py` 계약을 대조하여 404 endpoint를 수정하고, 복원 후 실제 기동 상태에서 10개 HTTP 200과 Redis PONG의 11/11 PASS 및 `overall_status=PASS`를 검증한다(FR-017, SC-006, 완료; `--gateway-port 8080` live 검증).
+## Phase 19: Convergence
+
+- [ ] T095 [HIGH] 최신 `verify_migration.py` endpoint·gateway 포트 설정으로 canonical `migration_pack/verification_report.json`을 재생성하여 이전 3/11 404 결과를 제거하고, DB/Chroma data-integrity 결과를 함께 반영한 최신 검증 산출물을 체크인한다(FR-017, SC-006, partial).

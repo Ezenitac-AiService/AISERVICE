@@ -60,6 +60,13 @@ EXCLUDE_EXTENSIONS: set[str] = {
     ".tmp",
     ".swp",
     ".ds_store",
+    ".sql",
+    ".gz",
+    ".tar",
+    ".zip",
+    ".7z",
+    ".sqlite3",
+    ".sqlite3-journal",
     ".safetensors",
     ".pt",
     ".pth",
@@ -387,13 +394,18 @@ def _copy_tree_clean(
 ) -> tuple[int, int]:
     included_count = 0
     total_bytes = 0
+    bundle_resolved = bundle_dir.resolve()
     for root, dirs, files in os.walk(src_folder):
         root_path = Path(root)
         rel_root = root_path.relative_to(PROJECT_ROOT)
         dirs[:] = [
             d
             for d in dirs
-            if not should_exclude_path(rel_root / d, include_models=include_models)
+            if (
+                (root_path / d).resolve() != bundle_resolved
+                and bundle_resolved not in (root_path / d).resolve().parents
+                and not should_exclude_path(rel_root / d, include_models=include_models)
+            )
         ]
         for file in files:
             src_file = root_path / file

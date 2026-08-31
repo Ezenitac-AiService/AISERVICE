@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 import sys
 import time
@@ -13,6 +14,10 @@ from typing import Any
 
 class VolumeExportError(RuntimeError):
     """필수 볼륨을 안전하게 추출할 수 없을 때 발생합니다."""
+
+
+TAR_IMAGE = os.environ.get("MIGRATION_TAR_IMAGE", "ubuntu:24.04")
+CHROMA_HELPER_IMAGE = os.environ.get("MIGRATION_CHROMA_HELPER_IMAGE", "python:3.12-slim")
 
 
 def get_managed_volumes_map() -> dict[str, dict[str, Any]]:
@@ -64,6 +69,80 @@ def list_existing_docker_volumes() -> list[str]:
         return []
 
 
+def resolve_existing_volume_name(name: str, container: str | None = None) -> str:
+    """Compose 접두사가 붙은 실제 Docker volume 이름을 canonical 이름에서 찾습니다."""
+    if not name:
+        return name
+    if container:
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "-f",
+                    "{{range .Mounts}}{{println .Name \"|\" .Destination}}{{end}}",
+                    container,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            mount_names = []
+            for line in result.stdout.splitlines():
+                volume, separator, destination = line.partition("|")
+                if separator and destination.strip() == "/data" and volume.strip():
+                    mount_names.append(volume.strip())
+            matches = sorted(value for value in mount_names if name in value)
+            if matches:
+                return matches[0]
+        except (OSError, subprocess.SubprocessError):
+            pass
+    existing = set(list_existing_docker_volumes())
+    if name in existing:
+        return name
+    matches = sorted(
+        value for value in existing if value.endswith(name) or name in value
+    )
+    return matches[0] if matches else name
+
+
+def resolve_running_container(name_or_service: str) -> str | None:
+    """정확한 이름, Compose 접두사/접미사 및 라벨 기반으로 실행 중인 컨테이너를 탐색합니다."""
+    if not name_or_service:
+        return None
+    # 1. 정확한 이름 검사
+    if _container_running(name_or_service):
+        return name_or_service
+
+    # 2. docker ps 실행 중 컨테이너 목록에서 라벨/이름 패턴 탐색
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Labels}}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            parts = line.strip().split("\t", 1)
+            c_name = parts[0].strip()
+            c_labels = parts[1].strip() if len(parts) > 1 else ""
+
+            # 서비스 라벨 매칭 (com.docker.compose.service)
+            if f"com.docker.compose.service={name_or_service}" in c_labels:
+                return c_name
+            # 이름 접두/접미 패턴 매칭 (e.g. aiservice-mysql-green-1, bteam_mysql-green_1)
+            clean_target = name_or_service.replace("-", "").replace("_", "")
+            clean_cname = c_name.replace("-", "").replace("_", "")
+            if clean_target in clean_cname:
+                return c_name
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def _container_running(container: str) -> bool:
     result = subprocess.run(
         ["docker", "inspect", "-f", "{{.State.Running}}", container],
@@ -74,35 +153,97 @@ def _container_running(container: str) -> bool:
     return result.returncode == 0 and result.stdout.strip().lower() == "true"
 
 
-def measure_chroma_vector_count(container: str) -> int:
-    """Chroma canonical collection의 원본 vector 수를 SQLite에서 측정합니다."""
+def measure_chroma_vector_count(container: str, vol_name: str = "green_chroma_data") -> int:
+    """Chroma canonical collection의 원본 vector 수를 SQLite 또는 지원 컨테이너에서 측정합니다."""
     script = (
         "import sqlite3; "
         "db=sqlite3.connect('/data/chroma.sqlite3'); "
         "collection=db.execute(\"SELECT id FROM collections WHERE name='oliview_review_sentences_v2'\").fetchone(); "
-        "raise SystemExit(3) if collection is None else None; "
-        "print(db.execute('SELECT COUNT(*) FROM embeddings WHERE collection_id=?', (collection[0],)).fetchone()[0]); "
+        "assert collection is not None; "
+        "print(db.execute('SELECT COUNT(*) FROM embeddings e JOIN segments s ON e.segment_id=s.id WHERE s.collection=?', (collection[0],)).fetchone()[0]); "
         "db.close()"
     )
-    result = subprocess.run(
-        ["docker", "exec", container, "python", "-c", script],
+    # 1. 타겟 컨테이너 내부 실행 시도
+    if container and _container_running(container):
+        result = subprocess.run(
+            ["docker", "exec", container, "python", "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip().isdigit():
+            return int(result.stdout.strip())
+
+    # 2. 컨테이너에 python/sqlite3 CLI가 없는 경우 볼륨 마운트 헬퍼 컨테이너 fallback
+    helper_volume = resolve_existing_volume_name(vol_name, container)
+    helper_result = subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{helper_volume}:/data:ro",
+            CHROMA_HELPER_IMAGE,
+            "python",
+            "-c",
+            script,
+        ],
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=60,
         check=False,
     )
-    if result.returncode != 0 or not result.stdout.strip().isdigit():
-        raise VolumeExportError(f"Chroma vector 수 측정 실패: {container}")
-    return int(result.stdout.strip())
+    if helper_result.returncode == 0 and helper_result.stdout.strip().isdigit():
+        return int(helper_result.stdout.strip())
+
+    raise VolumeExportError(f"Chroma vector 수 측정 실패: container={container}, volume={vol_name}")
 
 
-def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bool]:
+def _run_chroma_sqlite_command(
+    container: str, volume_name: str, script: str, *, read_only: bool
+) -> subprocess.CompletedProcess[str]:
+    """실행 중 컨테이너 또는 지원 Python 컨테이너에서 Chroma SQLite 작업을 실행합니다."""
+    if container and _container_running(container):
+        result = subprocess.run(
+            ["docker", "exec", container, "python", "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result
+
+    mount_volume = resolve_existing_volume_name(volume_name, container)
+    mount = f"{mount_volume}:/data" + (":ro" if read_only else "")
+    return subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            mount,
+            CHROMA_HELPER_IMAGE,
+            "python",
+            "-c",
+            script,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+
+
+def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, Any]:
     """MySQL/Chroma는 pause, Redis는 BGSAVE 후 상태를 반환합니다."""
-    container = str(meta.get("associated_container", ""))
-    state = {"paused": False}
+    raw_container = str(meta.get("associated_container", ""))
+    container = resolve_running_container(raw_container) or raw_container
+    state = {"paused": False, "resolved_container": container}
     if not container or not _container_running(container):
         if meta.get("snapshot") == "chroma":
-            raise VolumeExportError(f"Chroma 컨테이너가 실행 중이 아닙니다: {container}")
+            raise VolumeExportError(f"Chroma 컨테이너가 실행 중이 아닙니다: {raw_container}")
         return state
 
     snapshot = str(meta.get("snapshot", ""))
@@ -134,7 +275,30 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bo
             time.sleep(1)
         raise VolumeExportError(f"Redis BGSAVE 완료 대기 시간 초과: {container}")
 
-    # pause는 MySQL dirty page의 추가 변경을 막는 일관성 경계를 제공합니다.
+    if snapshot == "chroma":
+        checkpoint_script = (
+            "import pathlib, sqlite3; "
+            "p=pathlib.Path('/data/chroma.sqlite3'); "
+            "con=sqlite3.connect(p); "
+            "result=con.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall(); "
+            "con.close(); "
+            "busy=result[0][0] if result else 0; "
+            "raise SystemExit(1) if busy else SystemExit(0)"
+        )
+        checkpoint = _run_chroma_sqlite_command(
+            container, vol_name, checkpoint_script, read_only=False
+        )
+        if checkpoint.returncode != 0:
+            raise VolumeExportError(f"Chroma SQLite WAL checkpoint 실패: {container}")
+        first_count = measure_chroma_vector_count(container, vol_name)
+        second_count = measure_chroma_vector_count(container, vol_name)
+        if first_count != second_count:
+            raise VolumeExportError(
+                f"Chroma vector 수가 안정화되지 않았습니다: {first_count} != {second_count}"
+            )
+        meta["vector_count"] = first_count
+
+    # pause는 MySQL/Chroma의 추가 변경을 막는 일관성 경계를 제공합니다.
     result = subprocess.run(
         ["docker", "pause", container],
         capture_output=True,
@@ -146,49 +310,6 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, bo
         raise VolumeExportError(f"서비스 pause 실패: {container}")
     state["paused"] = True
 
-    if snapshot == "chroma":
-        try:
-            checkpoint = subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    container,
-                    "python",
-                    "-c",
-                    (
-                        "import pathlib, sqlite3; "
-                        "p=pathlib.Path('/data/chroma.sqlite3'); "
-                        "con=sqlite3.connect(p); "
-                        "result=con.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall(); "
-                        "con.close(); "
-                        "busy=result[0][0] if result else 0; "
-                        "raise SystemExit(1) if busy else SystemExit(0)"
-                    ),
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-            if checkpoint.returncode != 0:
-                raise VolumeExportError(f"Chroma SQLite WAL checkpoint 실패: {container}")
-            first_count = measure_chroma_vector_count(container)
-            second_count = measure_chroma_vector_count(container)
-            if first_count != second_count:
-                raise VolumeExportError(
-                    f"Chroma vector 수가 안정화되지 않았습니다: {first_count} != {second_count}"
-                )
-            meta["vector_count"] = first_count
-        except Exception:
-            subprocess.run(
-                ["docker", "unpause", container],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-            state["paused"] = False
-            raise
     return state
 
 
@@ -196,7 +317,7 @@ def post_resume_service_state(
     vol_name: str, meta: dict[str, Any], state: dict[str, bool] | None = None
 ) -> None:
     del vol_name
-    container = str(meta.get("associated_container", ""))
+    container = str((state or {}).get("resolved_container") or meta.get("associated_container", ""))
     if container and (state or {}).get("paused"):
         subprocess.run(
             ["docker", "unpause", container],
@@ -218,32 +339,11 @@ def export_single_volume(
     out_dir.mkdir(parents=True, exist_ok=True)
     archive_stem = archive_name or volume_name
     archive_file = out_dir / f"{archive_stem}.tar.gz"
-    state: dict[str, bool] = {"paused": False}
+    state: dict[str, Any] = {"paused": False}
     if meta:
         state = pre_flush_service_state(volume_name, meta)
     try:
-        host_mount = str(out_dir)
-        if sys.platform.startswith("win"):
-            drive, rest = str(out_dir)[:2], str(out_dir)[2:]
-            if drive[1:] == ":":
-                host_mount = f"/{drive[0].lower()}{rest.replace(chr(92), '/')}"
-        command = [
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            f"{volume_name}:/source:ro",
-            "-v",
-            f"{host_mount}:/backup",
-            "alpine",
-            "tar",
-            "--sparse",
-            "-czf",
-            f"/backup/{archive_file.name}",
-            "-C",
-            "/source",
-            ".",
-        ]
+        command = build_volume_archive_command(volume_name, archive_file.name, out_dir)
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=900, check=False
         )
@@ -258,6 +358,30 @@ def export_single_volume(
     finally:
         if meta:
             post_resume_service_state(volume_name, meta, state)
+
+
+def build_volume_archive_command(
+    volume_name: str, archive_name: str, output_dir: Path | str
+) -> list[str]:
+    """실제 Docker 호스트 경로와 sparse-capable GNU tar image를 사용하는 명령을 구성합니다."""
+    host_mount = str(Path(output_dir).resolve())
+    return [
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{volume_name}:/source:ro",
+        "-v",
+        f"{host_mount}:/backup",
+        TAR_IMAGE,
+        "tar",
+        "--sparse",
+        "-czf",
+        f"/backup/{archive_name}",
+        "-C",
+        "/source",
+        ".",
+    ]
 
 
 def export_all_managed_volumes(

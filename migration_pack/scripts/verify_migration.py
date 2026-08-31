@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import socket
 import ssl
 import sys
@@ -20,11 +21,17 @@ if __package__ in {None, ""}:
 
 SSL_CTX = ssl._create_unverified_context()
 
-ENDPOINTS: list[dict[str, Any]] = [
+def build_endpoints(
+    gateway_port: int | str = 80, secondary_gateway_port: int | str = 8080
+) -> list[dict[str, Any]]:
+    """현재 Compose gateway와 보조 포트에 맞춘 11개 검증 endpoint를 구성합니다."""
+    gateway = f"http://127.0.0.1:{gateway_port}"
+    secondary = f"http://127.0.0.1:{secondary_gateway_port}"
+    return [
     {
         "id": "gateway_root",
         "name": "Nginx Gateway Root (80)",
-        "url": "http://127.0.0.1/",
+        "url": f"{gateway}/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -32,7 +39,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "gateway_secondary",
         "name": "Nginx Gateway Secondary (8080)",
-        "url": "http://127.0.0.1:8080/",
+        "url": f"{secondary}/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -48,7 +55,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "bge_m3_embedding",
         "name": "BGE-M3 Embedding",
-        "url": "http://127.0.0.1:8090/health",
+        "url": "http://127.0.0.1:8090/v1/models",
         "method": "GET",
         "category": "AI",
         "expected_status": [200],
@@ -56,7 +63,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "bge_reranker",
         "name": "BGE Reranker",
-        "url": "http://127.0.0.1:8091/health",
+        "url": "http://127.0.0.1:8091/v1/models",
         "method": "GET",
         "category": "AI",
         "expected_status": [200],
@@ -64,7 +71,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "pilos_web",
         "name": "Pilos Web",
-        "url": "http://127.0.0.1/ateam/pilos/",
+        "url": f"{gateway}/ateam/pilos/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -72,7 +79,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "oliview_frontend",
         "name": "Oliview Frontend",
-        "url": "http://127.0.0.1/bteam/oliview/",
+        "url": f"{gateway}/bteam/oliview/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -80,7 +87,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "oliview_backend",
         "name": "Oliview Backend API",
-        "url": "http://127.0.0.1/bteam/oliview/api/health",
+        "url": f"{gateway}/bteam/oliview/api/health",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -88,7 +95,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "oliview_chatbot_a",
         "name": "Oliview Chatbot A (Streamlit)",
-        "url": "http://127.0.0.1/bteam/chata/",
+        "url": f"{gateway}/bteam/chata/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -96,7 +103,7 @@ ENDPOINTS: list[dict[str, Any]] = [
     {
         "id": "oliview_chatbot_b",
         "name": "Oliview Chatbot B (FastAPI)",
-        "url": "http://127.0.0.1/bteam/chatb/",
+        "url": f"{gateway}/bteam/chatb/",
         "method": "GET",
         "category": "HTTP",
         "expected_status": [200],
@@ -109,7 +116,10 @@ ENDPOINTS: list[dict[str, Any]] = [
         "category": "REDIS",
         "expected_status": [200],
     },
-]
+    ]
+
+
+ENDPOINTS: list[dict[str, Any]] = build_endpoints()
 
 
 def _tcp_probe(host: str, port: int, *, redis: bool = False) -> tuple[bool, str]:
@@ -422,6 +432,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout", type=int, default=15)
     parser.add_argument(
+        "--gateway-port",
+        type=int,
+        default=int(os.environ.get("MIGRATION_VERIFY_GATEWAY_PORT", "80")),
+        help="gateway primary port used for root and application routes",
+    )
+    parser.add_argument(
+        "--secondary-gateway-port",
+        type=int,
+        default=int(os.environ.get("MIGRATION_VERIFY_SECONDARY_GATEWAY_PORT", "8080")),
+        help="gateway secondary port used for the secondary root check",
+    )
+    parser.add_argument(
         "--skip-data-integrity",
         action="store_true",
         help="대상 DB/Chroma 데이터 수 비교를 생략합니다",
@@ -432,7 +454,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_argument_parser().parse_args(argv)
     started = time.perf_counter()
-    results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in ENDPOINTS]
+    endpoints = build_endpoints(args.gateway_port, args.secondary_gateway_port)
+    results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in endpoints]
     integrity = {} if args.skip_data_integrity else collect_data_integrity()
     report = build_verification_report(results, _hardware_detected(), integrity)
     report["duration_seconds"] = round(time.perf_counter() - started, 3)

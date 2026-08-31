@@ -78,8 +78,8 @@ python3 migration_pack/scripts/verify_migration.py
 | **80** | Nginx 통합 게이트웨이 | `http://<서버IP>/` | 전체 포털 진입점 |
 | **8080** | Nginx 보조 포트 게이트웨이 | `http://<서버IP>:8080/` | 보조 포털 진입점 |
 | **8081** | Model Gateway (Qwen 2B) | `http://<서버IP>:8081/health` | LLM 추론 API |
-| **8090** | BGE-M3 Dense Embedding | `http://<서버IP>:8090/health` | 임베딩 API |
-| **8091** | BGE-Reranker v2 | `http://<서버IP>:8091/health` | 리랭커 API |
+| **8090** | BGE-M3 Dense Embedding | `http://<서버IP>:8090/v1/models` | 임베딩 API |
+| **8091** | BGE-Reranker v2 | `http://<서버IP>:8091/v1/models` | 리랭커 API |
 | **8080** | A-Team Pilos 대시보드 | `http://<서버IP>:8080/ateam/pilos/` | 감성지수 웹 |
 | **8080** | B-Team Oliview 프론트 | `http://<서버IP>:8080/bteam/oliview/` | 화장품 랭킹 UI |
 | **8080** | B-Team Oliview 백엔드 | `http://<서버IP>:8080/bteam/oliview/api/health` | API health |

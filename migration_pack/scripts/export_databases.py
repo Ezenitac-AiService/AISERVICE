@@ -88,28 +88,132 @@ def _docker_env(password: str) -> list[str]:
     return ["-e", f"MYSQL_PWD={password}"]
 
 
-def check_container_running(container_name: str) -> bool:
+def resolve_running_container(name_or_service: str) -> str | None:
+    """정확한 이름, Compose 라벨 및 이름 패턴 기반으로 실행 중인 DB 컨테이너를 탐색합니다."""
+    if not name_or_service:
+        return None
     try:
         result = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}"],
+            ["docker", "ps", "--format", "{{.Names}}\t{{.Labels}}"],
             capture_output=True,
             text=True,
             check=True,
         )
+        for line in result.stdout.splitlines():
+            if not line.strip():
+                continue
+            parts = line.strip().split("\t", 1)
+            c_name = parts[0].strip()
+            c_labels = parts[1].strip() if len(parts) > 1 else ""
+
+            if c_name == name_or_service:
+                return c_name
+            if f"com.docker.compose.service={name_or_service}" in c_labels:
+                return c_name
+            clean_target = name_or_service.replace("-", "").replace("_", "")
+            clean_cname = c_name.replace("-", "").replace("_", "")
+            if clean_target in clean_cname:
+                return c_name
     except (OSError, subprocess.CalledProcessError):
-        return False
-    return container_name in result.stdout.split()
+        pass
+    return None
+
+
+def check_container_running(container_name: str) -> bool:
+    return resolve_running_container(container_name) is not None
+
+
+def inspect_view_definers(target: Mapping[str, str], container: str) -> list[dict[str, str]]:
+    """information_schema.VIEWS에서 invalid definer를 사전 탐지합니다."""
+    query = (
+        "SELECT TABLE_NAME, DEFINER, IS_UPDATABLE "
+        "FROM information_schema.views WHERE TABLE_SCHEMA='"
+        + target["db_name"].replace("'", "''")
+        + "';"
+    )
+    command = [
+        "docker",
+        "exec",
+        *_docker_env(target["root_password"]),
+        container,
+        "mysql",
+        "-uroot",
+        "-s",
+        "-N",
+        "-e",
+        query,
+    ]
+    views = []
+    try:
+        res = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                parts = line.strip().split("\t")
+                if parts and parts[0]:
+                    views.append({
+                        "table_name": parts[0],
+                        "definer": parts[1] if len(parts) > 1 else "",
+                        "is_updatable": parts[2] if len(parts) > 2 else "NO",
+                    })
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return views
+
+
+def find_invalid_view_definers(
+    target: Mapping[str, str], container: str, views: list[dict[str, str]] | None = None
+) -> list[dict[str, str]]:
+    """View DEFINER가 실제 MySQL 계정으로 존재하는지 확인하고 invalid 항목을 반환합니다."""
+    view_rows = views if views is not None else inspect_view_definers(target, container)
+    if not view_rows:
+        return []
+    account_query = (
+        "SELECT CONCAT(User, '@', Host) FROM mysql.user "
+        "WHERE User IS NOT NULL ORDER BY User, Host;"
+    )
+    command = [
+        "docker",
+        "exec",
+        *_docker_env(target["root_password"]),
+        container,
+        "mysql",
+        "-uroot",
+        "-s",
+        "-N",
+        "-e",
+        account_query,
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise DatabaseExportError(f"MySQL View DEFINER 검증 실패: {exc}") from exc
+    if result.returncode != 0:
+        raise DatabaseExportError(
+            f"MySQL 계정 목록 조회 실패({target['db_name']}): {result.stderr[-500:]}"
+        )
+    accounts = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    invalid: list[dict[str, str]] = []
+    for view in view_rows:
+        definer = str(view.get("definer", ""))
+        user, separator, host = definer.partition("@")
+        candidates = {definer}
+        if separator:
+            candidates.add(f"{user}@%")
+        if not any(candidate in accounts for candidate in candidates):
+            invalid.append(view)
+    return invalid
 
 
 def check_database_connection(target: Mapping[str, str]) -> bool:
     """컨테이너 내부 mysqladmin ping으로 실제 DB 연결을 확인합니다."""
+    container = resolve_running_container(target["container"]) or target["container"]
     try:
         result = subprocess.run(
             [
                 "docker",
                 "exec",
                 *_docker_env(target["root_password"]),
-                target["container"],
+                container,
                 "mysqladmin",
                 "ping",
                 "-h",
@@ -128,12 +232,13 @@ def check_database_connection(target: Mapping[str, str]) -> bool:
 
 def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
     """각 테이블의 COUNT(*)를 합산해 정확한 논리 행 수를 측정합니다."""
+    container = resolve_running_container(target["container"]) or target["container"]
     db_name = target["db_name"].replace("`", "``")
     list_command = [
         "docker",
         "exec",
         *_docker_env(target["root_password"]),
-        target["container"],
+        container,
         "mysql",
         "-uroot",
         "-s",
@@ -141,7 +246,7 @@ def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
         "-e",
         "SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA='"
         + target["db_name"].replace("'", "''")
-        + "' ORDER BY TABLE_NAME;",
+        + "' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME;",
     ]
     try:
         tables = subprocess.run(
@@ -156,7 +261,7 @@ def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
                     "docker",
                     "exec",
                     *_docker_env(target["root_password"]),
-                    target["container"],
+                    container,
                     "mysql",
                     "-uroot",
                     "-s",
@@ -180,14 +285,25 @@ def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
 
 def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
     """MySQL dirty-page 정합성을 확보한 뒤 gzip 스트리밍 덤프를 생성합니다."""
-    container = target["container"]
-    if not check_container_running(container):
-        raise DatabaseExportError(f"컨테이너가 실행 중이 아닙니다: {container}")
+    container = resolve_running_container(target["container"])
+    if not container:
+        raise DatabaseExportError(f"컨테이너가 실행 중이 아닙니다: {target['container']}")
 
     db_name = target["db_name"]
     output_path = Path(target["output_file"])
     output_path.parent.mkdir(parents=True, exist_ok=True)
     row_count, row_source = count_database_rows(target)
+    view_meta = inspect_view_definers(target, container)
+    invalid_view_definers = find_invalid_view_definers(target, container, view_meta)
+    if invalid_view_definers:
+        output_path.unlink(missing_ok=True)
+        details = ", ".join(
+            f"{view.get('table_name', '<unknown>')} ({view.get('definer', '<unknown>')})"
+            for view in invalid_view_definers
+        )
+        raise DatabaseExportError(
+            f"invalid View DEFINER가 있어 무손실 dump를 생성할 수 없습니다: {details}"
+        )
     dump_args = [
         "mysqldump",
         "-uroot",
