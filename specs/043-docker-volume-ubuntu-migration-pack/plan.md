@@ -25,7 +25,7 @@ AISERVICE의 전체 복합 멀티 에이전트 시스템(A-Team, B-Team, Model G
 **Language/Version**: Python 3.11 / 3.12, Bash (POSIX compliant), C++17 (for llama.cpp JIT compilation)  
 **Primary Dependencies**: Docker Engine 27.x, Docker Compose v2.29+, NVIDIA Container Toolkit v1.16+, CMake 3.28+, GCC/G++ 12+, `curl`, `tar` (sparse-aware), `gzip`  
 **Storage**: MySQL 8.0/8.4 LTS (`pilos_v2`, `oliview_project`, Green `cosmetic_db`), ChromaDB v2 (`oliview_review_sentences_v2` with 48,210+ 1024-dim vectors), Redis 7 (AOF/RDB)
-**Testing**: `pytest`, `verify_migration.py` (10 HTTP + Redis TCP PING으로 구성된 11개 검사 계약)
+**Testing**: `pytest`, `verify_migration.py` (10 HTTP + Redis TCP PING으로 구성된 11개 검사 계약; Gateway 포트는 CLI 인자 > 환경 변수 > 기본값 순서)
 **Target Platform**: Ubuntu Linux 24.04 LTS (Intel Core i7-930 SSE4.2 CPU, 24GB DDR3 RAM, NVIDIA GeForce GTX 1070 8GB GDDR5 GPU)  
 **Project Type**: Multi-Service System Migration & Infrastructure Automation Pack  
 **Performance Goals**: 원클릭 복원 완료 시간 $\le 25$분 (클린 OS) / $\le 10$분 (사전 준비 OS), 10개 HTTP + Redis TCP PING 11개 검사 성공률 100% (11/11 Pass), LLM API 지연시간 $\le 3.0$초 (Fast SLM)
@@ -84,7 +84,9 @@ c:\AISERVICE\
 │   │   ├── bootstrap_restore.sh           # [MODIFY] 우분투 원클릭 멱등 부트스트랩 스크립트
 │   │   ├── bootstrap_restore.py           # [MODIFY] 멀티 OS 호환 복원 코어 로직
 │   │   └── verify_migration.py            # [MODIFY] 10개 HTTP + Redis TCP PING 11개 검사 게이트
+│   ├── checksums.sha256                    # [OUTPUT] clean source bundle 전체 파일 inventory 체크섬
 │   ├── database/                          # [OUTPUT] 압축된 MySQL 덤프 파일 (.sql.gz)
+│   │   └── checksums.sha256                # [OUTPUT] DB dump/volume 산출물 전용 체크섬
 │   ├── volumes/                           # [OUTPUT] Docker Volume 물리 아카이브 (.tar.gz)
 │   ├── config/
 │   │   └── ddns.env.template              # [MAINTAIN] DuckDNS 템플릿
@@ -153,6 +155,7 @@ c:\AISERVICE\
 
 #### 4.1 `verify_migration.py`
 - 정확히 10개 HTTP 엔드포인트(Nginx 80/8080, Model Gateway 8081/8090/8091, A-Team Pilos 대시보드, B-Team Oliview UI/API/올리챗/올원챗)와 Redis TCP PING 1개를 E2E 헬스체크.
+- Gateway 포트는 CLI 인자(`--gateway-port`, `--secondary-gateway-port`)가 환경 변수(`MIGRATION_VERIFY_GATEWAY_PORT`, `MIGRATION_VERIFY_SECONDARY_GATEWAY_PORT`)보다 우선하며, 미지정 시 각각 80과 8080을 사용한다.
 - `verification_report.json` 발행.
 
 #### 4.2 `MIGRATION_GUIDE.md` [NEW]
@@ -165,7 +168,7 @@ c:\AISERVICE\
 ### Automated Tests
 1. **단위/통합 테스트**:
    ```bash
-   pytest tests/test_migration_pack.py -v
+   pytest tests/ -v
    ```
 2. **사전 검증 시뮬레이션 (Dry-Run)**:
    ```bash
@@ -173,8 +176,9 @@ c:\AISERVICE\
    ```
 3. **11개 검사 E2E 헬스체크(10개 HTTP + Redis TCP PING)**:
    ```bash
-   python migration_pack/scripts/verify_migration.py
+   python migration_pack/scripts/verify_migration.py --gateway-port "${MIGRATION_VERIFY_GATEWAY_PORT:-80}" --secondary-gateway-port "${MIGRATION_VERIFY_SECONDARY_GATEWAY_PORT:-8080}"
    ```
+   `tests/test_migration_convergence.py`와 canonical `migration_pack/verification_report.json`의 schema·data-integrity 결과도 함께 확인한다.
 
 ### Manual Verification
 1. **Windows 패키징 검증**: `dist/`에 기본 `.tar.gz`(선택 `.zip`/`both`), `migration_manifest.json`, `checksums.sha256`가 생성되고 평문 시크릿이 없는지 확인.

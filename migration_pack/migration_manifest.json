@@ -35,9 +35,9 @@
     {
       "name": "pilos_v2",
       "dump_file": "database/pilos_v2.sql.gz",
-      "size_bytes": 574451088,
-      "sha256": "149da9f21723803db10e9aabebc800154af48c8c4c453a1fa49f8adfe52ac4a3",
-      "row_count": 16180853,
+      "size_bytes": 594806474,
+      "sha256": "2f858ce439f540aec167a8ce9c08f3e20865b996e63b3faaacc980a511218966",
+      "row_count": 16410866,
       "row_count_source": "COUNT(*) per table",
       "dump_status": "PASS"
     },
@@ -46,7 +46,7 @@
       "dump_file": "database/oliview_project.sql.gz",
       "size_bytes": 537332311,
       "sha256": "09f3f4ac92c42691d9363f7dd5a1294e9c41a0f714ee68eb7b6d7ea975042b35",
-      "row_count": 352991,
+      "row_count": 232085,
       "row_count_source": "COUNT(*) per table",
       "dump_status": "PASS"
     },
@@ -55,7 +55,7 @@
       "dump_file": "database/cosmetic_db.sql.gz",
       "size_bytes": 537344356,
       "sha256": "bcabd93de8dd77809b82112db33ffc78083212e125c0ca1715695f4c8c14925f",
-      "row_count": 351385,
+      "row_count": 232118,
       "row_count_source": "COUNT(*) per base table (invalid views excluded)",
       "dump_status": "PARTIAL",
       "dump_exit_code": 2,
@@ -103,8 +103,8 @@
       "volume_name": "aiservice_redis_data",
       "source_volume_name": "aiservice_redis_data",
       "archive_file": "volumes/aiservice_redis_data.tar.gz",
-      "size_bytes": 318749,
-      "sha256": "e8cee2d06f7ce93a9d399be1ecb93a24e7ee1ddf1636b49c94683e42f430353e",
+      "size_bytes": 322297,
+      "sha256": "b5e5a87dc5d7d22889a450fc93539475ba1d1388530b131fb05a1c19dfd3b541",
       "is_sparse": true
     }
   ],
@@ -128,14 +128,14 @@
     "pilos_worker"
   ],
   "checksums": {
-    "database/pilos_v2.sql.gz": "149da9f21723803db10e9aabebc800154af48c8c4c453a1fa49f8adfe52ac4a3",
+    "database/pilos_v2.sql.gz": "2f858ce439f540aec167a8ce9c08f3e20865b996e63b3faaacc980a511218966",
     "database/oliview_project.sql.gz": "09f3f4ac92c42691d9363f7dd5a1294e9c41a0f714ee68eb7b6d7ea975042b35",
     "database/cosmetic_db.sql.gz": "bcabd93de8dd77809b82112db33ffc78083212e125c0ca1715695f4c8c14925f",
     "volumes/ateam_db_data.tar.gz": "27f464b315043db3f28f1a46c7e79a3cc5426e0ff21a3aceeeac95bcb50291c4",
     "volumes/bteam_bteam_mysql_data.tar.gz": "cf10b4300a2a0e3c00e5d4a50c705e6fbae7bd2238d1b7adb8eaf740d306bc88",
     "volumes/green_mysql_data.tar.gz": "1626e310e07a4029697ec99139fa010d3c79b816fdf29c5fa177231f8fe50334",
     "volumes/green_chroma_data.tar.gz": "27a9bf1ba92d56da1ef783df0ec7b2675c29bc7decb874df5f7f375c3a5815f0",
-    "volumes/aiservice_redis_data.tar.gz": "e8cee2d06f7ce93a9d399be1ecb93a24e7ee1ddf1636b49c94683e42f430353e"
+    "volumes/aiservice_redis_data.tar.gz": "b5e5a87dc5d7d22889a450fc93539475ba1d1388530b131fb05a1c19dfd3b541"
   },
   "source_bundle": {
     "file_count": 10050,

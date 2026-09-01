@@ -31,7 +31,7 @@
   $\rightarrow$ **A: 전원 승인 (4대 미세 보강 항목 최종 통합)**:
     1. **APT 무인 환경 변수 표준화 (`DEBIAN_FRONTEND=noninteractive`)**: `needrestart` 대화창 자동 바이패스 및 완전 무인 패키지 설치 보장.
     2. **DB 볼륨 추출 안전 절차 (InnoDB Dirty Page 플러시)**: 라이브 MySQL 볼륨 백업 시 `FLUSH TABLES WITH READ LOCK` 또는 `docker pause` 적용으로 디스크-메모리 정합성 보장.
-    3. **Model Gateway 계층형 런타임 폴백 (vLLM $\leftrightarrow$ llama.cpp)**: GPU vLLM $\rightarrow$ 저VRAM llama.cpp CUDA $\rightarrow$ CPU OpenBLAS AVX-512 3단계 무정지 계층 폴백.
+    3. **Model Gateway 계층형 런타임 폴백 (vLLM $\leftrightarrow$ llama.cpp)**: GPU vLLM $\rightarrow$ 저VRAM llama.cpp CUDA $\rightarrow$ AVX 비활성·SSE4.2 호환 CPU OpenBLAS 3단계 무정지 계층 폴백.
     4. **단계별 컨테이너 기동 시퀀스**: 인프라(DB, Redis, Model Gateway)의 완전한 Healthy 상태 확인 후 애플리케이션(UI, Backend, Chatbot)을 기동하여 Connection Refused 방지.
 - **Q7: 타겟 호스트 하드웨어 사양(Intel i7-930, 24GB RAM, GTX 1070 8GB)에 특화된 빌드 및 런타임 제약사항을 명세에 반영할까요?**  
   $\rightarrow$ **A: 전격 반영**:
@@ -208,10 +208,11 @@ AISERVICE_Migration_Pack/
 ├── config/                         # 공통 환경 설정 및 템플릿
 ├── tests/                          # E2E 및 단위/통합 테스트 스위트
 ├── migration_pack/                 # 마이그레이션 전용 자산 및 도구
+│   ├── checksums.sha256             # clean source bundle 전체 파일 inventory 체크섬
 │   ├── database/                   # 압축된 MySQL 덤프 파일 (.sql.gz)
 │   │   ├── pilos_v2.sql.gz
 │   │   ├── oliview_project.sql.gz
-│   │   └── checksums.sha256
+│   │   └── checksums.sha256             # DB dump/volume 산출물 전용 체크섬
 │   ├── volumes/                    # Docker Volume 물리 아카이브 (.tar.gz)
 │   │   ├── ateam_db_data.tar.gz
 │   │   ├── bteam_bteam_mysql_data.tar.gz

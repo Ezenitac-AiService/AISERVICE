@@ -94,7 +94,7 @@
 
 ### Implementation for User Story 4
 - [x] T021 [US4] `make_migration_pack.py`에 엄격한 제외 필터 기반 클린 소스 어셈블러를 구현
-- [x] T022 [US4] `make_migration_pack.py` 및 `migration_pack/scripts/bootstrap_restore.sh`에 실사용 `.env` 암호화 보존, 외부 키 주입 및 복호화 후 보안 권한(`chmod 600`) 적용 로직을 구현
+- [x] T022 [US4] `make_migration_pack.py` 및 `migration_pack/scripts/bootstrap_restore.sh`에 실사용 `.env` 암호화 보존, 외부 키 주입 및 복호화 후 보안 권한(`chmod 600`) 적용 로직을 구현(SC-001)
 - [x] T023 [US4] `make_migration_pack.py`에 매니페스트 v2.0 생성기 및 SHA-256 체크섬 매트릭스 빌더를 구현
 
 **Checkpoint**: Zero-Config 실사용 시크릿 100% 보존 및 클린 아카이브 패키징 완료
@@ -113,7 +113,7 @@
 ### Implementation for User Story 5
 - [x] T025 [US5] `migration_pack/scripts/normalize_compose.py`에 `/dev/dxg`를 Linux 표준 `nvidia` 런타임으로 변환하는 Compose 정규화기를 구현(FR-012, US5/AC1)
 - [x] T026 [US5] `migration_pack/scripts/bootstrap_restore.sh`에 단계적 컨테이너 기동 시퀀스(DB/Redis/Model Gateway 준비성 프로브 $\rightarrow$ 앱 기동)를 구현
-- [x] T027 [US5] `migration_pack/scripts/bootstrap_restore.sh` 및 `bootstrap_restore.py`에 멱등 에러 트랩(`set -euo pipefail`) 및 권한 정규화를 구현
+- [x] T027 [US5] `migration_pack/scripts/bootstrap_restore.sh` 및 `bootstrap_restore.py`에 멱등 에러 트랩(`set -euo pipefail`) 및 권한 정규화를 구현(SC-001)
 
 **Checkpoint**: 원클릭 단계적 무인 복원 및 Compose 오케스트레이션 완성
 
@@ -205,12 +205,12 @@ graph TD
 
 - [x] T038 [CRITICAL] 마이그레이션 도구의 하드코딩된 DB 자격 증명과 DuckDNS 비밀값을 제거하고 번들된 `.env`/`ddns/.env`에서 읽도록 하며, 원문 값은 보호된 파일에만 두고 코드 로그와 매니페스트 메타데이터에서는 마스킹한다(Constitution IV / FR-006, contradicts).
 - [x] T039 `make_migration_pack.py`의 런타임과 CLI 의미를 보완한다. 필수 모듈을 모두 import하고 `--include-models`, `--force`, `--dry-run`, 대상 프로파일 옵션을 처리하며 환경/Docker/볼륨/디스크 사전 검사를 수행하고 계약된 종료 코드를 반환한다(FR-008, FR-019, missing).
-- [x] T040 `docs/`를 포함한 모든 지정 소스 영역을 클린 어셈블러가 미러링하고 활성 환경 파일을 보존하며, 내부 복원 스크립트가 덮어쓰지 않는 실행 가능한 번들 루트 래퍼를 생성한다(FR-005, FR-006, FR-010, partial).
+- [x] T040 `docs/`를 포함한 모든 지정 소스 영역을 클린 어셈블러가 미러링하고 활성 환경 파일을 보존하며, 내부 복원 스크립트가 덮어쓰지 않는 실행 가능한 번들 루트 래퍼를 생성한다(FR-005, FR-006, FR-010, SC-001, partial).
 - [x] T041 환경 기반 MySQL 대상 탐색과 안전한 스트리밍 덤프를 구현한다. `FLUSH TABLES WITH READ LOCK` 또는 동등한 일시정지 프로토콜, 대용량 덤프 옵션, 프로세스의 모든 nonzero 종료에 대한 엄격한 실패 처리를 적용한다(FR-003, EC-001, missing).
 - [x] T042 `green_mysql_data`를 포함한 모든 지정 named volume의 export 맵을 완성하고 SQLite WAL 및 Redis BGSAVE 스냅샷을 일관되게 수행하며, 필수 볼륨을 조용히 생략하지 않고 명확히 실패한다(FR-004, US3/AC1, missing).
 - [x] T043 DB/볼륨/source-bundle 산출물에 대한 v2 매니페스트와 SHA-256 매트릭스를 생성하고 스키마 검증한다. 조작한 행 수가 아닌 측정 메타데이터를 포함하고 오래된 체크인 산출물을 갱신한다(FR-009, SC-009, plan: manifest v2, partial).
 - [x] T044 Ubuntu, 공식 Docker/Compose, NVIDIA 드라이버, 호환 `nvidia-container-toolkit`, Docker GPU 런타임, cron을 독립적으로 탐지하고 준비하도록 사전 요구사항 프로비저닝을 보완한다. 드라이버 실패를 삼키지 않고 GPU-skip/yes 동작을 존중한다(FR-001, US1/AC2, FR-015, partial).
-- [x] T045 부트스트랩 사전 검사와 정규화를 완성한다. root 권한, 디스크/포트 검사, CRLF-to-LF 변환, 모든 번들 `.env`의 보안 권한, 스크립트 실행 권한, dry-run 검사, 옵션 전달, 멱등적 덮어쓰기 처리를 강제한다(FR-007, FR-011, EC-004, EC-006, missing).
+- [x] T045 부트스트랩 사전 검사와 정규화를 완성한다. root 권한, 디스크/포트 검사, CRLF-to-LF 변환, 모든 번들 `.env`의 보안 권한, 스크립트 실행 권한, dry-run 검사, 옵션 전달, 멱등적 덮어쓰기 처리를 강제한다(FR-007, FR-011, SC-001, EC-004, EC-006, missing).
 - [x] T046 Mutex 판단을 성공적인 물리 볼륨 복원과 무결성/레코드 검사 결과에 기반하도록 하고, 기존 볼륨 덮어쓰기 시 프롬프트 또는 force를 적용하며, 모든 logical restore nonzero 종료를 실패로 처리한다(FR-013, US3/AC2, EC-005, partial).
 - [x] T047 하드웨어 적응형 `llama.cpp` 재빌드 소스 또는 wheel 파이프라인을 연결하고, CPU 플래그를 유효한 CMake 변수로 전달하며, Pascal `sm_61`을 매핑하고 GPU offload를 자동 조정한다. Illegal instruction 또는 CUDA mismatch 시 호환성 fallback을 재시도한다(FR-002, US2, Clarification Q1, missing).
 - [x] T048 정확히 5,000 MB인 GTX 1070 안전 예산을 적용하고 세 모델 로드를 동적으로 분할하며 탐지 프로파일을 런타임 설정에 저장한다. 이어서 vLLM → CUDA llama.cpp → CPU OpenBLAS fallback chain을 구현한다(FR-014, SC-003, Clarification Q6, partial).
@@ -261,7 +261,7 @@ graph TD
 ## Phase 15: Convergence
 
 - [x] T068 [CRITICAL] `migration_pack/scripts/bootstrap_restore.sh`의 옵션 파싱 `while`/`case` 블록을 올바르게 닫아 `bash -n`, `--help`, `--dry-run` smoke test가 통과하고 FR-010/FR-011 및 US5의 원클릭 진입점이 실제 실행 가능하도록 복구한다(FR-010/011, US5/AC2, contradicts).
-- [x] T069 [CRITICAL] `make_migration_pack.py`, `migration_pack/scripts/bootstrap_restore.sh`, `migration_pack/scripts/bootstrap_restore.py`에 승인된 암호화 provider/envelope, 외부 `MIGRATION_PACK_KEY_FILE` 또는 `--key-file`, `.tar.gz.enc`/`.zip.enc` 생성·복호화, 평문 `.env` 비노출, 보안 매니페스트 필드 및 checksum 처리를 실제로 연결하고 계약 Red/Green 테스트를 통과시킨다(FR-006/008, US4/AC1, missing).
+- [x] T069 [CRITICAL] `make_migration_pack.py`, `migration_pack/scripts/bootstrap_restore.sh`, `migration_pack/scripts/bootstrap_restore.py`에 승인된 암호화 provider/envelope, 외부 `MIGRATION_PACK_KEY_FILE` 또는 `--key-file`, `.tar.gz.enc`/`.zip.enc` 생성·복호화, 평문 `.env` 비노출, 보안 매니페스트 필드 및 checksum 처리를 실제로 연결하고 계약 Red/Green 테스트를 통과시킨다(FR-006/008, SC-001, US4/AC1, missing).
 - [x] T070 [HIGH] `make_migration_pack.py`와 `bootstrap_restore.py`의 dry-run 및 사전검사를 실제 DB 연결, 대상 Docker volume 존재·크기, Docker daemon, root/포트/최소 25GB 디스크 조건까지 수행하도록 완성하고 migration CLI/bootstrap 계약의 종료 코드를 정확히 반환한다(FR-019, EC-004/006, partial).
 - [x] T071 [HIGH] `bootstrap_restore.py`에 `bteam/docker-compose.green.yml` 기반 Green MySQL/Chroma staged startup, 모든 기본·Green DB readiness 대기, `GREEN_DB_*` 대상 복원 및 매니페스트/무결성 연결을 구현한다(FR-003/004, SC-004, US3/AC1, partial).
 - [x] T072 [HIGH] `migration_pack/scripts/export_databases.py`의 MySQL 일관성 lock을 dump 스트림과 동일 세션에서 유지·해제하고 Green DB의 정확한 행 수를 수집하며, `export_docker_volumes.py`에서 Chroma SQLite WAL checkpoint와 Redis BGSAVE 완료·성공 상태를 검증한 뒤 아카이브를 생성하도록 보완한다(FR-003, EC-001/003, partial).
@@ -278,7 +278,7 @@ graph TD
 - [x] T080 [HIGH] Chroma WAL checkpoint 이후 canonical 컬렉션의 벡터 수를 필수 측정하고 측정값이 없거나 불안정하면 패키징을 차단하며 원본 수치를 매니페스트에 기록한다(FR-004, SC-004, 완료).
 - [x] T081 [HIGH] Model Gateway에 vLLM → CUDA llama.cpp → CPU OpenBLAS 순서의 실제 런타임 시도·health/readiness·CUDA/Illegal instruction 오류 감지 및 fallback을 연결하고 Non-AVX/GTX 1070 경로를 검증한다(FR-002, SC-003, 완료).
 - [x] T082 [MEDIUM] 계획서·데이터 모델·manifest·Quickstart·코드의 서비스 inventory를 대조하여 10개와 11개 불일치를 해소하고 엔드포인트 매핑을 단일 기준으로 정리한다(서비스 inventory, 완료).
-- [x] T083 [HIGH] `bootstrap_restore.py --archive` 직접 실행 경로에서도 `.env`와 `ddns/.env`를 600으로 설정하고 복원 스크립트의 실행 권한을 정규화하여 shell wrapper와 동일한 보안 보장을 제공한다(FR-007, SC-008, US5/AC1, 완료).
+- [x] T083 [HIGH] `bootstrap_restore.py --archive` 직접 실행 경로에서도 `.env`와 `ddns/.env`를 600으로 설정하고 복원 스크립트의 실행 권한을 정규화하여 shell wrapper와 동일한 보안 보장을 제공한다(FR-007, SC-001, SC-008, US5/AC1, 완료).
 - [x] T084 [MEDIUM] 최신 TDD 테스트 증적을 반영하여 `plan.md` Constitution Check의 Principle II 상태와 검증 근거를 갱신한다(Constitution II, 완료).
 
 ## Phase 17: Convergence
@@ -298,4 +298,16 @@ graph TD
 - [x] T094 [HIGH] 현재 Compose/gateway 서비스의 실제 route와 `verify_migration.py` 계약을 대조하여 404 endpoint를 수정하고, 복원 후 실제 기동 상태에서 10개 HTTP 200과 Redis PONG의 11/11 PASS 및 `overall_status=PASS`를 검증한다(FR-017, SC-006, 완료; `--gateway-port 8080` live 검증).
 ## Phase 19: Convergence
 
-- [ ] T095 [HIGH] 최신 `verify_migration.py` endpoint·gateway 포트 설정으로 canonical `migration_pack/verification_report.json`을 재생성하여 이전 3/11 404 결과를 제거하고, DB/Chroma data-integrity 결과를 함께 반영한 최신 검증 산출물을 체크인한다(FR-017, SC-006, partial).
+- [x] T095 [HIGH] 최신 `verify_migration.py` endpoint·gateway 포트 설정으로 canonical `migration_pack/verification_report.json`을 재생성하여 이전 3/11 404 결과를 제거하고, DB/Chroma data-integrity 결과를 함께 반영한 최신 검증 산출물을 체크인한다(FR-017, SC-006, 완료; endpoint 11/11 PASS, Chroma PASS, DB 행 수 불일치는 FAIL로 기록).
+
+## Phase 20: Convergence
+
+- [x] T096 [HIGH] `migration_manifest.json`의 원본 기준과 현재 실행 DB(`pilos_v2`, `oliview_project`, `cosmetic_db`) 행 수 불일치 원인을 동일한 source/runtime 측정 경계에서 재현·분석하고, 누락 데이터를 복원한다. 기준값 갱신은 독립적으로 재현된 원본 측정 증거가 있을 때만 허용하며 단순 기준 완화는 금지하고, 이후 `verification_report.json`의 DB data-integrity를 PASS로 갱신한다(FR-003, SC-004, 완료; source/runtime 동일 COUNT(*) 측정과 재생성 dump 증거, Pilos 16410866, Oliview 232085, Cosmetic 232118, Chroma 57435, endpoint 11/11 PASS).
+
+## Phase 21: Convergence
+
+- [ ] T097 [HIGH] `make_migration_pack.py`의 clean bundle 경계를 수정하여 생성된 `database/*.sql.gz` 및 `volumes/*.tar.gz` 산출물은 암호화 배포 archive에 포함하고 `.git`/cache/임시 파일만 제외하도록 명시적 allowlist 또는 후처리 복사를 적용하며, 복호화 archive 내용·manifest·checksum을 함께 검증한다(FR-003/004, US3/AC1, partial).
+- [ ] T098 [HIGH] `make_migration_pack.py`가 root Compose에서 참조하는 필수 bind 파일(특히 `bteam/oliview_project_backup_0813.sql`)을 clean bundle에서 보존하거나 해당 Compose 참조를 데이터 dump/volume 복원 경로로 안전하게 대체하여 압축 해제 후 Compose 기동 시 누락 경로가 발생하지 않도록 보완한다(FR-005/010, US5/AC1, partial).
+- [ ] T099 [HIGH] `model_gateway/scripts/build_llama.sh`의 runtime-status heredoc에서 Bash fallback 함수를 Python 코드 밖으로 분리하고, `probe_hardware.py`의 Non-AVX compiler flags 및 `_target_hardware()` manifest가 실제 CMake 빌드에 `-march=native`와 `CMAKE_CUDA_ARCHITECTURES=61`을 일관되게 전달하도록 수정한 뒤 CPU/CUDA/status smoke test를 추가한다(FR-002, US2/AC1, SC-003, partial).
+- [ ] T100 [HIGH] `bootstrap_restore.py`의 Green restore 경로가 Compose service label/name suffix로 실제 `bteam-green-mysql-green-1` 및 `bteam-green_green_*` 대상을 resolve하고, volume 복원·MySQL/Redis readiness·DB Mutex 판정이 같은 resolved container/volume을 사용하도록 통합 테스트와 함께 보완한다(FR-003/004, US3/AC1, SC-004, partial).
+- [ ] T101 [MEDIUM] `bootstrap_restore.sh --skip-gpu`가 GPU 설치·JIT 생략뿐 아니라 Compose GPU deploy/device/environment를 CPU-only 설정으로 전환하고 Model Gateway가 CPU fallback chain으로 readiness를 통과하도록 연결한다(bootstrap-restore contract `--skip-gpu`, FR-002, partial).

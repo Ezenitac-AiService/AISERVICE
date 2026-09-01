@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-08-30T11:21:57.266253+00:00",
-  "status": "FAIL",
+  "timestamp": "2026-08-31T15:36:38.513235+00:00",
+  "status": "PASS",
   "total_endpoints": 11,
-  "passed_endpoints": 3,
-  "failed_endpoints": 8,
-  "duration_seconds": 20.799,
+  "passed_endpoints": 11,
+  "failed_endpoints": 0,
+  "duration_seconds": 16.458,
   "hardware_detected": {
     "cpu_model": "Intel64 Family 6 Model 79 Stepping 1, GenuineIntel",
     "avx_supported": false,
@@ -13,30 +13,28 @@
     "compute_capability": "6.1"
   },
   "data_integrity": {
-    "status": "FAIL",
+    "status": "PASS",
     "databases": [
       {
         "name": "pilos_v2",
-        "expected_row_count": 16180853,
-        "actual_row_count": 16181009,
+        "expected_row_count": 16410866,
+        "actual_row_count": 16410866,
         "measurement_method": "COUNT(*) per table",
-        "status": "FAIL",
-        "error": "복원 후 DB 행 수가 원본 측정값과 다릅니다"
+        "status": "PASS"
       },
       {
         "name": "oliview_project",
-        "expected_row_count": 352991,
-        "actual_row_count": 352991,
+        "expected_row_count": 232085,
+        "actual_row_count": 232085,
         "measurement_method": "COUNT(*) per table",
         "status": "PASS"
       },
       {
         "name": "cosmetic_db",
-        "expected_row_count": 351385,
-        "actual_row_count": 0,
-        "measurement_method": "unavailable",
-        "status": "FAIL",
-        "error": "복원 후 DB 행 수가 원본 측정값과 다릅니다"
+        "expected_row_count": 232118,
+        "actual_row_count": 232118,
+        "measurement_method": "COUNT(*) per table",
+        "status": "PASS"
       }
     ],
     "chroma": {
@@ -51,20 +49,19 @@
     {
       "id": "gateway_root",
       "name": "Nginx Gateway Root (80)",
-      "url": "http://127.0.0.1/",
-      "status_code": 404,
-      "latency_ms": 58.63,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/",
+      "status_code": 200,
+      "latency_ms": 14.83,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "gateway_secondary",
       "name": "Nginx Gateway Secondary (8080)",
       "url": "http://127.0.0.1:8080/",
       "status_code": 200,
-      "latency_ms": 21.85,
+      "latency_ms": 5.08,
       "status": "PASS",
       "passed": true,
       "message": "HTTP response and payload accepted"
@@ -74,7 +71,7 @@
       "name": "Model Gateway (LLM)",
       "url": "http://127.0.0.1:8081/health",
       "status_code": 200,
-      "latency_ms": 22.22,
+      "latency_ms": 11.93,
       "status": "PASS",
       "passed": true,
       "message": "HTTP response and payload accepted"
@@ -82,86 +79,79 @@
     {
       "id": "bge_m3_embedding",
       "name": "BGE-M3 Embedding",
-      "url": "http://127.0.0.1:8090/health",
-      "status_code": 404,
-      "latency_ms": 261.09,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8090/v1/models",
+      "status_code": 200,
+      "latency_ms": 4.87,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "bge_reranker",
       "name": "BGE Reranker",
-      "url": "http://127.0.0.1:8091/health",
-      "status_code": 404,
-      "latency_ms": 261.1,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8091/v1/models",
+      "status_code": 200,
+      "latency_ms": 4.79,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "pilos_web",
       "name": "Pilos Web",
-      "url": "http://127.0.0.1/ateam/pilos/",
-      "status_code": 404,
-      "latency_ms": 11.18,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/ateam/pilos/",
+      "status_code": 200,
+      "latency_ms": 25.2,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "oliview_frontend",
       "name": "Oliview Frontend",
-      "url": "http://127.0.0.1/bteam/oliview/",
-      "status_code": 404,
-      "latency_ms": 43.94,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/bteam/oliview/",
+      "status_code": 200,
+      "latency_ms": 35.94,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "oliview_backend",
       "name": "Oliview Backend API",
-      "url": "http://127.0.0.1/bteam/oliview/api/health",
-      "status_code": 404,
-      "latency_ms": 31.26,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/bteam/oliview/api/health",
+      "status_code": 200,
+      "latency_ms": 5.14,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "oliview_chatbot_a",
       "name": "Oliview Chatbot A (Streamlit)",
-      "url": "http://127.0.0.1/bteam/chata/",
-      "status_code": 404,
-      "latency_ms": 10.62,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/bteam/chata/",
+      "status_code": 200,
+      "latency_ms": 5.07,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "oliview_chatbot_b",
       "name": "Oliview Chatbot B (FastAPI)",
-      "url": "http://127.0.0.1/bteam/chatb/",
-      "status_code": 404,
-      "latency_ms": 10.18,
-      "status": "FAIL",
-      "passed": false,
-      "message": "HTTP 404: Not Found",
-      "error": "HTTP 404: Not Found"
+      "url": "http://127.0.0.1:8080/bteam/chatb/",
+      "status_code": 200,
+      "latency_ms": 19.3,
+      "status": "PASS",
+      "passed": true,
+      "message": "HTTP response and payload accepted"
     },
     {
       "id": "redis",
       "name": "Redis Session Store (PING-PONG)",
       "url": "tcp://127.0.0.1:6379",
       "status_code": 200,
-      "latency_ms": 1.95,
+      "latency_ms": 1.88,
       "status": "PASS",
       "passed": true,
       "message": "+PONG"
@@ -169,8 +159,8 @@
   ],
   "report_version": "2.0.0",
   "total_checks": 11,
-  "passed_checks": 3,
-  "failed_checks": 8,
-  "pass_rate_pct": 27.3,
-  "overall_status": "DEGRADED"
+  "passed_checks": 11,
+  "failed_checks": 0,
+  "pass_rate_pct": 100.0,
+  "overall_status": "HEALTHY"
 }
