@@ -172,18 +172,18 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 - **FR-005**: 시스템은 전체 작업 폴더(`c:\AISERVICE`)의 소스 코드와 설정 파일을 1:1로 미러링하되, `.git`, `.venv`, `node_modules`, `__pycache__` 등 불필요한 임시/캐시 디렉터리를 제외하는 클린 어셈블리 기능을 제공해야 한다.
 - **FR-006**: 시스템은 실사용 환경 변수 파일(루트 `.env` 및 `ddns/.env`)의 실제 시크릿/설정값 일체를 암호화된 아카이브에 100% 누락 없이 번들링하고, 복호화 키를 아카이브 외부의 보호된 경로 또는 비밀 주입 경로에서 받아 타겟 서버에서 사용자의 수동 입력 없이 즉시 기동(Zero-Config)할 수 있도록 보장해야 한다. 원문 시크릿은 로그, 매니페스트, 체크섬 및 평문 전송에 기록하지 않는다.
 - **FR-007**: 시스템은 번들 압축 해제 시 `.env` 파일에 `chmod 600` 보안 권한을 자동 적용하고, 모든 스크립트에 `chmod +x`를 부여해야 한다.
-- **FR-008**: 시스템은 우분투 리눅스 타겟 환경에 최적화된 단일 선택 형식 아카이브를 생성하는 `make_migration_pack.py` CLI를 제공해야 한다. 기본 형식은 `.tar.gz`이며 `--format zip`으로 `.zip`을 선택하고 `--format both`로 두 형식을 병렬 생성할 수 있다. 각 배포 아카이브는 시크릿 보호 정책에 따라 암호화되어야 한다.
+- **FR-008**: 시스템은 우분투 리눅스 타겟 환경에 최적화된 암호화 아카이브를 생성하는 `make_migration_pack.py` CLI를 제공해야 한다. 기본 `--format tar.gz`는 `*.tar.gz.enc`, `--format zip`은 동일 내용의 `*.zip.enc`를 생성하며, `--format both`는 두 개의 독립적인 암호화 아카이브를 생성한다(병렬 생성은 허용하되 필수는 아님). 각 아카이브는 동일한 manifest/checksum을 참조하고 외부 키 없이는 복호화할 수 없어야 한다.
 - **FR-009**: 시스템은 모든 생성된 덤프 파일, 볼륨 아카이브, 소스 번들에 대한 SHA-256 해시 체크섬을 `migration_manifest.json` 및 `checksums.sha256`에 기록해야 한다.
 - **FR-010**: 시스템은 타겟 우분투 서버에서 원클릭으로 실행 가능한 멱등 복원 및 부트스트랩 스크립트(`bootstrap_restore.sh`)를 제공해야 한다.
 - **FR-011**: 부트스트랩 스크립트는 우분투 환경에서 모든 쉘 스크립트의 CRLF 줄바꿈을 LF로 자동 변환하고 `set -euo pipefail` 에러 트랩을 적용해야 한다.
 - **FR-012**: 부트스트랩 스크립트는 Docker Compose 파일에서 Windows WSL 전용 디바이스(`/dev/dxg`, `/usr/lib/wsl`)를 자동 제거하고 Native Ubuntu GPU 런타임 설정으로 자동 변환해야 한다.
 - **FR-013**: 부트스트랩 스크립트는 물리 볼륨 복원 성공 시 중복 SQL 덤프 복원을 건너뛰는 상호 배제(Mutex) 복원 로직을 적용하여 DB 테이블 충돌을 방지해야 한다.
-- **FR-014**: Model Gateway는 8GB VRAM 환경(GTX 1070)에서 Qwen 2B LLM, BGE-M3 임베딩, BGE-Reranker 3종 모델을 OOM 없이 100% GPU 가속 서빙하도록 VRAM 예산(5.0GB)을 파티셔닝해야 한다.
+- **FR-014**: NVIDIA GTX 1070이 감지되고 GPU 드라이버 및 컨테이너 런타임이 정상인 대상에서는 Model Gateway가 Qwen 2B LLM, BGE-M3 임베딩, BGE-Reranker 3종 모델을 OOM 없이 5.0GB VRAM 예산 안에서 100% GPU 가속으로 서빙해야 한다. GPU가 없거나 `--skip-gpu`가 지정되었거나 GPU 호환성 검증이 실패한 경우에는 CPU fallback chain으로 기동할 수 있지만, 검증 보고서에 `DEGRADED` 사유를 기록하며 이 경로는 SC-003의 GPU PASS로 산정하지 않는다.
 - **FR-015**: 시스템은 번들된 `.env` 설정에 따라 타겟 우분투 서버에서 DuckDNS 동적 IP 갱신 데몬(`ddns/duck.sh`)을 `curl -4` 옵션과 함께 5분 주기 크론잡으로 자동 등록하고 초기 IP를 즉시 동기화해야 한다.
 - **FR-016**: 부트스트랩 스크립트는 인프라 컨테이너(MySQL, Redis, Model Gateway)의 Healthy 상태를 확인한 후 애플리케이션 컨테이너를 순차 기동하는 단계별 오케스트레이션을 보장해야 한다.
 - **FR-017**: 시스템은 복원 완료 후 즉시 10개 HTTP 엔드포인트와 Redis TCP PING으로 구성된 11개 주요 서비스 검사를 수행하고 결과를 `verification_report.json`으로 저장하는 자동 검증기(`verify_migration.py`)를 제공해야 한다.
 - **FR-018**: 시스템은 마이그레이션 팩 구성, 우분투 서버 사전 요구사항, 복원 절차, GPU 환경 설정, 트러블슈팅을 다루는 `MIGRATION_GUIDE.md`를 포함해야 한다.
-- **FR-019**: 시스템은 사전 검증 모드(`--dry-run`), 볼륨 포함 옵션(`--include-volumes`), 모델 가중치 포함 옵션(`--include-models`), 강제 덮어쓰기 옵션(`--force`)을 지원해야 한다.
+- **FR-019**: 시스템은 사전 검증 모드(`--dry-run`), 볼륨 포함 옵션(`--include-volumes`), 모델 가중치 포함 옵션(`--include-models`), GPU 설치·JIT·GPU Compose 경로를 생략하고 CPU-only 모드로 강제하는 옵션(`--skip-gpu`), 강제 덮어쓰기 옵션(`--force`)을 지원해야 한다. `--include-models`는 설정된 모델 루트의 파일을 아카이브에 포함하고 각 파일의 크기와 SHA-256을 manifest/checksum에 기록하며 복원 시 동일 경로로 배치해야 한다.
 
 ---
 
@@ -212,6 +212,7 @@ AISERVICE_Migration_Pack/
 │   ├── database/                   # 압축된 MySQL 덤프 파일 (.sql.gz)
 │   │   ├── pilos_v2.sql.gz
 │   │   ├── oliview_project.sql.gz
+│   │   ├── cosmetic_db.sql.gz      # Green MySQL 논리 덤프
 │   │   └── checksums.sha256             # DB dump/volume 산출물 전용 체크섬
 │   ├── volumes/                    # Docker Volume 물리 아카이브 (.tar.gz)
 │   │   ├── ateam_db_data.tar.gz
@@ -278,6 +279,6 @@ AISERVICE_Migration_Pack/
 
 - **마이그레이션 성격**: 본 마이그레이션은 동일 개발/실증(DEV/DEMO) 모드의 호스트 환경 이전(Windows $\rightarrow$ Ubuntu Linux)이므로, `.env` 내의 실사용 시크릿을 암호화된 번들에 포함하되 키는 외부 보호 경로에서 주입합니다. 복원 후 기능에는 원문 값을 사용하지만 로그·매니페스트·체크섬·평문 전송에는 기록하지 않습니다.
 - **타겟 하드웨어 프로파일**: 타겟 서버는 Intel Core i7-930 CPU (Non-AVX, SSE4.2), 24GB RAM, NVIDIA GeForce GTX 1070 8GB GPU를 탑재한 Ubuntu 24.04 LTS 환경을 표준으로 합니다.
-- **GPU 가속 환경**: NVIDIA GPU 장착 서버의 경우 부트스트랩 스크립트 또는 자동 설치 도구를 통해 `nvidia-container-toolkit`을 활성화하며, CPU 전용 서버인 경우 CPU 폴백 모드가 적용됩니다.
+- **GPU 가속 환경**: NVIDIA GPU 장착 서버의 경우 부트스트랩 스크립트 또는 자동 설치 도구를 통해 `nvidia-container-toolkit`을 활성화합니다. GPU가 없거나 `--skip-gpu`가 지정된 경우 Compose의 GPU device/deploy/environment 설정을 제거한 CPU-only 모드로 실행하며, GPU 호환성 실패 시에도 CPU fallback을 허용하되 검증 보고서에는 `DEGRADED` 상태와 사유를 기록합니다. GTX 1070과 정상 GPU 런타임 조건에서만 SC-003의 100% GPU 가속 PASS를 인정합니다.
 - **스토리지 여유 공간**: 덤프 생성 및 볼륨 아카이브 추출/압축 해제를 위해 소스 호스트 및 타겟 우분투 서버에 최소 25GB 이상의 디스크 여유 공간이 확보되어 있어야 합니다.
 - **보안 및 아카이브 전송**: 실사용 시크릿이 포함된 마이그레이션 아카이브는 공용 네트워크에 공개되지 않도록 SSH/SCP 또는 개인 보안 채널을 통해 전송해야 합니다.

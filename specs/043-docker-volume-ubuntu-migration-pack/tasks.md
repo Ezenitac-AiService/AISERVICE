@@ -306,8 +306,12 @@ graph TD
 
 ## Phase 21: Convergence
 
-- [ ] T097 [HIGH] `make_migration_pack.py`의 clean bundle 경계를 수정하여 생성된 `database/*.sql.gz` 및 `volumes/*.tar.gz` 산출물은 암호화 배포 archive에 포함하고 `.git`/cache/임시 파일만 제외하도록 명시적 allowlist 또는 후처리 복사를 적용하며, 복호화 archive 내용·manifest·checksum을 함께 검증한다(FR-003/004, US3/AC1, partial).
+- [ ] T097 [HIGH] `make_migration_pack.py`의 clean bundle 경계를 수정하여 생성된 `database/*.sql.gz`(pilos_v2, oliview_project, cosmetic_db) 및 `volumes/*.tar.gz` 산출물은 암호화 배포 archive에 포함하고 `.git`/cache/임시 파일만 제외하도록 명시적 allowlist 또는 후처리 복사를 적용하며, 복호화 archive 내용·manifest·checksum을 함께 검증한다(FR-003/004, US3/AC1, partial).
 - [ ] T098 [HIGH] `make_migration_pack.py`가 root Compose에서 참조하는 필수 bind 파일(특히 `bteam/oliview_project_backup_0813.sql`)을 clean bundle에서 보존하거나 해당 Compose 참조를 데이터 dump/volume 복원 경로로 안전하게 대체하여 압축 해제 후 Compose 기동 시 누락 경로가 발생하지 않도록 보완한다(FR-005/010, US5/AC1, partial).
 - [ ] T099 [HIGH] `model_gateway/scripts/build_llama.sh`의 runtime-status heredoc에서 Bash fallback 함수를 Python 코드 밖으로 분리하고, `probe_hardware.py`의 Non-AVX compiler flags 및 `_target_hardware()` manifest가 실제 CMake 빌드에 `-march=native`와 `CMAKE_CUDA_ARCHITECTURES=61`을 일관되게 전달하도록 수정한 뒤 CPU/CUDA/status smoke test를 추가한다(FR-002, US2/AC1, SC-003, partial).
 - [ ] T100 [HIGH] `bootstrap_restore.py`의 Green restore 경로가 Compose service label/name suffix로 실제 `bteam-green-mysql-green-1` 및 `bteam-green_green_*` 대상을 resolve하고, volume 복원·MySQL/Redis readiness·DB Mutex 판정이 같은 resolved container/volume을 사용하도록 통합 테스트와 함께 보완한다(FR-003/004, US3/AC1, SC-004, partial).
-- [ ] T101 [MEDIUM] `bootstrap_restore.sh --skip-gpu`가 GPU 설치·JIT 생략뿐 아니라 Compose GPU deploy/device/environment를 CPU-only 설정으로 전환하고 Model Gateway가 CPU fallback chain으로 readiness를 통과하도록 연결한다(bootstrap-restore contract `--skip-gpu`, FR-002, partial).
+- [ ] T101 [MEDIUM] `bootstrap_restore.sh --skip-gpu`가 GPU 설치·JIT 생략뿐 아니라 Compose GPU deploy/device/environment를 CPU-only 설정으로 전환하고 Model Gateway가 CPU fallback chain으로 readiness를 통과하도록 연결하며, 검증 보고서에 `DEGRADED` 상태와 사유를 기록한다(bootstrap-restore contract `--skip-gpu`, FR-002/014, partial).
+
+## Phase 22: Specification Convergence
+
+- [ ] T102 [MEDIUM] `--include-models`가 설정된 모델 루트의 실제 파일을 암호화 archive에 포함하고 파일별 크기·SHA-256을 `migration_manifest.json`/`checksums.sha256`에 기록하며 복원 시 동일 경로에 배치하도록 구현하고, 누락·변조·복원 경로를 검증하는 Red/Green 계약 테스트를 추가한다(FR-019, Constitution II, partial).
