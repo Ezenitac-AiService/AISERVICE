@@ -227,7 +227,7 @@ class AiGatewayClient:
         rep_pen = self.settings.default_repetition_penalty if repetition_penalty is None else repetition_penalty
 
         url = f"{self.settings.llm_endpoint}/chat/completions"
-        payload = json.dumps({
+        payload = {
             "model": self.settings.synthesis_llm_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -238,7 +238,7 @@ class AiGatewayClient:
             "top_p": p_val,
             "repetition_penalty": rep_pen,
             "stream": True,
-        }).encode("utf-8")
+        }
 
         headers = {
             "Content-Type": "application/json",
@@ -247,68 +247,59 @@ class AiGatewayClient:
             "X-Session-Id": session_id,
         }
 
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        resp = None
+        inactivity_timeout = self.settings.inactivity_timeout_s
+        timeout_config = httpx.Timeout(timeout=inactivity_timeout, connect=10.0, read=inactivity_timeout)
 
         try:
-            # Spec 037: Environment-based Sliding Inactivity Timeout (Dev: 45s, Prod: 15s)
-            inactivity_timeout = self.settings.inactivity_timeout_s
-            resp = urllib.request.urlopen(req, timeout=inactivity_timeout)
+            with httpx.Client(timeout=timeout_config) as client:
+                with client.stream("POST", url, json=payload, headers=headers) as resp:
+                    if resp.status_code != 200:
+                        err_text = resp.read().decode("utf-8", errors="ignore")
+                        raise ValueError(f"HTTP {resp.status_code}: {err_text}")
 
-            pending_event_type = None
-            for line in resp:
-                line_str = line.decode("utf-8").strip()
-
-                # Spec 031 FR-002: Keep-Alive 하트비트 수신 시 리스 갱신 (타임아웃 리셋)
-                if not line_str or line_str.startswith(":"):
-                    # `: keepalive` 코멘트 — 연결 유지 확인, 타임아웃 리셋됨
-                    continue
-
-                # SSE event type 파싱
-                if line_str.startswith("event:"):
-                    pending_event_type = line_str[6:].strip()
-                    continue
-
-                if not line_str.startswith("data:"):
-                    continue
-
-                data_str = line_str[5:].strip()
-
-                # Spec 031 FR-003: queue_status 이벤트 처리
-                if pending_event_type == "queue_status":
                     pending_event_type = None
-                    if queue_callback and data_str:
+                    for line_str in resp.iter_lines():
+                        line_str = line_str.strip()
+                        if not line_str or line_str.startswith(":"):
+                            continue
+
+                        if line_str.startswith("event:"):
+                            pending_event_type = line_str[6:].strip()
+                            continue
+
+                        if not line_str.startswith("data:"):
+                            continue
+
+                        data_str = line_str[5:].strip()
+
+                        if pending_event_type == "queue_status":
+                            pending_event_type = None
+                            if queue_callback and data_str:
+                                try:
+                                    status_data = json.loads(data_str)
+                                    queue_callback(status_data)
+                                except Exception:
+                                    pass
+                            continue
+
+                        pending_event_type = None
+
+                        if data_str == "[DONE]":
+                            break
                         try:
-                            status_data = json.loads(data_str)
-                            queue_callback(status_data)
+                            chunk_obj = json.loads(data_str)
+                            delta = chunk_obj["choices"][0].get("delta", {})
+                            token = delta.get("content", "")
+                            if token:
+                                yield token
                         except Exception:
-                            pass
-                    continue
-
-                pending_event_type = None
-
-                if data_str == "[DONE]":
-                    break
-                try:
-                    chunk_obj = json.loads(data_str)
-                    delta = chunk_obj["choices"][0].get("delta", {})
-                    token = delta.get("content", "")
-                    if token:
-                        yield token
-                except Exception:
-                    continue
+                            continue
         except Exception as e:
             logger.error(
                 f"LLM 스트리밍 오류: {e}",
                 extra={"trace_id": trace_id or get_trace_id(), "error_type": type(e).__name__},
             )
             yield f"\n[답변 생성 오류: {e}]"
-        finally:
-            if resp is not None:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
 
     async def agenerate_stream(
         self,
