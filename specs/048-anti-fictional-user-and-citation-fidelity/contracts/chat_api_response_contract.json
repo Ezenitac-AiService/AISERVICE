@@ -51,17 +51,15 @@
     },
     "pipeline_stages": {
       "type": "array",
+      "minItems": 4,
       "maxItems": 4,
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["stage", "status", "latency_ms"],
-        "properties": {
-          "stage": { "type": "string", "enum": ["search", "rerank", "grounding", "synthesis"] },
-          "status": { "type": "string", "enum": ["pending", "running", "completed", "skipped", "failed"] },
-          "latency_ms": { "type": "integer", "minimum": 0 }
-        }
-      }
+      "prefixItems": [
+        { "$ref": "#/$defs/searchStage" },
+        { "$ref": "#/$defs/rerankStage" },
+        { "$ref": "#/$defs/groundingStage" },
+        { "$ref": "#/$defs/synthesisStage" }
+      ],
+      "items": false
     },
     "error": {
       "type": ["object", "null"],
@@ -73,6 +71,49 @@
           "enum": ["UNAUTHORIZED", "FORBIDDEN", "RATE_LIMITED", "INVALID_REQUEST", "TIMEOUT", "UPSTREAM_ERROR", "INTERNAL_ERROR"]
         },
         "message": { "type": "string", "maxLength": 500 }
+      }
+    }
+  },
+  "$defs": {
+    "stageStatus": { "type": "string", "enum": ["pending", "running", "completed", "skipped", "failed"] },
+    "searchStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "latency_ms"],
+      "properties": {
+        "stage": { "const": "search" },
+        "status": { "$ref": "#/$defs/stageStatus" },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "rerankStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "latency_ms"],
+      "properties": {
+        "stage": { "const": "rerank" },
+        "status": { "$ref": "#/$defs/stageStatus" },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "groundingStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "latency_ms"],
+      "properties": {
+        "stage": { "const": "grounding" },
+        "status": { "$ref": "#/$defs/stageStatus" },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "synthesisStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status", "latency_ms"],
+      "properties": {
+        "stage": { "const": "synthesis" },
+        "status": { "$ref": "#/$defs/stageStatus" },
+        "latency_ms": { "type": "integer", "minimum": 0 }
       }
     }
   },

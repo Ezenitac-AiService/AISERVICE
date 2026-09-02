@@ -22,6 +22,9 @@
 - [x] `K=0`, citation bounds and invalid-citation removal behavior are defined.
 - [x] Security requirements cover prompt injection, PII, XSS, resource limits and structured logging.
 - [x] API request, response, SSE and log contracts are separated.
+- [x] Response status branches, structured product links and pipeline-stage events are contractually discriminated.
+- [x] Browser session/CSRF and direct Bearer flows prohibit JavaScript credential storage and normalize to a shared principal.
+- [x] Distributed rate/concurrency limits require Redis atomic operations and PRODUCTION fail-closed behavior.
 - [ ] Retrieval thresholds are validated — pending T043 calibration.
 - [ ] Hardware performance assumptions are validated — pending T046 benchmark.
 
@@ -31,11 +34,13 @@
 - [x] Stream-boundary testing is defined independently of tokenizer/SSE boundaries.
 - [x] Core, ChatA, ChatB and gateway test suites are all in the regression scope.
 - [x] Browser zero-flicker is defined through Playwright `MutationObserver` and final DOM evidence.
+- [x] ChatA and ChatB each have an implementation-before Red browser zero-flicker task.
 - [x] Accessibility verification includes keyboard, focus, dialog, status and target size.
 - [ ] Contract tests have recorded Red/Green evidence — pending T002 and implementation.
 - [ ] Integrity/security corpus has passed — pending T045.
 - [ ] HTTPS live E2E and browser/device matrix have passed — pending T047.
 - [ ] Ruff/Mypy quality gate has passed — pending T044.
+- [ ] ESLint/TypeScript `checkJs`/html-validate/Stylelint quality gate has passed — pending T001 config and T044 execution.
 - [ ] Independent service container and network-isolation gates have passed — pending T047.
 - [ ] `verification-report.md` exists with reproducible evidence — pending T048.
 
@@ -46,6 +51,7 @@
 - [x] Invalid citation clamping and orphaned bound claims have been removed from the plan and tasks.
 - [x] Structured logging and sensitive-data masking have explicit requirements and tests.
 - [x] Infrastructure SSOT and external-vLLM opt-in are blocking tasks.
+- [x] Pydantic Settings and Nginx rendering consume the same runtime environment schema; generated Nginx drift is a blocking failure.
 - [x] Core synchronization has non-destructive safety gates.
 - [ ] Constitution implementation gates are complete — pending T001~T048, including T044 static analysis, T046 PRODUCTION topology decision and T047 service isolation.
 
