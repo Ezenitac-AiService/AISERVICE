@@ -15,6 +15,9 @@
 *.sql.gz
 *.dump
 *.backup
+*.backup.*
+*.bak
+*.bak.*
 
 # Archives & Large Bundles
 *.tar
@@ -85,7 +88,7 @@ Thumbs.db
 *.tmp
 
 # DuckDNS local secret/configuration and runtime logs
-ddns/duckdns-config.xml
+ddns/duckdns-config.xml*
 ddns/duckdns.log
 ddns/.env
 
