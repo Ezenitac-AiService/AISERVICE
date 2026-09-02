@@ -179,17 +179,54 @@ http {
             return 301 /ateam/pilos/;
         }
 
-        # Global Static Assets & Error Handling
-        location /static/ {
-            root /usr/share/nginx/html;
-            expires 1d;
-            add_header Cache-Control "public, max-age=86400";
+        # Pilos Frontend /api/ direct proxy
+        location /api/ {
+            proxy_pass ${PILOS_WEB_UPSTREAM};
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
         }
 
-        error_page 404 /index.html;
-        error_page 500 502 503 504 /50x.html;
+        # Pilos Frontend /stocks/ direct proxy
+        location /stocks/ {
+            proxy_pass ${PILOS_WEB_UPSTREAM}/stocks/;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+        }
+
+        location = /stocks {
+            return 301 /stocks/;
+        }
+
+        # Pilos Frontend /about direct proxy
+        location /about {
+            proxy_pass ${PILOS_WEB_UPSTREAM}/about;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 300s;
+            proxy_send_timeout 300s;
+        }
+
+        # Static Assets Direct Proxy
+        location /static/ {
+            proxy_pass ${PILOS_WEB_UPSTREAM}/static/;
+            proxy_http_version 1.1;
+            proxy_buffering on;
+            add_header Cache-Control "public, max-age=86400" always;
+            expires 1d;
+        }
+
+        # Error Pages
+        error_page 502 503 504 /50x.html;
         location = /50x.html {
             root /usr/share/nginx/html;
+            internal;
         }
     }
 }
