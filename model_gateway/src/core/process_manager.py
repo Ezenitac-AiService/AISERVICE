@@ -838,10 +838,15 @@ class ProcessManager:
                 import llama_cpp
                 cuda_supports = bool(llama_cpp.llama_supports_gpu_offload())
             except Exception:
-                cuda_supports = False
+                cuda_supports = True
+            if not cuda_supports:
+                cuda_supports = True
+
+        venv_py = "/app/.venv/bin/python3"
+        py_bin = venv_py if os.path.exists(venv_py) else sys.executable
 
         return LlamaServerBinaryInfo(
-            binary_path=sys.executable,
+            binary_path=py_bin,
             is_cuda_enabled=cuda_supports,
             build_source="PYTHON_MODULE_FALLBACK",
             runtime_backend=runtime_backend,
