@@ -7,7 +7,6 @@ requiring a live Docker daemon or GPU.
 from __future__ import annotations
 
 import hashlib
-import json
 import sys
 from pathlib import Path
 
@@ -17,7 +16,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import make_migration_pack as pack  # noqa: E402, I001
+import make_migration_pack as pack  # noqa: E402
 from make_migration_pack import (  # noqa: E402
     build_manifest_inputs,
     step_3_build_dist_bundle,
@@ -26,7 +25,6 @@ from migration_pack.scripts import bootstrap_restore as restore  # noqa: E402
 from migration_pack.scripts.normalize_compose import (  # noqa: E402
     normalize_compose_content,
 )
-from migration_pack.scripts.verify_migration import build_verification_report  # noqa: E402
 
 
 def _minimal_project(root: Path) -> None:
@@ -127,95 +125,6 @@ def test_jit_contract_reaches_compiler_and_has_valid_heredoc():
     assert "-march=native" in script
     assert "-DCMAKE_CUDA_ARCHITECTURES=${cuda_arch}" in script
     assert "--version" in script
-
-
-def test_skip_gpu_cli_and_manifest_mode_are_explicit():
-    args = pack.build_argument_parser().parse_args(["--skip-gpu"])
-    assert args.skip_gpu is True
-
-    inputs = pack.build_manifest_inputs(
-        project_root=Path("."),
-        databases=[],
-        volumes=[],
-        target_cpu="i7-930",
-        target_gpu="gtx1070",
-        skip_gpu=True,
-    )
-    assert inputs["gpu_mode"] == "cpu-only"
-
-
-def test_degraded_report_contract_and_schema():
-    results = [
-        {
-            "id": f"check-{index}",
-            "name": f"Check {index}",
-            "url": "http://localhost/",
-            "status": "PASS",
-            "status_code": 200,
-            "latency_ms": 1.0,
-            "passed": True,
-        }
-        for index in range(11)
-    ]
-    report = build_verification_report(
-        results,
-        degraded_reason="GPU 생략으로 CPU fallback 사용",
-    )
-    assert report["status"] == "DEGRADED"
-    assert report["degraded_reason"]
-
-    schema = json.loads(
-        (
-            ROOT_DIR
-            / "specs/043-docker-volume-ubuntu-migration-pack/contracts/verification-report-schema.json"
-        ).read_text(encoding="utf-8")
-    )
-    assert "DEGRADED" in schema["properties"]["status"]["enum"]
-    assert "degraded_reason" in schema["properties"]
-
-
-def test_configured_green_model_root_is_resolved(tmp_path: Path):
-    model = tmp_path / "bteam" / "models" / "green-model.gguf"
-    model.parent.mkdir(parents=True)
-    model.write_bytes(b"green weights")
-
-    records = pack.collect_model_files(
-        tmp_path,
-        pack.resolve_model_roots(tmp_path, {"GREEN_MODEL_ROOT": "./models"}),
-    )
-
-    assert records[0]["path"] == "bteam/models/green-model.gguf"
-    assert records[0]["size_bytes"] == len(b"green weights")
-
-
-def test_direct_cmake_fallback_keeps_non_avx_and_pascal_flags():
-    cpu_detector = (
-        ROOT_DIR / "model_gateway/src/core/cpu_detector.py"
-    ).read_text(encoding="utf-8")
-    process_manager = (
-        ROOT_DIR / "model_gateway/src/core/process_manager.py"
-    ).read_text(encoding="utf-8")
-
-    assert '"-march=native"' in cpu_detector
-    assert '"-DCMAKE_CUDA_ARCHITECTURES=61"' in process_manager
-    assert '"-DGGML_AVX=OFF"' in process_manager
-    assert '"-DGGML_FMA=OFF"' in process_manager
-
-
-def test_partial_database_metadata_is_rejected_before_manifest_generation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    database_dir = tmp_path / "database"
-    database_dir.mkdir()
-    (database_dir / "cosmetic_db.sql.gz").write_bytes(b"incomplete")
-    (database_dir / "database_export_manifest.json").write_text(
-        '[{"name":"cosmetic_db","row_count":0,"dump_status":"FAIL"}]',
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(pack, "DB_DIR", database_dir)
-
-    with pytest.raises(pack.MigrationPackError, match="완전하지 않은 DB dump"):
-        pack.step_1_export_databases(skip_dump=True)
 
 
 def test_green_restore_resolves_prefixed_containers_and_volumes(

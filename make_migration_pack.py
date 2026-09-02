@@ -25,7 +25,6 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from migration_pack.scripts.archive_crypto import encrypt_file, load_key_file
 from migration_pack.scripts.env_utils import (
     load_environment,
     mask_secret,
@@ -97,10 +96,6 @@ EXCLUDE_EXTENSIONS: set[str] = {
     ".weights",
 }
 MODEL_DIR_NAMES = {"models", "checkpoints"}
-DEFAULT_MODEL_ROOTS = (
-    Path("model_gateway/models"),
-    Path("ateam/pilos-sentiment-index/artifacts"),
-)
 MODEL_FILE_EXTENSIONS = {
     ".bin",
     ".gguf",
@@ -539,7 +534,8 @@ def _copy_file_to_bundle(source: Path, bundle_dir: Path, relative_path: Path) ->
     if not source.is_file():
         return 0
     destination = bundle_dir / relative_path
-    _safe_copy_file(source, destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
     return source.stat().st_size
 
 
@@ -585,7 +581,7 @@ def collect_model_files(
 ) -> list[dict[str, Any]]:
     """모델 가중치의 상대 경로, 크기, SHA-256을 수집합니다."""
     root = Path(project_root).resolve()
-    roots = list(model_roots or DEFAULT_MODEL_ROOTS)
+    roots = list(model_roots or (Path("model_gateway/models"), Path("ateam/pilos-sentiment-index/artifacts")))
     records: list[dict[str, Any]] = []
     for model_root in roots:
         source_root = (root / model_root).resolve()
@@ -607,47 +603,6 @@ def collect_model_files(
                 }
             )
     return records
-
-
-def resolve_model_roots(
-    project_root: Path | str,
-    environment: Mapping[str, str] | None = None,
-) -> list[Path]:
-    """환경 설정에 정의된 모델 루트를 프로젝트 기준 상대 경로로 해석합니다.
-
-    ``MODEL_ROOTS``/``MODEL_ROOT``는 쉼표 또는 세미콜론으로 여러 루트를
-    지정할 수 있습니다. Green Compose의 ``./models``처럼 compose 파일
-    디렉터리를 기준으로 한 상대 경로도 ``bteam/`` 후보로 해석합니다.
-    프로젝트 외부 경로는 번들 경계를 벗어나므로 수집하지 않습니다.
-    """
-    root = Path(project_root).resolve()
-    env = dict(environment or load_environment(root))
-    configured: list[tuple[str, str]] = []
-    for key in ("MODEL_ROOTS", "MODEL_ROOT", "GREEN_MODEL_ROOT"):
-        value = str(env.get(key, "")).strip()
-        if value:
-            configured.append((key, value))
-
-    candidates: list[Path] = []
-    for key, value in configured:
-        for raw_root in value.replace(";", ",").split(","):
-            raw_root = raw_root.strip()
-            if not raw_root:
-                continue
-            candidate = Path(raw_root).expanduser()
-            paths = [candidate] if candidate.is_absolute() else [root / candidate]
-            if key == "GREEN_MODEL_ROOT" and not candidate.is_absolute():
-                paths.append(root / "bteam" / candidate)
-            for path in paths:
-                resolved = path.resolve()
-                if resolved == root or root not in resolved.parents:
-                    continue
-                if resolved not in candidates:
-                    candidates.append(resolved)
-
-    if not candidates:
-        candidates = [(root / path).resolve() for path in DEFAULT_MODEL_ROOTS]
-    return candidates
 
 
 def _sha256_file(path: Path) -> str:
@@ -867,13 +822,7 @@ def step_4_generate_manifest(
         target_gpu=target_gpu,
         environment=environment,
         checksums=checksum_map,
-        models=(
-            models
-            if models is not None
-            else collect_model_files(
-                bundle_dir, resolve_model_roots(bundle_dir, environment)
-            )
-        ),
+        models=models if models is not None else collect_model_files(bundle_dir),
         archive_format=archive_format,
         skip_gpu=skip_gpu,
     )
@@ -891,7 +840,6 @@ def step_4_generate_manifest(
         archive_envelope=inputs["archive_envelope"],
         secrets=inputs["secrets"],
         models=inputs["models"],
-        gpu_mode=inputs["gpu_mode"],
     )
     manifest["source_bundle"] = {
         "file_count": len(checksum_map),
