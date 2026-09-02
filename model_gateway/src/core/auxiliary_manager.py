@@ -183,51 +183,51 @@ class AuxiliaryModelManager:
         self._recovery_task = asyncio.create_task(self._crash_recovery_loop())
 
     async def check_and_recover_crashes(self):
-        """FR-001 & FR-007: Check process states and trigger circuit breaker or recovery."""
+        """FR-001, FR-004 & FR-007: Check process states and trigger circuit breaker or recovery."""
         # Check Embedding instance
         if self.embedding_enabled and not os.environ.get("MOCK_LLAMA_SERVER"):
             if self.embedding_pm.state.status != ProcessStatusEnum.DISABLED:
-                if self.embedding_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING):
-                    if self.embedding_pm.process and self.embedding_pm.process.returncode is not None:
-                        self.embedding_consecutive_crashes += 1
-                        print(f"[AuxiliaryManager] FR-007: Embedding process crash detected! ({self.embedding_consecutive_crashes}/{self.max_consecutive_crashes})")
-                        if self.embedding_consecutive_crashes >= self.max_consecutive_crashes:
-                            err_msg = f"Embedding disabled due to {self.embedding_consecutive_crashes} consecutive crashes."
-                            print(f"[AuxiliaryManager] ❌ FR-001: {err_msg}")
-                            self.embedding_pm._log_to_error_log(err_msg)
-                            self.embedding_pm.state = ProcessState(
-                                status=ProcessStatusEnum.DISABLED,
-                                port=self.embedding_port,
-                                model_id="bge-m3",
-                                error_message=err_msg
-                            )
-                        else:
-                            self.embedding_pm.state = ProcessState(status=ProcessStatusEnum.UNLOADED, port=self.embedding_port)
-                            await self.ensure_embedding_resident("bge-m3")
-                elif self.embedding_pm.state.status == ProcessStatusEnum.READY:
+                process_alive = self.embedding_pm.process is not None and self.embedding_pm.process.returncode is None
+                if not process_alive and self.embedding_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING, ProcessStatusEnum.ERROR, ProcessStatusEnum.UNLOADED):
+                    self.embedding_consecutive_crashes += 1
+                    print(f"[AuxiliaryManager] FR-007: Embedding process missing/crashed! ({self.embedding_consecutive_crashes}/{self.max_consecutive_crashes})")
+                    if self.embedding_consecutive_crashes >= self.max_consecutive_crashes:
+                        err_msg = f"Embedding disabled due to {self.embedding_consecutive_crashes} consecutive crashes."
+                        print(f"[AuxiliaryManager] ❌ FR-001: {err_msg}")
+                        self.embedding_pm._log_to_error_log(err_msg)
+                        self.embedding_pm.state = ProcessState(
+                            status=ProcessStatusEnum.DISABLED,
+                            port=self.embedding_port,
+                            model_id="bge-m3",
+                            error_message=err_msg
+                        )
+                    else:
+                        self.embedding_pm.state = ProcessState(status=ProcessStatusEnum.UNLOADED, port=self.embedding_port)
+                        await self.ensure_embedding_resident("bge-m3")
+                elif self.embedding_pm.state.status == ProcessStatusEnum.READY and process_alive:
                     self._reset_crash_counter_if_ready("embedding")
 
         # Check Rerank instance
         if self.rerank_enabled and not os.environ.get("MOCK_LLAMA_SERVER"):
             if self.rerank_pm.state.status != ProcessStatusEnum.DISABLED:
-                if self.rerank_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING):
-                    if self.rerank_pm.process and self.rerank_pm.process.returncode is not None:
-                        self.rerank_consecutive_crashes += 1
-                        print(f"[AuxiliaryManager] FR-007: Reranker process crash detected! ({self.rerank_consecutive_crashes}/{self.max_consecutive_crashes})")
-                        if self.rerank_consecutive_crashes >= self.max_consecutive_crashes:
-                            err_msg = f"Reranker disabled due to {self.rerank_consecutive_crashes} consecutive crashes."
-                            print(f"[AuxiliaryManager] ❌ FR-001: {err_msg}")
-                            self.rerank_pm._log_to_error_log(err_msg)
-                            self.rerank_pm.state = ProcessState(
-                                status=ProcessStatusEnum.DISABLED,
-                                port=self.rerank_port,
-                                model_id="bge-reranker-v2-m3",
-                                error_message=err_msg
-                            )
-                        else:
-                            self.rerank_pm.state = ProcessState(status=ProcessStatusEnum.UNLOADED, port=self.rerank_port)
-                            await self.ensure_rerank_resident("bge-reranker-v2-m3")
-                elif self.rerank_pm.state.status == ProcessStatusEnum.READY:
+                process_alive = self.rerank_pm.process is not None and self.rerank_pm.process.returncode is None
+                if not process_alive and self.rerank_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING, ProcessStatusEnum.ERROR, ProcessStatusEnum.UNLOADED):
+                    self.rerank_consecutive_crashes += 1
+                    print(f"[AuxiliaryManager] FR-007: Reranker process missing/crashed! ({self.rerank_consecutive_crashes}/{self.max_consecutive_crashes})")
+                    if self.rerank_consecutive_crashes >= self.max_consecutive_crashes:
+                        err_msg = f"Reranker disabled due to {self.rerank_consecutive_crashes} consecutive crashes."
+                        print(f"[AuxiliaryManager] ❌ FR-001: {err_msg}")
+                        self.rerank_pm._log_to_error_log(err_msg)
+                        self.rerank_pm.state = ProcessState(
+                            status=ProcessStatusEnum.DISABLED,
+                            port=self.rerank_port,
+                            model_id="bge-reranker-v2-m3",
+                            error_message=err_msg
+                        )
+                    else:
+                        self.rerank_pm.state = ProcessState(status=ProcessStatusEnum.UNLOADED, port=self.rerank_port)
+                        await self.ensure_rerank_resident("bge-reranker-v2-m3")
+                elif self.rerank_pm.state.status == ProcessStatusEnum.READY and process_alive:
                     self._reset_crash_counter_if_ready("rerank")
 
 

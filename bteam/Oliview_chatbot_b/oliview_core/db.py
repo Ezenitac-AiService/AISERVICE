@@ -50,34 +50,64 @@ def get_db_cursor() -> Generator[pymysql.cursors.DictCursor, None, None]:
 
 
 def fetch_review_metadata(review_ids: List[int]) -> Dict[int, Dict[str, Any]]:
-    """Fetches review metadata (product name, brand, rating, url, text) for given review IDs."""
+    """Fetches review metadata (product name, brand, rating, url, text) for given review/sentence IDs."""
     if not review_ids:
         return {}
 
     id_list_str = ",".join(str(int(i)) for i in review_ids)
-    query = f"""
+    
+    # 1. Try standard view (vw_chroma_review_sentences) for sentence_ids
+    query_view = f"""
     SELECT 
-        r.review_id,
-        r.product_id,
-        p.product_name,
-        p.brand,
-        p.category,
-        p.product_url,
-        r.review_clean_text,
-        r.review_text,
-        r.sentiment
-    FROM reviews r
-    LEFT JOIN products p ON r.product_id = p.product_id
-    WHERE r.review_id IN ({id_list_str})
+        s.sentence_id AS review_id,
+        s.product_id,
+        s.product_name,
+        s.brand_name AS brand,
+        s.analysis_category_name AS category,
+        COALESCE(p.product_image_url, '') AS product_url,
+        s.sentence_text AS review_clean_text,
+        s.sentence_text AS review_text,
+        s.sentiment
+    FROM vw_chroma_review_sentences s
+    LEFT JOIN products p ON s.product_id = p.product_id
+    WHERE s.sentence_id IN ({id_list_str})
     """
     results: Dict[int, Dict[str, Any]] = {}
     try:
         with get_db_cursor() as cursor:
-            cursor.execute(query)
+            cursor.execute(query_view)
             for row in cursor.fetchall():
                 results[row["review_id"]] = row
     except Exception as e:
-        print(f"[WARN] DB 리뷰 메타데이터 조회 오류: {e}")
+        print(f"[WARN] DB 리뷰 메타데이터 뷰 조회 오류: {e}")
+
+    if results:
+        return results
+
+    # 2. Fallback to raw reviews table with proper brand/product JOIN
+    query_fallback = f"""
+    SELECT 
+        r.review_id,
+        r.product_id,
+        p.product_name,
+        COALESCE(b.brand_name, '') AS brand,
+        '' AS category,
+        COALESCE(p.product_image_url, '') AS product_url,
+        r.review_content AS review_clean_text,
+        r.review_content AS review_text,
+        'NEUTRAL' AS sentiment
+    FROM reviews r
+    LEFT JOIN products p ON r.product_id = p.product_id
+    LEFT JOIN brands b ON p.brand_id = b.brand_id
+    WHERE r.review_id IN ({id_list_str})
+    """
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute(query_fallback)
+            for row in cursor.fetchall():
+                results[row["review_id"]] = row
+    except Exception as e:
+        print(f"[WARN] DB 리뷰 메타데이터 폴백 조회 오류: {e}")
     return results
 
 

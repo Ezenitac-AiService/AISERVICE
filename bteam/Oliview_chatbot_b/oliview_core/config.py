@@ -179,8 +179,8 @@ class CoreSettings(BaseModel):
     # Lenient Timeouts (seconds) - Spec 037 POC Demo Friendly
     timeout_search_sec: float = Field(default_factory=lambda: 10.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 5.0)
     timeout_rerank_sec: float = Field(default_factory=lambda: 20.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 5.0)
-    timeout_llm_sec: float = Field(default_factory=lambda: 180.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 60.0)
-    inactivity_timeout_s: float = Field(default_factory=lambda: 45.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 15.0)
+    timeout_llm_sec: float = Field(default_factory=lambda: 180.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 120.0)
+    inactivity_timeout_s: float = Field(default_factory=lambda: 90.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 60.0)
 
     # 2-Stage Sampling Defaults (Spec 037: Top-P Nucleus Sampling)
     default_top_p: float = Field(default=0.85, description="Qwen 3.5 Token-level Nucleus Sampling Top-P")

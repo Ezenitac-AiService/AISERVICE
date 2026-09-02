@@ -49,6 +49,8 @@ class BGEReranker:
         try:
             # 1. High-speed GPU remote reranking (approx 0.03s ~ 0.05s)
             scores = self.client.rerank(query, documents)
+            if scores is None or len(scores) < len(documents):
+                raise ValueError("Remote GPU reranker returned None or incomplete score list")
         except Exception as e:
             # 2. Local Fallback
             print(f"[WARN] GPU 리랭커 실패 -> 로컬 폴백 가동: {e}")
@@ -61,6 +63,9 @@ class BGEReranker:
             except Exception as fe:
                 print(f"[WARN] 로컬 CrossEncoder 사용 불가, 기본 유사도 점수 반환: {fe}")
                 scores = [0.85 - (i * 0.05) for i in range(len(documents))]
+
+        if scores is None or not scores:
+            scores = [0.85 - (i * 0.05) for i in range(len(documents))]
 
         indexed_scores = list(enumerate(scores))
         indexed_scores.sort(key=lambda x: x[1], reverse=True)

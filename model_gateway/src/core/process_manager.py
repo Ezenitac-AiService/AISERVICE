@@ -939,8 +939,9 @@ class ProcessManager:
             ]
             if not is_aux:
                 if use_flash_attn:
+                    cmd.extend(["--flash_attn", "True"])
+                if n_ctx >= 32768 or kv_type in ("q8_0", "q4_0", "fp8"):
                     cmd.extend([
-                        "--flash_attn", "True",
                         "--type_k", str(type_kv_int),
                         "--type_v", str(type_kv_int),
                     ])
