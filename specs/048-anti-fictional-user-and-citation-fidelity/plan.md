@@ -162,6 +162,7 @@ runtime environment, auth transport, API request/판별형 response, product lin
 ### Phase 1 — Governance, contracts and reproducible baselines
 
 - Draft 2020-12 계약을 확정하고 schema 자체의 valid/invalid fixture는 Green baseline으로 검증하며, 미구현 runtime adapter conformance만 Red로 기록한다.
+- auth transport/runtime environment 계약과 lockfile 기반 frontend quality toolchain을 구현 전에 고정한다.
 - 현재 테스트 수는 T002에서 `pytest --collect-only`로 산출하여 baseline으로 기록한다.
 - 평가 코퍼스와 hardware benchmark workload를 구현 전에 고정한다.
 
