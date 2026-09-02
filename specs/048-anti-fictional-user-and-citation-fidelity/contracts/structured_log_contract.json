@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StructuredLogEventContract",
+  "description": "Privacy-preserving structured event; raw query, review, context, prompt and token fields are intentionally absent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "correlation_id", "service", "event", "latency_ms", "model_invoked", "abstained", "redaction_applied", "guardrail_counts"],
+  "properties": {
+    "timestamp": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "service": { "type": "string", "enum": ["chat_a", "chat_b", "oliview_core", "model_gateway"] },
+    "event": { "type": "string", "enum": ["request_started", "retrieval_completed", "model_started", "guardrail_completed", "request_completed", "request_failed"] },
+    "latency_ms": { "type": "integer", "minimum": 0 },
+    "model_invoked": { "type": "boolean" },
+    "abstained": { "type": "boolean" },
+    "redaction_applied": { "type": "boolean" },
+    "guardrail_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["persona_removed", "quotes_removed", "citations_removed", "polarity_blocked", "injection_blocked", "pii_redacted"],
+      "properties": {
+        "persona_removed": { "type": "integer", "minimum": 0 },
+        "quotes_removed": { "type": "integer", "minimum": 0 },
+        "citations_removed": { "type": "integer", "minimum": 0 },
+        "polarity_blocked": { "type": "integer", "minimum": 0 },
+        "injection_blocked": { "type": "integer", "minimum": 0 },
+        "pii_redacted": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

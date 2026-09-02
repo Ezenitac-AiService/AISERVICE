@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChatApiResponseContract",
+  "description": "Final non-streaming or completed-stream response contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "status", "answer", "k_bound", "citations", "model_invoked"],
+  "properties": {
+    "request_id": { "type": "string", "format": "uuid" },
+    "status": { "type": "string", "enum": ["answered", "abstained", "error"] },
+    "answer": { "type": "string", "maxLength": 20000 },
+    "k_bound": { "type": "integer", "minimum": 0, "maximum": 20 },
+    "model_invoked": { "type": "boolean" },
+    "citations": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["review_index", "review_id", "quote"],
+        "properties": {
+          "review_index": { "type": "integer", "minimum": 1, "maximum": 20 },
+          "review_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "quote": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      }
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "maxLength": 80 },
+        "message": { "type": "string", "maxLength": 500 }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChatSseEventContract",
+  "description": "Application payload carried by a UTF-8 text/event-stream event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "sequence", "event", "data"],
+  "properties": {
+    "request_id": { "type": "string", "format": "uuid" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "event": { "type": "string", "enum": ["start", "delta", "citation", "abstention", "done", "error"] },
+    "data": {
+      "oneOf": [
+        { "type": "string", "maxLength": 20000 },
+        { "type": "object", "maxProperties": 20 }
+      ]
+    }
+  }
+}

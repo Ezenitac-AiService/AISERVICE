@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CorePromptContract",
+  "description": "Interface contract for SSOT bteam/oliview_core/prompts.py",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["persona", "k_bound", "system_prompt", "zero_tolerance_rules", "untrusted_context_delimiter"],
+  "properties": {
+    "persona": {
+      "type": "string",
+      "enum": ["CONCIERGE", "ANALYST"]
+    },
+    "k_bound": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "system_prompt": {
+      "type": "string",
+      "minLength": 50
+    },
+    "zero_tolerance_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "untrusted_context_delimiter": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 100
+    }
+  }
+}
