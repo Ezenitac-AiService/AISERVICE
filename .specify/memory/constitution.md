@@ -1,9 +1,10 @@
 <!--
 Sync Impact Report:
-- Version Change: 1.1.0 → 1.1.1 (PATCH: 원칙 VI 세부 동적 설정 가이드라인 명시)
+- Version Change: 1.1.1 → 1.2.0 (MINOR: 원칙 VII 포괄적 무하드코딩 및 인프라 SSOT 원칙 신설, 인프라 포트/URL 하드코딩 방지 규문화)
 - Modified Principles:
-  - PRINCIPLE_6: VI. 환경별 운영 모드 이원화 및 레거시 시연 지연 허용 (동적 설정 기반 전환 규칙 추가)
-- Added Principles: None
+  - PRINCIPLE_6: VI. 환경별 운영 모드 이원화 및 레거시 시연 지연 허용 (기존 유지)
+- Added Principles:
+  - PRINCIPLE_7: VII. 포괄적 무하드코딩 및 인프라 엔드포인트 단일 진실 공급원 (Zero Hardcoding & Infrastructure SSOT)
 - Added Sections: None
 - Removed Sections: None
 - Deferred Items / TODOs: None
@@ -45,10 +46,16 @@ Sync Impact Report:
 - **무환각 및 사실 무결성 절대 원칙**: 운영 모드(DEMO / PRODUCTION)와 무관하게, **검색 0건 시 가짜 후기 창작 금지(100% 무환각)** 및 **실존 리뷰 기반 인라인 인용 결속(100% Citation)**은 어떠한 모드에서도 절대 타협하거나 생략하지 않는다.
 - **근거(Rationale)**: 환경 간 코드 수정 없이 설정만으로 유연하게 배포 타겟을 전환할 수 있도록 무하드코딩 원칙을 확립하고, 실증 단계의 인프라 제약과 상용 단계의 성능 요구를 체계적으로 분리 충족하기 위함이다.
 
+### VII. 포괄적 무하드코딩 및 인프라 엔드포인트 단일 진실 공급원 (Zero Hardcoding & Infrastructure SSOT)
+- **임의 포트/URL 하드코딩 절대 금지**: 서비스 포트, 내부 통신 URL, 헬스체크 엔드포인트, 런타임 폴백 체인은 소스 코드 내에 임의의 기본값으로 하드코딩되어서는 안 되며, 반드시 명시적 환경 변수(`.env`), Pydantic Settings, 또는 설정 매니저(`ConfigManager`)를 단일 진실 공급원(SSOT)으로 삼아야 한다.
+- **셀프 루프백 및 포트 충돌 방지 의무**: 서브프로세스 또는 외장 엔진의 헬스체크 주소를 지정할 때, 현재 프로세스(호스트/컨테이너) 자체의 리슨 포트와 동일한 주소를 외장 종속성 검사용으로 사용하는 것을 엄격히 금지한다.
+- **명시적 활성화 플래그 (Explicit Enablement)**: 외장 서비스(예: 외장 vLLM 클러스터) 연동은 기본적으로 비활성화(`false`)되어야 하며, 환경 변수(`ENABLE_EXTERNAL_VLLM=true` 등)를 통해 명시적으로 활성화되고 유효한 엔드포인트가 제공된 경우에만 네트워크 프로브를 수행해야 한다.
+- **근거(Rationale)**: 코드 내 임의 하드코딩으로 인한 셀프 루프백 오인, 포트 충돌, 묵시적 서빙 스킵 등 치명적인 런타임 장애를 원천 차단하고 환경 간 배포 안정성을 확보하기 위함이다.
+
 ## 기술 제약 및 보안 표준
 
 - **기술 스택 및 인프라**: Python 기반 AI/ML 백엔드, FastAPI/vLLM 모델 서빙 게이트웨이, 감정 분석/챗봇 파이프라인, 관계형 데이터베이스 및 Docker 기반 컨테이너 인프라를 표준으로 한다.
-- **환경 변수 기반 동적 설정**: 시연 모드(`DEMO`)와 상용 모드(`PRODUCTION`)의 전환, 타임아웃, SLA 임계치는 `.env` 및 `oliview_core/config.py`의 `Pydantic BaseSettings`를 통해 동적으로 제어한다.
+- **환경 변수 기반 동적 설정**: 시연 모드(`DEMO`)와 상용 모드(`PRODUCTION`)의 전환, 타임아웃, 포트 번호, 외부 서비스 연동 플래그 및 SLA 임계치는 `.env` 및 설정 객체를 통해 동적으로 제어한다.
 - **보안 및 환경 통제**: 환경 변수(`.env`) 기반 설정 관리, API Key 및 인증 토큰 보호, 컨테이너 네트워크 접근 제어를 철저히 적용한다.
 
 ## 개발 워크플로우 및 품질 게이트
@@ -66,4 +73,4 @@ Sync Impact Report:
   - **PATCH (경미한 수정)**: 문구 수정, 명확화, 오탈자 교정 등 비시맨틱 정제.
 - **준수성 검증**: 모든 기여(PR, 커밋, 에이전트 태스크)는 본 헌법에 명시된 원칙 및 품질 게이트를 준수하는지 정기적으로 검증되어야 한다.
 
-**Version**: 1.1.1 | **Ratified**: 2026-08-17 | **Last Amended**: 2026-08-26
+**Version**: 1.2.0 | **Ratified**: 2026-08-17 | **Last Amended**: 2026-09-02

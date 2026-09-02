@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
 
     async def safe_startup_aux():
         try:
-            await asyncio.sleep(1.5)
+            # LLM VRAM 온로드 완료 후 보조 모델(임베딩/리랭커) 순차 스폰 (VRAM 경합 방지)
+            await asyncio.sleep(6.0)
             await auxiliary_manager.start_auto_startup_and_recovery()
         except Exception as e:
             print(f"[Lifespan Error - Aux Startup]: {e}")

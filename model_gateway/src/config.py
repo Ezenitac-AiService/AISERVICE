@@ -12,8 +12,20 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+def is_external_vllm_enabled() -> bool:
+    """FR-001 & 헌법 v1.2.0 원칙 VII: ENABLE_EXTERNAL_VLLM 환경변수가 true일 때만 외장 vLLM 활성화."""
+    return os.environ.get("ENABLE_EXTERNAL_VLLM", "0").lower() in ("1", "true", "yes")
+
+
+def get_default_fallback_chain() -> list[str]:
+    """외장 vLLM 명시 활성화 시 vllm 포함, 기본은 llama.cpp-cuda -> llama.cpp-cpu-openblas."""
+    if is_external_vllm_enabled():
+        return ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
+    return ["llama.cpp-cuda", "llama.cpp-cpu-openblas"]
+
+
 DEFAULT_MODEL_VRAM_BUDGET_MB = {"llm": 2600, "embedding": 1200, "reranker": 1200}
-DEFAULT_FALLBACK_CHAIN = ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
+DEFAULT_FALLBACK_CHAIN = get_default_fallback_chain()
 RUNTIME_COMPATIBILITY_ERROR_MARKERS = (
     "illegal instruction",
     "cuda error",
@@ -60,7 +72,7 @@ def get_runtime_profile() -> dict[str, Any]:
         profile.get("vram_safety_limit_mb", VRAM_SAFETY_LIMIT_MB)
     )
     profile.setdefault("model_vram_budget_mb", dict(DEFAULT_MODEL_VRAM_BUDGET_MB))
-    profile.setdefault("runtime_fallback_chain", list(DEFAULT_FALLBACK_CHAIN))
+    profile.setdefault("runtime_fallback_chain", get_default_fallback_chain())
     return profile
 
 
@@ -75,7 +87,7 @@ def get_runtime_fallback_chain() -> list[str]:
     return [
         str(value)
         for value in get_runtime_profile().get(
-            "runtime_fallback_chain", DEFAULT_FALLBACK_CHAIN
+            "runtime_fallback_chain", get_default_fallback_chain()
         )
     ]
 

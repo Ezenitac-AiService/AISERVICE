@@ -540,7 +540,14 @@ class ProcessManager:
             return 4000 + kv_vram_mb
 
     def is_ready(self) -> bool:
-        return self.state.status == ProcessStatusEnum.READY
+        """FR-003 & FR-005: READY 상태이면서 서브프로세스가 실제로 생존(returncode is None)해 있는지 검증."""
+        if self.state.status != ProcessStatusEnum.READY:
+            return False
+        if getattr(self, "active_runtime_backend", None) == "vllm":
+            return True
+        if self.process is None or self.process.returncode is not None:
+            return False
+        return True
 
     def _log_to_error_log(self, message: str) -> None:
         try:
@@ -674,26 +681,44 @@ class ProcessManager:
                 if selected != "unavailable":
                     return selected
 
+            from src.config import is_external_vllm_enabled
+
             def probe(backend: str) -> bool:
                 if backend == "vllm":
+                    if not is_external_vllm_enabled():
+                        return False
                     url = os.environ.get(
-                        "VLLM_HEALTH_URL", "http://127.0.0.1:8081/health"
+                        "VLLM_HEALTH_URL", "http://127.0.0.1:8000/health"
                     )
-                    response = httpx.get(url, timeout=1.0)
-                    return response.status_code == 200
-                binary = os.environ.get("LLAMA_SERVER_BINARY") or shutil.which(
-                    "llama-server"
-                )
-                if not binary:
-                    return False
-                result = subprocess.run(
-                    [binary, "--version"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                    check=False,
-                )
-                return result.returncode == 0
+                    try:
+                        response = httpx.get(url, timeout=1.0)
+                        return response.status_code == 200
+                    except Exception:
+                        return False
+                elif backend == "llama.cpp-cuda":
+                    binary = os.environ.get("LLAMA_SERVER_BINARY") or shutil.which("llama-server")
+                    if binary:
+                        try:
+                            result = subprocess.run([binary, "--version"], capture_output=True, text=True, timeout=2, check=False)
+                            if result.returncode == 0:
+                                return True
+                        except Exception:
+                            pass
+                    try:
+                        import llama_cpp
+                        return bool(llama_cpp.llama_supports_gpu_offload())
+                    except Exception:
+                        return False
+                elif backend == "llama.cpp-cpu-openblas":
+                    binary = os.environ.get("LLAMA_SERVER_BINARY") or shutil.which("llama-server")
+                    if binary:
+                        return True
+                    try:
+                        import llama_cpp
+                        return True
+                    except Exception:
+                        return False
+                return False
 
             selected, _failures = attempt_runtime_backends(probe)
             if selected != "unavailable":
@@ -807,9 +832,17 @@ class ProcessManager:
             except Exception as e:
                 print(f"[ProcessManager] Warning: CMake build failed: {e}")
 
+        cuda_supports = False
+        if cuda_enabled:
+            try:
+                import llama_cpp
+                cuda_supports = bool(llama_cpp.llama_supports_gpu_offload())
+            except Exception:
+                cuda_supports = False
+
         return LlamaServerBinaryInfo(
             binary_path=sys.executable,
-            is_cuda_enabled=False,
+            is_cuda_enabled=cuda_supports,
             build_source="PYTHON_MODULE_FALLBACK",
             runtime_backend=runtime_backend,
         )
@@ -1067,8 +1100,11 @@ class ProcessManager:
 
         for backend in backend_order:
             if backend == "vllm":
+                from src.config import is_external_vllm_enabled
+                if not is_external_vllm_enabled():
+                    continue
                 vllm_url = os.environ.get(
-                    "VLLM_HEALTH_URL", "http://127.0.0.1:8081/health"
+                    "VLLM_HEALTH_URL", "http://127.0.0.1:8000/health"
                 )
                 try:
                     response = await asyncio.to_thread(httpx.get, vllm_url, timeout=1.0)
@@ -1114,9 +1150,11 @@ class ProcessManager:
                     start_new_session=True,
                     env=env
                 )
+                file_size_mb = os.path.getsize(model_file) / (1024 * 1024) if os.path.exists(model_file) else 1000.0
+                timeout_sec = float(os.environ.get("RUNTIME_BACKEND_READY_TIMEOUT", str(self.calculate_polling_timeout(file_size_mb) + 20.0)))
                 ready = await poll_server_health(
                     port=self.port,
-                    timeout=float(os.environ.get("RUNTIME_BACKEND_READY_TIMEOUT", "10")),
+                    timeout=max(30.0, timeout_sec),
                 )
                 if ready:
                     if self.process and self.process.stdout:

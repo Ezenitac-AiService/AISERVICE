@@ -76,7 +76,11 @@ class AuxiliaryModelManager:
             self.embedding_consecutive_crashes = 0
             return self.embedding_pm.state
 
-        # Poll health until ready
+        if state.status == ProcessStatusEnum.READY:
+            self.embedding_consecutive_crashes = 0
+            return state
+
+        # Poll health if not yet ready
         success = await self._poll_health(self.embedding_port, self.embedding_pm)
         if success:
             self.embedding_consecutive_crashes = 0
@@ -113,7 +117,11 @@ class AuxiliaryModelManager:
             self.rerank_consecutive_crashes = 0
             return self.rerank_pm.state
 
-        # Poll health until ready
+        if state.status == ProcessStatusEnum.READY:
+            self.rerank_consecutive_crashes = 0
+            return state
+
+        # Poll health if not yet ready
         success = await self._poll_health(self.rerank_port, self.rerank_pm)
         if success:
             self.rerank_consecutive_crashes = 0
@@ -122,8 +130,6 @@ class AuxiliaryModelManager:
     async def _poll_health(self, port: int, pm: ProcessManager, timeout_s: int = 30) -> bool:
         """Poll backend health endpoint until process is ready or times out."""
         start_t = time.perf_counter()
-        health_url = f"http://127.0.0.1:{port}/health"
-
         async with httpx.AsyncClient() as client:
             while time.perf_counter() - start_t < timeout_s:
                 if pm.process and pm.process.returncode is not None:
@@ -135,35 +141,21 @@ class AuxiliaryModelManager:
                     )
                     return False
 
-                try:
-                    resp = await client.get(health_url, timeout=2.0)
-                    if resp.status_code == 200:
-                        pm.state = ProcessState(
-                            status=ProcessStatusEnum.READY,
-                            model_id=pm.state.model_id,
-                            port=port,
-                            pid=pm.process.pid if pm.process else None,
-                            vram_offloaded=True,
-                            vram_offloaded_100pct=True
-                        )
-                        return True
-                except Exception:
-                    pass
-
-                try:
-                    resp = await client.get(f"http://127.0.0.1:{port}/v1/models", timeout=2.0)
-                    if resp.status_code == 200:
-                        pm.state = ProcessState(
-                            status=ProcessStatusEnum.READY,
-                            model_id=pm.state.model_id,
-                            port=port,
-                            pid=pm.process.pid if pm.process else None,
-                            vram_offloaded=True,
-                            vram_offloaded_100pct=True
-                        )
-                        return True
-                except Exception:
-                    pass
+                for endpoint in (f"http://127.0.0.1:{port}/v1/models", f"http://127.0.0.1:{port}/health"):
+                    try:
+                        resp = await client.get(endpoint, timeout=1.5)
+                        if resp.status_code == 200:
+                            pm.state = ProcessState(
+                                status=ProcessStatusEnum.READY,
+                                model_id=pm.state.model_id,
+                                port=port,
+                                pid=pm.process.pid if pm.process else None,
+                                vram_offloaded=True,
+                                vram_offloaded_100pct=True
+                            )
+                            return True
+                    except Exception:
+                        pass
                 await asyncio.sleep(0.5)
 
         pm.state = ProcessState(
