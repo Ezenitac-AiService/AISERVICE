@@ -14,6 +14,9 @@
 - `document_score_threshold=0.85`, second score `0.60`, cliff `0.25`는 T043에서 승인할 초기 후보값이며 public schema나 runtime의 무조건 기본값으로 사용하지 않는다.
 - runtime은 service-local core copy만 import하고 `bteam/oliview_core`는 canonical source로 사용한다. 같은 프로세스에서 master/copy를 혼용하지 않는다.
 - `sync_core.py` write mode는 dry-run, hash manifest, 원자적 교체, 충돌 차단 테스트가 Green인 경우에만 실행한다.
+- ChatA/ChatB persona는 server `ServiceIdentity`로 고정하고 client payload의 persona 필드는 거부한다.
+- 브라우저에는 Bearer/session 원문을 노출하지 않으며 session/CSRF를 principal로 정규화한다. 모든 worker의 rate/concurrency 상태는 Redis atomic operation으로 공유한다.
+- `gateway/nginx.conf`는 공통 환경 schema와 template renderer로만 생성하며 직접 편집하지 않는다.
 
 ---
 
@@ -144,4 +147,4 @@ Phase 6: Calibration & Verification (T043~T048)
 
 - T001~T048이 모두 완료되고 체크되어야 한다.
 - checklist는 evidence link가 있는 항목만 PASS로 전환한다.
-- CRITICAL integrity/security failure, sensitive-data exposure, K=0 model call, invalid citation 또는 결속 claim 잔존/clamping, HTTP-only E2E, Ruff/Mypy 실패, container isolation 실패가 하나라도 남으면 완료로 간주하지 않는다. PRODUCTION cluster가 없거나 SLA를 통과하지 못한 경우 PRODUCTION은 `NOT VERIFIED`/미승인으로 명시하며 단일 GPU 결과로 대체하지 않는다.
+- CRITICAL integrity/security failure, sensitive-data exposure, K=0 model call, invalid citation 또는 결속 claim 잔존/clamping, HTTP-only E2E, Python/frontend 정적 분석 실패, Nginx render drift, container isolation 실패가 하나라도 남으면 완료로 간주하지 않는다. PRODUCTION cluster가 없거나 SLA를 통과하지 못한 경우 PRODUCTION은 `NOT VERIFIED`/미승인으로 명시하며 단일 GPU 결과로 대체하지 않는다.
