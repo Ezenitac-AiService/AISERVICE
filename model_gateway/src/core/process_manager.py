@@ -10,21 +10,20 @@ import socket
 import subprocess
 import sys
 import time
-import httpx
 from enum import Enum
-from typing import Optional, Dict, Any, List
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import httpx
 from pydantic import BaseModel, ConfigDict, Field
-
 from src.core.config_manager import ConfigManager
-
 from src.core.gpu_detector import (
-    get_nvml_vram_info,
-    estimate_kv_cache_vram,
-    VramOffloadStatus,
     GpuAccelerationError,
+    PortCollisionError,
+    VramOffloadStatus,
     VramOverflowError,
-    PortCollisionError
+    estimate_kv_cache_vram,
+    get_nvml_vram_info,
 )
 
 _signal_handlers_registered = False
@@ -248,8 +247,8 @@ class ProcessManager:
 
     def verify_vram_released(self, baseline_free_vram_mb: int = 0, tolerance_mb: int = 200) -> bool:
         """FR-013: VRAM memory release check via nvidia-smi."""
-        import subprocess
         import shutil
+        import subprocess
         
         nvidia_smi = shutil.which("nvidia-smi")
         if not nvidia_smi:
@@ -654,6 +653,13 @@ class ProcessManager:
     @staticmethod
     def _runtime_backend_from_profile() -> str:
         """JIT 프로파일의 실제 probe 결과를 읽어 backend 선택에 사용합니다."""
+        if os.environ.get("MODEL_GATEWAY_CPU_ONLY", os.environ.get("AISERVICE_SKIP_GPU", "0")) in {
+            "1",
+            "true",
+            "TRUE",
+            "yes",
+        }:
+            return "llama.cpp-cpu-openblas"
         try:
             from src.config import (
                 attempt_runtime_backends,
@@ -755,14 +761,25 @@ class ProcessManager:
         llama_src_dir = os.path.join(base_dir, "llama.cpp")
         if os.path.exists(os.path.join(llama_src_dir, "CMakeLists.txt")):
             try:
-                from src.core.cpu_detector import get_llama_build_flags, print_detection_report
+                from src.core.cpu_detector import (
+                    get_llama_build_flags,
+                    print_detection_report,
+                )
                 build_flags = get_llama_build_flags()
                 cmake_args = build_flags.cmake_args_list
                 print(f"[ProcessManager] llama-server missing. Compiling llama.cpp with hardware detection flags ({build_flags.cmake_args_str})...")
                 print_detection_report()
             except Exception as e:
                 print(f"[ProcessManager] ⚠️ Hardware detection failed, using fallback flags: {e}")
-                cmake_args = ["-DGGML_CUDA=ON", "-DGGML_AVX=OFF", "-DGGML_AVX2=OFF", "-DGGML_F16C=OFF", "-DGGML_FMA=OFF"]
+                cmake_args = [
+                    "-DGGML_CUDA=ON",
+                    "-DCMAKE_CUDA_ARCHITECTURES=61",
+                    "-march=native",
+                    "-DGGML_AVX=OFF",
+                    "-DGGML_AVX2=OFF",
+                    "-DGGML_F16C=OFF",
+                    "-DGGML_FMA=OFF",
+                ]
 
             import subprocess
             try:
@@ -982,7 +999,7 @@ class ProcessManager:
 
         if not os.environ.get("MOCK_LLAMA_SERVER"):
             try:
-                gpu_info = get_nvml_vram_info()
+                get_nvml_vram_info()
             except GpuAccelerationError as e:
                 self.state = ProcessState(
                     status=ProcessStatusEnum.ERROR,
@@ -1013,7 +1030,13 @@ class ProcessManager:
 
         # Force 100% GPU VRAM Offloading environment variables
         env = dict(os.environ)
-        env["CUDA_VISIBLE_DEVICES"] = "0"
+        cpu_only = os.environ.get(
+            "MODEL_GATEWAY_CPU_ONLY", os.environ.get("AISERVICE_SKIP_GPU", "0")
+        ).lower() in {"1", "true", "yes"}
+        if cpu_only:
+            env.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            env["CUDA_VISIBLE_DEVICES"] = "0"
 
         bind_host = "0.0.0.0"
 
@@ -1027,15 +1050,19 @@ class ProcessManager:
             )
             return self.state
 
-        from src.config import get_runtime_fallback_chain, is_runtime_compatibility_error
+        from src.config import (
+            get_runtime_fallback_chain,
+            is_runtime_compatibility_error,
+        )
 
         selected_backend = self._runtime_backend_from_profile()
-        backend_order = [selected_backend]
-        backend_order.extend(
-            backend
-            for backend in get_runtime_fallback_chain()
-            if backend not in backend_order
-        )
+        backend_order = ["llama.cpp-cpu-openblas"] if cpu_only else [selected_backend]
+        if not cpu_only:
+            backend_order.extend(
+                backend
+                for backend in get_runtime_fallback_chain()
+                if backend not in backend_order
+            )
         self.runtime_backend_failures = []
 
         for backend in backend_order:
@@ -1230,9 +1257,9 @@ class ProcessManager:
 
     async def _wait_for_port_free(self, max_retries: int = 10, interval: float = 0.5) -> bool:
         """TCP Port Readiness Polling with clean non-zero connection verification."""
+        import signal
         import socket
         import subprocess
-        import signal
         if os.environ.get("MOCK_LLAMA_SERVER") == "1" or "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("MOCK_CPU_ONLY") == "1":
             return True
 

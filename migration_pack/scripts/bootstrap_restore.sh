@@ -63,6 +63,7 @@ fi
 
 if [[ "${DRY_RUN}" == "true" ]]; then
     RESTORE_ARGS=(--dry-run)
+    if [[ "${SKIP_GPU}" == "true" ]]; then RESTORE_ARGS+=(--skip-gpu); fi
     if [[ -n "${KEY_FILE}" ]]; then RESTORE_ARGS+=(--key-file "${KEY_FILE}"); fi
     python3 "${SCRIPT_DIR}/bootstrap_restore.py" "${RESTORE_ARGS[@]}"
     exit $?
@@ -77,7 +78,11 @@ if [[ "${NON_INTERACTIVE}" == "true" ]]; then
 fi
 bash "${SCRIPT_DIR}/install_prerequisites.sh"
 
-python3 "${SCRIPT_DIR}/normalize_compose.py" --input "${ROOT_DIR}/docker-compose.yml"
+if [[ "${SKIP_GPU}" == "true" ]]; then
+    python3 "${SCRIPT_DIR}/normalize_compose.py" --input "${ROOT_DIR}/docker-compose.yml" --cpu-only
+else
+    python3 "${SCRIPT_DIR}/normalize_compose.py" --input "${ROOT_DIR}/docker-compose.yml"
+fi
 
 if [[ -f "${ROOT_DIR}/model_gateway/scripts/build_llama.sh" && "${SKIP_GPU}" != "true" ]]; then
     bash "${ROOT_DIR}/model_gateway/scripts/build_llama.sh"
@@ -99,6 +104,9 @@ if [[ "${FORCE_DUMP}" == "true" ]]; then
 fi
 if [[ "${SKIP_DDNS}" == "true" ]]; then
     RESTORE_ARGS+=(--skip-ddns)
+fi
+if [[ "${SKIP_GPU}" == "true" ]]; then
+    RESTORE_ARGS+=(--skip-gpu)
 fi
 if [[ -n "${KEY_FILE}" ]]; then
     RESTORE_ARGS+=(--key-file "${KEY_FILE}")

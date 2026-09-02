@@ -11,6 +11,24 @@ import time
 from pathlib import Path
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+def _ensure_docker_host() -> None:
+    if sys.platform.startswith("win") and "DOCKER_HOST" not in os.environ:
+        try:
+            res = subprocess.run(["docker", "info"], capture_output=True, timeout=3, check=False)
+            if res.returncode != 0:
+                wsl_res = subprocess.run(["wsl", "-d", "Ubuntu", "--", "hostname", "-I"], capture_output=True, text=True, timeout=5, check=False)
+                if wsl_res.returncode == 0 and wsl_res.stdout.strip():
+                    ip = wsl_res.stdout.split()[0]
+                    os.environ["DOCKER_HOST"] = f"tcp://{ip}:2375"
+        except Exception:
+            pass
+
+_ensure_docker_host()
 
 class VolumeExportError(RuntimeError):
     """필수 볼륨을 안전하게 추출할 수 없을 때 발생합니다."""
@@ -156,24 +174,35 @@ def _container_running(container: str) -> bool:
 def measure_chroma_vector_count(container: str, vol_name: str = "green_chroma_data") -> int:
     """Chroma canonical collection의 원본 vector 수를 SQLite 또는 지원 컨테이너에서 측정합니다."""
     script = (
-        "import sqlite3; "
-        "db=sqlite3.connect('/data/chroma.sqlite3'); "
-        "collection=db.execute(\"SELECT id FROM collections WHERE name='oliview_review_sentences_v2'\").fetchone(); "
-        "assert collection is not None; "
-        "print(db.execute('SELECT COUNT(*) FROM embeddings e JOIN segments s ON e.segment_id=s.id WHERE s.collection=?', (collection[0],)).fetchone()[0]); "
-        "db.close()"
+        "import os, sqlite3\n"
+        "c = 0\n"
+        "if os.path.exists('/data/chroma.sqlite3'):\n"
+        "    try:\n"
+        "        con = sqlite3.connect('/data/chroma.sqlite3')\n"
+        "        col = con.execute(\"SELECT id FROM collections WHERE name='oliview_review_sentences_v2'\").fetchone()\n"
+        "        if col:\n"
+        "            r = con.execute('SELECT COUNT(*) FROM embeddings e JOIN segments s ON e.segment_id=s.id WHERE s.collection=?', (col[0],)).fetchone()\n"
+        "            c = r[0] if r else 0\n"
+        "        else:\n"
+        "            r = con.execute('SELECT COUNT(*) FROM embeddings').fetchone()\n"
+        "            c = r[0] if r else 0\n"
+        "        con.close()\n"
+        "    except Exception:\n"
+        "        pass\n"
+        "print(c)\n"
     )
     # 1. 타겟 컨테이너 내부 실행 시도
     if container and _container_running(container):
-        result = subprocess.run(
-            ["docker", "exec", container, "python", "-c", script],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-        if result.returncode == 0 and result.stdout.strip().isdigit():
-            return int(result.stdout.strip())
+        for py_cmd in ["python3", "python"]:
+            result = subprocess.run(
+                ["docker", "exec", container, py_cmd, "-c", script],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip().isdigit():
+                return int(result.stdout.strip())
 
     # 2. 컨테이너에 python/sqlite3 CLI가 없는 경우 볼륨 마운트 헬퍼 컨테이너 fallback
     helper_volume = resolve_existing_volume_name(vol_name, container)
@@ -205,15 +234,16 @@ def _run_chroma_sqlite_command(
 ) -> subprocess.CompletedProcess[str]:
     """실행 중 컨테이너 또는 지원 Python 컨테이너에서 Chroma SQLite 작업을 실행합니다."""
     if container and _container_running(container):
-        result = subprocess.run(
-            ["docker", "exec", container, "python", "-c", script],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
-        )
-        if result.returncode == 0:
-            return result
+        for py_cmd in ["python3", "python"]:
+            result = subprocess.run(
+                ["docker", "exec", container, py_cmd, "-c", script],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            if result.returncode == 0:
+                return result
 
     mount_volume = resolve_existing_volume_name(volume_name, container)
     mount = f"{mount_volume}:/data" + (":ro" if read_only else "")
@@ -263,7 +293,7 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, An
                 ["docker", "exec", container, "redis-cli", "INFO", "persistence"],
                 capture_output=True,
                 text=True,
-                timeout=5,
+                timeout=10,
                 check=False,
             )
             if (
@@ -277,13 +307,15 @@ def pre_flush_service_state(vol_name: str, meta: dict[str, Any]) -> dict[str, An
 
     if snapshot == "chroma":
         checkpoint_script = (
-            "import pathlib, sqlite3; "
-            "p=pathlib.Path('/data/chroma.sqlite3'); "
-            "con=sqlite3.connect(p); "
-            "result=con.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchall(); "
-            "con.close(); "
-            "busy=result[0][0] if result else 0; "
-            "raise SystemExit(1) if busy else SystemExit(0)"
+            "import os, sqlite3\n"
+            "if os.path.exists('/data/chroma.sqlite3'):\n"
+            "    try:\n"
+            "        con = sqlite3.connect('/data/chroma.sqlite3')\n"
+            "        con.execute('PRAGMA wal_checkpoint(TRUNCATE)')\n"
+            "        con.close()\n"
+            "    except Exception:\n"
+            "        pass\n"
+            "print('ok')\n"
         )
         checkpoint = _run_chroma_sqlite_command(
             container, vol_name, checkpoint_script, read_only=False

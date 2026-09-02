@@ -25,6 +25,7 @@ Docker 볼륨 및 실사용 `.env`가 암호화된 상태로 포함된 단일 �
 ```powershell
 python make_migration_pack.py --include-volumes --format tar.gz --target-os ubuntu --target-cpu i7-930 --target-gpu gtx1070
 ```
+- GPU 설치·JIT 및 GPU Compose 경로를 생략하려면 `--skip-gpu`를 추가합니다. 이 경우 manifest의 `gpu_mode`가 `cpu-only`가 되고 복원 검증은 `DEGRADED` 상태를 사용합니다.
 - **출력물**: `dist/AISERVICE_Migration_Pack_<TIMESTAMP>.tar.gz.enc` 및 `dist/checksums.sha256` (`--format zip`은 `.zip.enc`, `--format both`는 두 형식 생성)
 - **보안**: 복호화 키는 아카이브에 포함하지 않으며, 매니페스트·로그·체크섬에는 시크릿 원문을 기록하지 않습니다.
 
@@ -87,7 +88,7 @@ python3 migration_pack/scripts/verify_migration.py
 11. `redis-cli -h localhost -p 6379 PING` $\rightarrow$ Redis 세션/캐시 인프라 (PONG)
 
 ### 3.3 검증 성공 판정
-`verification_report.json`에서 `status: "PASS"` 및 `passed_endpoints: 11 / 11`을 확인합니다. HTTP 10개는 200 OK, Redis 검사는 PING/PONG을 만족해야 합니다.
+`verification_report.json`에서 정상 GTX 1070 GPU 경로는 `status: "PASS"`, CPU fallback 또는 `--skip-gpu` 경로는 `status: "DEGRADED"`와 `degraded_reason`을 확인합니다. 두 상태 모두 11개 검사가 전부 성공하면 종료 코드 0이며, HTTP 10개는 200 OK, Redis 검사는 PING/PONG을 만족해야 합니다. 검사 실패 시에는 `status: "FAIL"` 및 비정상 종료 코드가 반환됩니다.
 
 ### 3.4 SLA 및 호환성 검증
 - 사전 인프라 준비 서버: 부트스트랩 시작부터 전 서비스 기동까지 10분 이내

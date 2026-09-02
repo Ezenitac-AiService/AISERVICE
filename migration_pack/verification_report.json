@@ -1,6 +1,6 @@
 {
   "timestamp": "2026-08-31T15:36:38.513235+00:00",
-  "status": "PASS",
+  "status": "FAIL",
   "total_endpoints": 11,
   "passed_endpoints": 11,
   "failed_endpoints": 0,
@@ -13,12 +13,12 @@
     "compute_capability": "6.1"
   },
   "data_integrity": {
-    "status": "PASS",
+    "status": "FAIL",
     "databases": [
       {
         "name": "pilos_v2",
-        "expected_row_count": 16410866,
-        "actual_row_count": 16410866,
+        "expected_row_count": 12253826,
+        "actual_row_count": 12253826,
         "measurement_method": "COUNT(*) per table",
         "status": "PASS"
       },
@@ -31,10 +31,11 @@
       },
       {
         "name": "cosmetic_db",
-        "expected_row_count": 232118,
-        "actual_row_count": 232118,
+        "expected_row_count": 0,
+        "actual_row_count": 0,
         "measurement_method": "COUNT(*) per table",
-        "status": "PASS"
+        "status": "FAIL",
+        "error": "cosmetic_db dump가 불완전하여 무손실 복원을 판정할 수 없습니다."
       }
     ],
     "chroma": {
@@ -162,5 +163,5 @@
   "passed_checks": 11,
   "failed_checks": 0,
   "pass_rate_pct": 100.0,
-  "overall_status": "HEALTHY"
+  "overall_status": "DEGRADED"
 }

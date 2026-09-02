@@ -7,6 +7,8 @@
 .env.*
 !.env.example
 *.env.local
+*.key
+*.key.*
 
 # Large Database Dumps & Backups
 *.sql

@@ -14,6 +14,7 @@
     "archive_provider",
     "archive_envelope",
     "secrets",
+    "gpu_mode",
     "target_hardware_profile",
     "databases",
     "volumes",
@@ -39,6 +40,7 @@
     "archive_encrypted": { "type": "boolean", "const": true },
     "archive_provider": { "type": "string", "const": "stdlib-pbkdf2-hmac-sha256" },
     "archive_envelope": { "type": "string", "const": "AISERVICE-MIGRATION-ARCHIVE-V1" },
+    "gpu_mode": { "type": "string", "enum": ["gpu", "cpu-only"] },
     "secrets": {
       "type": "object",
       "required": ["encrypted", "key_source", "plaintext_excluded"],
@@ -92,6 +94,18 @@
           "size_bytes": { "type": "integer" },
           "sha256": { "type": "string" },
           "is_sparse": { "type": "boolean" }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer" },
+          "sha256": { "type": "string" }
         }
       }
     },

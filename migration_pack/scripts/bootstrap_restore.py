@@ -22,9 +22,13 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from migration_pack.scripts.env_utils import load_environment, required_environment
 from migration_pack.scripts.archive_crypto import decrypt_file, load_key_file
-from migration_pack.scripts.export_docker_volumes import get_managed_volumes_map
+from migration_pack.scripts.env_utils import load_environment, required_environment
+from migration_pack.scripts.export_databases import resolve_running_container
+from migration_pack.scripts.export_docker_volumes import (
+    get_managed_volumes_map,
+    resolve_existing_volume_name,
+)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PACK_ROOT = SCRIPT_DIR.parent
@@ -249,8 +253,11 @@ def check_preflight_system(
                 check=False,
             )
             existing = set(volumes.stdout.splitlines()) if volumes.returncode == 0 else set()
-            for volume_name in sorted(get_managed_volumes_map()):
-                if volume_name not in existing:
+            for volume_name, metadata in sorted(get_managed_volumes_map().items()):
+                actual_volume = resolve_existing_volume_name(
+                    volume_name, metadata.get("associated_container")
+                )
+                if actual_volume not in existing:
                     # Clean targets are allowed to create these from bundled archives.
                     archive = VOL_DIR / f"{volume_name}.tar.gz"
                     if not archive.is_file():
@@ -262,7 +269,7 @@ def check_preflight_system(
                         "run",
                         "--rm",
                         "-v",
-                        f"{volume_name}:/data:ro",
+                        f"{actual_volume}:/data:ro",
                         "alpine",
                         "du",
                         "-sb",
@@ -282,8 +289,66 @@ def check_preflight_system(
     return len(issues) == 0, issues
 
 
+def _compose_project_name(compose_file: Path | None) -> str | None:
+    if compose_file is None or not compose_file.is_file():
+        return None
+    for raw_line in compose_file.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("name:"):
+            value = raw_line.partition(":")[2].strip()
+            if value:
+                return value
+    return compose_file.parent.name
+
+
+def resolve_green_container(name: str) -> str:
+    """Compose project 접두사가 붙은 Green 컨테이너의 실제 이름을 반환합니다."""
+    return resolve_running_container(name) or name
+
+
+def resolve_restore_volume_names(
+    targets: list[dict[str, str]], *, green_compose: Path | None = None
+) -> dict[str, str]:
+    """canonical volume 키를 실제 Docker volume 이름으로 매핑합니다."""
+    target_containers = {
+        target["volume_name"]: target["container"] for target in targets
+    }
+    mapping: dict[str, str] = {}
+    project_name = _compose_project_name(green_compose)
+    for canonical, metadata in get_managed_volumes_map().items():
+        container = target_containers.get(
+            canonical, str(metadata.get("associated_container", ""))
+        )
+        actual = resolve_existing_volume_name(canonical, container or None)
+        if actual == canonical and project_name and canonical.startswith("green_"):
+            actual = f"{project_name}_{canonical}"
+        mapping[canonical] = actual
+    return mapping
+
+
+def resolve_restore_targets(
+    targets: list[dict[str, str]], *, green_compose: Path | None = None
+) -> list[dict[str, str]]:
+    """실행 중 컨테이너와 volume의 Compose 접두사를 복원 대상에 반영합니다."""
+    volume_names = resolve_restore_volume_names(targets, green_compose=green_compose)
+    resolved: list[dict[str, str]] = []
+    for target in targets:
+        item = dict(target)
+        item["container"] = resolve_running_container(item["container"]) or item[
+            "container"
+        ]
+        item["resolved_volume_name"] = volume_names.get(
+            item["volume_name"], item["volume_name"]
+        )
+        resolved.append(item)
+    return resolved
+
+
 def restore_docker_volumes(
-    *, force: bool = False, prompt: bool = True, force_dump: bool = False
+    *,
+    force: bool = False,
+    prompt: bool = True,
+    force_dump: bool = False,
+    volume_name_overrides: Mapping[str, str] | None = None,
 ) -> dict[str, bool]:
     """canonical volume archive를 복원하고 tar 실행 성공을 기록합니다."""
     results: dict[str, bool] = {}
@@ -312,13 +377,14 @@ def restore_docker_volumes(
         if canonical not in get_managed_volumes_map():
             log_warn(f"관리 대상이 아닌 volume archive를 건너뜁니다: {archive.name}")
             continue
-        already_exists = canonical in existing
+        actual_volume = (volume_name_overrides or {}).get(canonical, canonical)
+        already_exists = actual_volume in existing
         if already_exists and not force:
             approved = False
             if prompt:
                 try:
                     approved = input(
-                        f"Docker volume {canonical}을 덮어쓸까요? [y/N] "
+                        f"Docker volume {actual_volume}을 덮어쓸까요? [y/N] "
                     ).strip().lower() in {"y", "yes"}
                 except EOFError:
                     approved = False
@@ -337,7 +403,7 @@ def restore_docker_volumes(
                         "run",
                         "--rm",
                         "-v",
-                        f"{canonical}:/target",
+                        f"{actual_volume}:/target",
                         "alpine",
                         "sh",
                         "-c",
@@ -347,7 +413,7 @@ def restore_docker_volumes(
                     check=False,
                 )
             create = subprocess.run(
-                ["docker", "volume", "create", canonical],
+                ["docker", "volume", "create", actual_volume],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -359,7 +425,7 @@ def restore_docker_volumes(
                 "run",
                 "--rm",
                 "-v",
-                f"{canonical}:/target",
+                f"{actual_volume}:/target",
                 "-v",
                 f"{_docker_mount_path(VOL_DIR)}:/backup:ro",
                 "alpine",
@@ -377,7 +443,7 @@ def restore_docker_volumes(
                     f"volume 아카이브 추출 실패: {canonical}: {restored.stderr[-500:]}"
                 )
             results[canonical] = True
-            log_info(f"volume 복원 및 tar 검증 완료: {canonical}")
+            log_info(f"volume 복원 및 tar 검증 완료: {canonical} -> {actual_volume}")
         except (OSError, subprocess.SubprocessError, RestoreError) as exc:
             results[canonical] = False
             log_error(str(exc))
@@ -654,6 +720,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_argument_parser().parse_args(argv)
     force = bool(args.force or args.yes)
+    if args.skip_gpu:
+        os.environ["AISERVICE_SKIP_GPU"] = "1"
+        os.environ["MODEL_GATEWAY_CPU_ONLY"] = "1"
     try:
         if args.archive:
             destination = decrypt_and_extract_archive(
@@ -684,39 +753,48 @@ def main(argv: list[str] | None = None) -> int:
         if not verify_checksums() and not force:
             raise RestoreError("checksum 검증 실패", 1)
         targets = get_restore_targets(PROJECT_ROOT)
+        green_targets = [
+            target for target in targets if target["volume_name"] == "green_mysql_data"
+        ]
+        green_compose = PROJECT_ROOT / "bteam" / "docker-compose.green.yml"
+        volume_names = resolve_restore_volume_names(
+            targets, green_compose=green_compose if green_targets else None
+        )
         if args.dry_run:
             log_info("dry-run: 포트/디스크, checksum, 환경 변수, 복원 대상 사전 검사 완료")
             return 0
 
         volumes = restore_docker_volumes(
-            force=force, prompt=not force, force_dump=args.force_dump
+            force=force,
+            prompt=not force,
+            force_dump=args.force_dump,
+            volume_name_overrides=volume_names,
         )
         if any(value is False for value in volumes.values()):
             raise RestoreError("하나 이상의 물리 volume 복원이 실패했습니다", 3)
 
-        green_targets = [
-            target for target in targets if target["volume_name"] == "green_mysql_data"
-        ]
         _compose_up(["pilos_db", "bteam_db", "redis", "vllm-serv"])
         if green_targets:
-            green_compose = PROJECT_ROOT / "bteam" / "docker-compose.green.yml"
             if not green_compose.is_file():
                 raise RestoreError(f"Green Compose 파일이 없습니다: {green_compose}", 3)
             _compose_up(
                 ["mysql-green", "redis-green", "chroma-green"],
                 compose_file=green_compose,
             )
+        targets = resolve_restore_targets(
+            targets, green_compose=green_compose if green_targets else None
+        )
         for target in targets:
             if not wait_for_mysql(target["container"], target["root_password"]):
                 raise RestoreError(
                     f"{target['container']} MySQL readiness timeout", 2
                 )
-        if not wait_for_redis():
+        if not wait_for_redis(resolve_green_container("aiservice-redis")):
             raise RestoreError("Redis readiness timeout", 2)
         if not wait_for_model_gateway():
             raise RestoreError("Model Gateway readiness timeout", 2)
         if green_targets:
-            if not wait_for_redis("redis-green"):
+            if not wait_for_redis(resolve_green_container("redis-green")):
                 raise RestoreError("Green Redis readiness timeout", 2)
             if not wait_for_http("http://127.0.0.1:18000/api/v1/heartbeat"):
                 raise RestoreError("Green Chroma readiness timeout", 2)
@@ -740,8 +818,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         if not args.skip_verification:
             verify_script = SCRIPT_DIR / "verify_migration.py"
+            verify_command = [sys.executable, str(verify_script)]
+            if args.skip_gpu:
+                verify_command.extend(
+                    [
+                        "--degraded-reason",
+                        "GPU를 생략하여 Model Gateway가 CPU-only fallback으로 실행되었습니다",
+                    ]
+                )
             result = subprocess.run(
-                [sys.executable, str(verify_script)], cwd=PROJECT_ROOT, check=False
+                verify_command, cwd=PROJECT_ROOT, check=False
             )
             if result.returncode != 0:
                 raise RestoreError("11개 endpoint 검증 게이트 실패", 4)

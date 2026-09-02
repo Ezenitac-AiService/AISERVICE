@@ -111,6 +111,8 @@ def build_manifest_v2(
     archive_provider: str = "stdlib-pbkdf2-hmac-sha256",
     archive_envelope: str = "AISERVICE-MIGRATION-ARCHIVE-V1",
     secrets: dict[str, Any] | None = None,
+    models: list[dict[str, Any]] | None = None,
+    gpu_mode: str = "gpu",
 ) -> dict[str, Any]:
     """마이그레이션 매니페스트 v2.0 JSON 사양에 맞는 구조화된 딕셔너리를 생성합니다."""
     safe_ddns = dict(ddns_config)
@@ -136,6 +138,7 @@ def build_manifest_v2(
             "key_source": "external_protected_path",
             "plaintext_excluded": True,
         },
+        "gpu_mode": gpu_mode,
         "target_hardware_profile": target_hardware,
         "clean_os_prerequisites": {
             "docker_apt_repo": "https://download.docker.com/linux/ubuntu",
@@ -144,6 +147,7 @@ def build_manifest_v2(
         },
         "databases": databases,
         "volumes": volumes,
+        "models": models or [],
         "ddns_config": safe_ddns,
         "services": services,
         "checksums": checksums,
@@ -195,6 +199,8 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         errors.append("archive_provider must identify the approved provider")
     if manifest_data.get("archive_envelope") != "AISERVICE-MIGRATION-ARCHIVE-V1":
         errors.append("archive_envelope must identify the versioned envelope")
+    if manifest_data.get("gpu_mode") not in {"gpu", "cpu-only"}:
+        errors.append("gpu_mode must be 'gpu' or 'cpu-only'")
     secrets = manifest_data.get("secrets")
     if not isinstance(secrets, dict):
         errors.append("secrets must be an object")
@@ -225,6 +231,13 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         for key in ["volume_name", "archive_file", "size_bytes", "sha256"]:
             if key not in volume:
                 errors.append(f"Volume {index} missing field '{key}'")
+
+    for index, model in enumerate(manifest_data.get("models", [])):
+        for key in ["path", "size_bytes", "sha256"]:
+            if key not in model:
+                errors.append(f"Model {index} missing field '{key}'")
+        if "size_bytes" in model and not isinstance(model["size_bytes"], int):
+            errors.append(f"Model {index} size_bytes must be integer")
 
     ddns = manifest_data.get("ddns_config", {})
     for key in ["domain", "token", "cron_interval_minutes"]:

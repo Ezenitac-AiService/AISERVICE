@@ -26,6 +26,7 @@ AISERVICE의 전체 복합 멀티 에이전트 시스템(A-Team, B-Team, Model G
 **Primary Dependencies**: Docker Engine 27.x, Docker Compose v2.29+, NVIDIA Container Toolkit v1.16+, CMake 3.28+, GCC/G++ 12+, `curl`, `tar` (sparse-aware), `gzip`  
 **Storage**: MySQL 8.0/8.4 LTS (`pilos_v2`, `oliview_project`, Green `cosmetic_db`), ChromaDB v2 (`oliview_review_sentences_v2` with 48,210+ 1024-dim vectors), Redis 7 (AOF/RDB)
 **Testing**: `pytest`, `verify_migration.py` (10 HTTP + Redis TCP PING으로 구성된 11개 검사 계약; Gateway 포트는 CLI 인자 > 환경 변수 > 기본값 순서)
+**Normative Source**: 타겟 하드웨어, GPU/CPU fallback, 시크릿 보호 및 archive 판정은 `spec.md` §7.1과 FR/SC를 기준으로 하며, 본 계획서의 반복 내용은 구현 요약으로 취급한다.
 **Target Platform**: Ubuntu Linux 24.04 LTS (Intel Core i7-930 SSE4.2 CPU, 24GB DDR3 RAM, NVIDIA GeForce GTX 1070 8GB GDDR5 GPU)  
 **Project Type**: Multi-Service System Migration & Infrastructure Automation Pack  
 **Performance Goals**: 원클릭 복원 완료 시간 $\le 25$분 (클린 OS) / $\le 10$분 (사전 준비 OS), 10개 HTTP + Redis TCP PING 11개 검사 성공률 100% (11/11 Pass), LLM API 지연시간 $\le 3.0$초 (Fast SLM)
@@ -39,7 +40,7 @@ AISERVICE의 전체 복합 멀티 에이전트 시스템(A-Team, B-Team, Model G
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - [x] **원칙 I (Language & Communication Policy)**: 계획서, 명세서, 주석, 가이드 문서 일체 한국어 작성 완료.
-- [ ] **원칙 II (Test-First & Contract Verification)**: `contracts/` 4개 명세와 11개 검사(10개 HTTP + Redis TCP PING) 계약의 기존 Red/Green 검증은 완료했으나, Phase 21–22(T097–T102)의 archive 경계·Green resolver·CPU-only 전환·JIT 및 모델 포함 옵션 테스트 완료 후 최종 게이트를 재검증해야 함.
+- [x] **원칙 II (Test-First & Contract Verification)**: `contracts/` 4개 명세와 11개 검사(10개 HTTP + Redis TCP PING) 계약 및 Phase 21–22(T097–T102)의 archive 경계·Green resolver·CPU-only 전환·JIT·모델 포함 옵션을 테스트 우선으로 검증했다. 관련 회귀 스위트는 49개 테스트가 통과했다.
 - [x] **원칙 III (Service Modularity & Environment Isolation)**: A-Team, B-Team, Model Gateway의 독립 볼륨 및 컨테이너 격리 보존.
 - [x] **원칙 IV (Observability & Structured Logging)**: `migration_manifest.json` v2.0 및 `verification_report.json` 구조화 로깅 규격 완비.
 - [x] **원칙 V (Simplicity & YAGNI)**: 복잡한 서드파티 배포 도구 대신 순수 Python/Bash 기반 경량 원클릭 부트스트랩 채택.
@@ -184,6 +185,7 @@ c:\AISERVICE\
 
 - T097–T101: 생성된 DB/볼륨 산출물의 암호화 archive 포함, Compose bind 파일 보존, Non-AVX/CUDA JIT 전달, 실제 Green 대상 resolve, `--skip-gpu` CPU-only 및 `DEGRADED` 보고를 완료.
 - T102: `--include-models`의 실제 모델 파일 포함, 파일별 크기·SHA-256 manifest/checksum 기록, 동일 경로 복원 및 계약 테스트를 완료.
+- T103–T108: 정적 분석 품질 게이트, `--skip-gpu` CLI/manifest 계약, `DEGRADED` 보고서 schema, 보조 JIT fallback, canonical 산출물, 런타임 모델 루트 정렬을 완료.
 
 ### Convergence 의존성
 
@@ -193,6 +195,7 @@ Phase 1–10
     → Phase 14–20
     → Phase 21
     → Phase 22
+    → Phase 23
     → 최종 테스트·린트·헌법 적합성 게이트
 ```
 
@@ -203,13 +206,18 @@ Phase 1–10
 ### Automated Tests
 1. **단위/통합 테스트**:
    ```bash
-   pytest tests/ -v
+   pytest tests/test_migration_pack.py tests/test_migration_convergence.py tests/test_migration_pending.py tests/test_verification_report.py model_gateway/tests/unit/test_cpu_detector.py -v
    ```
-2. **사전 검증 시뮬레이션 (Dry-Run)**:
+2. **Feature touchpoint 정적 분석 및 타입/구문 검사**:
+   ```bash
+   uv run --with ruff --python 3.12 ruff check make_migration_pack.py migration_pack/scripts model_gateway/scripts/probe_hardware.py model_gateway/src/core/cpu_detector.py model_gateway/src/core/process_manager.py tests/test_migration_pending.py
+   python -m compileall -q make_migration_pack.py migration_pack/scripts model_gateway/scripts model_gateway/src/core tests/test_migration_pending.py
+   ```
+3. **사전 검증 시뮬레이션 (Dry-Run)**:
    ```bash
    python make_migration_pack.py --dry-run
    ```
-3. **11개 검사 E2E 헬스체크(10개 HTTP + Redis TCP PING)**:
+4. **11개 검사 E2E 헬스체크(10개 HTTP + Redis TCP PING)**:
    ```bash
    python migration_pack/scripts/verify_migration.py --gateway-port "${MIGRATION_VERIFY_GATEWAY_PORT:-80}" --secondary-gateway-port "${MIGRATION_VERIFY_SECONDARY_GATEWAY_PORT:-8080}"
    ```

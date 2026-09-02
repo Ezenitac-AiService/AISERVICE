@@ -19,6 +19,7 @@ python make_migration_pack.py [OPTIONS]
 | `--target-os` | String | `ubuntu` | 타겟 OS 플랫폼 (`ubuntu`, `linux`, `generic`) |
 | `--target-cpu` | String | `i7-930` | 타겟 CPU 아키텍처 (`i7-930`, `avx2`, `native`) |
 | `--target-gpu` | String | `gtx1070` | 타겟 GPU 아키텍처 (`gtx1070`, `sm_61`, `sm_80`, `sm_89`, `none`) |
+| `--skip-gpu` | Flag | `False` | GPU 설치·JIT·GPU Compose 경로를 생략하고 manifest에 CPU-only 모드 기록 |
 | `--format` | String | `tar.gz` | 아카이브 형식 (`tar.gz`, `zip`, `both`). `both`는 두 형식을 병렬 생성 |
 | `--key-file` | Path | `MIGRATION_PACK_KEY_FILE` | 아카이브 암호화 키 경로. 키는 결과 아카이브에 포함하지 않음 |
 | `--dry-run` | Flag | `False` | 실제 압축 없이 사전 요구사항, DB 연결, 볼륨 크기, 디스크 공간 점검 |

@@ -6,13 +6,18 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 import subprocess
 import sys
-import shlex
 import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -24,6 +29,21 @@ PACK_ROOT = SCRIPT_DIR.parent
 PROJECT_ROOT = PACK_ROOT.parent
 DB_DIR = PACK_ROOT / "database"
 DB_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_docker_host() -> None:
+    if sys.platform.startswith("win") and "DOCKER_HOST" not in os.environ:
+        try:
+            res = subprocess.run(["docker", "info"], capture_output=True, timeout=3, check=False)
+            if res.returncode != 0:
+                wsl_res = subprocess.run(["wsl", "-d", "Ubuntu", "--", "hostname", "-I"], capture_output=True, text=True, timeout=5, check=False)
+                if wsl_res.returncode == 0 and wsl_res.stdout.strip():
+                    ip = wsl_res.stdout.split()[0]
+                    os.environ["DOCKER_HOST"] = f"tcp://{ip}:2375"
+        except Exception:
+            pass
+
+_ensure_docker_host()
 
 
 class DatabaseExportError(RuntimeError):
@@ -252,33 +272,40 @@ def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
         tables = subprocess.run(
             list_command, capture_output=True, text=True, check=True, timeout=30
         ).stdout.splitlines()
-        total = 0
-        for table in tables:
-            escaped_table = table.replace("`", "``")
-            query = f"SELECT COUNT(*) FROM `{db_name}`.`{escaped_table}`;"
-            result = subprocess.run(
-                [
-                    "docker",
-                    "exec",
-                    *_docker_env(target["root_password"]),
-                    container,
-                    "mysql",
-                    "-uroot",
-                    "-s",
-                    "-N",
-                    "-e",
-                    query,
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=120,
-            )
-            value = result.stdout.strip()
-            if not value.isdigit():
-                raise ValueError(f"행 수 응답이 숫자가 아닙니다: {table}")
-            total += int(value)
-        return total, "COUNT(*) per table"
+        if not tables:
+            return 0, "COUNT(*) per table"
+
+        # 단일 SQL 쿼리로 모든 테이블의 COUNT(*)를 합산하여 Docker socket 부하를 방지합니다.
+        subqueries = [
+            f"(SELECT COUNT(*) FROM `{db_name}`.`{t.strip().replace('`', '``')}`)"
+            for t in tables
+            if t.strip()
+        ]
+        if not subqueries:
+            return 0, "COUNT(*) per table"
+        total_query = "SELECT " + " + ".join(subqueries) + ";"
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                *_docker_env(target["root_password"]),
+                container,
+                "mysql",
+                "-uroot",
+                "-s",
+                "-N",
+                "-e",
+                total_query,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120,
+        )
+        value = result.stdout.strip()
+        if not value.isdigit():
+            raise ValueError(f"행 수 응답이 숫자가 아닙니다: {value}")
+        return int(value), "COUNT(*) per table"
     except (OSError, ValueError, subprocess.SubprocessError):
         return 0, "unavailable"
 
@@ -304,7 +331,12 @@ def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
         raise DatabaseExportError(
             f"invalid View DEFINER가 있어 무손실 dump를 생성할 수 없습니다: {details}"
         )
-    dump_args = [
+    command = [
+        "docker",
+        "exec",
+        *_docker_env(target["root_password"]),
+        "-i",
+        container,
         "mysqldump",
         "-uroot",
         "--single-transaction",
@@ -314,36 +346,9 @@ def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
         "--events",
         "--hex-blob",
         "--default-character-set=utf8mb4",
-        "--max_allowed_packet=512M",
+        "--max_allowed_packet=1024M",
         "--net_buffer_length=16384",
         db_name,
-    ]
-    dump_command = " ".join(shlex.quote(value) for value in dump_args)
-    # mysql CLI를 오래 유지해 FLUSH TABLES lock의 세션을 dump 종료까지 보존합니다.
-    # 별도의 `mysql -e` 프로세스로 lock을 걸면 프로세스 종료와 함께 lock이 풀리므로
-    # named pipe를 통해 FLUSH/DUMP/UNLOCK 경계를 하나의 mysql 세션에 유지합니다.
-    session_script = (
-        "set -eu; "
-        "lock_dir=$(mktemp -d); lock_pipe=${lock_dir}/mysql-session; mkfifo ${lock_pipe}; "
-        "lock_pid=0; "
-        "cleanup() { "
-        "if [ ${lock_pid} -ne 0 ]; then printf 'UNLOCK TABLES;\\nQUIT;\\n' >${lock_pipe} || true; wait ${lock_pid} || true; fi; "
-        "rm -rf ${lock_dir}; "
-        "}; trap cleanup EXIT; "
-        "mysql -uroot <${lock_pipe} >/dev/null 2>&1 & lock_pid=$!; "
-        "exec 3>${lock_pipe}; printf 'FLUSH TABLES WITH READ LOCK;\\n' >&3; sleep 1; "
-        f"{dump_command}; "
-        "printf 'UNLOCK TABLES;\\nQUIT;\\n' >&3; exec 3>&-; wait ${lock_pid}; lock_pid=0"
-    )
-    command = [
-        "docker",
-        "exec",
-        *_docker_env(target["root_password"]),
-        "-i",
-        container,
-        "sh",
-        "-c",
-        session_script,
     ]
 
     start = time.time()

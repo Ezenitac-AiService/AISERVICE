@@ -4,15 +4,14 @@ Detects CPU SIMD instruction set support (AVX, AVX2, F16C, FMA) and GPU Compute 
 to dynamically select non-crashing build flags for llama-server and llama-cpp-python.
 """
 
-import os
-import re
-import sys
-import shutil
 import argparse
+import os
+import shutil
 import subprocess
-from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
+import sys
+from typing import Any, Dict, List
 
+from pydantic import BaseModel, Field
 from src.core.gpu_detector import GpuAccelerationError
 
 
@@ -267,6 +266,7 @@ def get_llama_build_flags(cpuinfo_path: str = "/proc/cpuinfo") -> LlamaCppBuildF
 
     args_list = [
         "-DGGML_CUDA=ON",
+        "-march=native",
         f"-DGGML_AVX={avx_flag}",
         f"-DGGML_AVX2={avx2_flag}",
         f"-DGGML_F16C={f16c_flag}",
@@ -568,4 +568,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

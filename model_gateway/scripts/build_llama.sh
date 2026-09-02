@@ -13,6 +13,15 @@ PROFILE_FILE="${GATEWAY_DIR}/config/hardware_profile.json"
 log_info() { echo "[INFO] $*"; }
 log_warn() { echo "[WARN] $*" >&2; }
 
+detect_vllm_status() {
+    local health_url="${VLLM_HEALTH_URL:-http://127.0.0.1:8081/health}"
+    if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "${health_url}" >/dev/null 2>&1; then
+        echo true
+    else
+        echo false
+    fi
+}
+
 write_runtime_status() {
     local selected="$1"
     local vllm_ok="${2:-false}"
@@ -30,15 +39,6 @@ profile["runtime_backend_status"] = {
     "vllm": sys.argv[3].lower() == "true",
     "llama.cpp-cuda": sys.argv[4].lower() == "true",
     "llama.cpp-cpu-openblas": sys.argv[5].lower() == "true",
-}
-
-detect_vllm_status() {
-    local health_url="${VLLM_HEALTH_URL:-http://127.0.0.1:8081/health}"
-    if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "${health_url}" >/dev/null 2>&1; then
-        echo true
-    else
-        echo false
-    fi
 }
 path.write_text(json.dumps(profile, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PY
@@ -94,8 +94,8 @@ run_build() {
         -S "${SRC_DIR}" -B "${build_dir}"
         -DCMAKE_BUILD_TYPE=Release
         -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF
-        -DCMAKE_C_FLAGS="${LLAMA_COMPILER_FLAGS:-}"
-        -DCMAKE_CXX_FLAGS="${LLAMA_COMPILER_FLAGS:-}"
+        -DCMAKE_C_FLAGS="${LLAMA_COMPILER_FLAGS:--march=native}"
+        -DCMAKE_CXX_FLAGS="${LLAMA_COMPILER_FLAGS:--march=native}"
     )
     if [[ "${backend}" == "cuda" ]]; then
         local cuda_arch="61"

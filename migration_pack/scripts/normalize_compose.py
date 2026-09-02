@@ -11,13 +11,15 @@ Native Ubuntu Linux 호환 표준 Docker Compose v2 형식으로 자동 정규�
 from __future__ import annotations
 
 import argparse
-import os
 import re
-import sys
 from pathlib import Path
 
 
-def normalize_compose_content(content: str, preserve_external_volumes: bool = False) -> str:
+def normalize_compose_content(
+    content: str,
+    preserve_external_volumes: bool = False,
+    cpu_only: bool = False,
+) -> str:
     """
     docker-compose.yml 텍스트를 읽어 우분투 네이티브 리눅스에 맞게 정규화합니다.
     1. /usr/lib/wsl 볼륨 마운트 제거
@@ -28,11 +30,33 @@ def normalize_compose_content(content: str, preserve_external_volumes: bool = Fa
     """
     lines = content.splitlines()
     output_lines = []
-    skip_next_n_lines = 0
-
     i = 0
     while i < len(lines):
         line = lines[i]
+
+        # CPU-only 모드에서는 GPU deploy 블록 전체를 제거합니다.
+        if cpu_only and re.match(r"^\s*deploy:\s*$", line):
+            deploy_indent = len(line) - len(line.lstrip())
+            end = i + 1
+            block = []
+            while end < len(lines):
+                candidate = lines[end]
+                if candidate.strip() and len(candidate) - len(candidate.lstrip()) <= deploy_indent:
+                    break
+                block.append(candidate)
+                end += 1
+            block_text = "\n".join(block).lower()
+            if "nvidia" in block_text or "capabilities: [gpu]" in block_text:
+                i = end
+                continue
+
+        if cpu_only and re.search(
+            r"(?:NVIDIA_VISIBLE_DEVICES|NVIDIA_DRIVER_CAPABILITIES|runtime:\s*nvidia)",
+            line,
+            re.IGNORECASE,
+        ):
+            i += 1
+            continue
 
         # 1. /usr/lib/wsl 마운트 라인 건너뛰기
         if re.search(r'-\s+/usr/lib/wsl', line):
@@ -70,7 +94,19 @@ def normalize_compose_content(content: str, preserve_external_volumes: bool = Fa
 
     result = "\n".join(output_lines) + "\n"
 
-    # 5. vllm-serv GPU deploy 디렉티브 보장 (만약 deploy가 없으면 주입)
+    # 5. CPU-only 환경은 GPU 런타임을 제거하고 애플리케이션에 명시적으로 전달합니다.
+    if cpu_only and "vllm-serv:" in result:
+        if "MODEL_GATEWAY_CPU_ONLY=1" not in result:
+            result = result.replace(
+                "    environment:\n",
+                "    environment:\n"
+                "      - AISERVICE_SKIP_GPU=1\n"
+                "      - MODEL_GATEWAY_CPU_ONLY=1\n",
+                1,
+            )
+        return result
+
+    # 6. vllm-serv GPU deploy 디렉티브 보장 (만약 deploy가 없으면 주입)
     if "deploy:" not in result and "vllm-serv:" in result:
         gpu_deploy_block = (
             "    deploy:\n"
@@ -91,7 +127,12 @@ def normalize_compose_content(content: str, preserve_external_volumes: bool = Fa
     return result
 
 
-def normalize_file(input_file: Path | str, output_file: Path | str | None = None) -> Path:
+def normalize_file(
+    input_file: Path | str,
+    output_file: Path | str | None = None,
+    *,
+    cpu_only: bool = False,
+) -> Path:
     """단일 compose 파일을 정규화하여 출력 파일로 저장합니다."""
     in_path = Path(input_file)
     if not in_path.is_file():
@@ -102,7 +143,7 @@ def normalize_file(input_file: Path | str, output_file: Path | str | None = None
     with open(in_path, "r", encoding="utf-8") as f:
         raw_content = f.read()
 
-    normalized = normalize_compose_content(raw_content)
+    normalized = normalize_compose_content(raw_content, cpu_only=cpu_only)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8", newline="\n") as f:
@@ -115,9 +156,14 @@ def main():
     parser = argparse.ArgumentParser(description="Normalize docker-compose.yml for Native Ubuntu Linux")
     parser.add_argument("--input", "-i", default="docker-compose.yml", help="Input compose file path")
     parser.add_argument("--output", "-o", default=None, help="Output compose file path (default: overwrite input)")
+    parser.add_argument(
+        "--cpu-only",
+        action="store_true",
+        help="GPU deploy/device 설정을 제거하고 Model Gateway CPU-only 모드로 정규화",
+    )
     args = parser.parse_args()
 
-    out = normalize_file(args.input, args.output)
+    out = normalize_file(args.input, args.output, cpu_only=args.cpu_only)
     print(f"[OK] Normalized compose saved to: {out}")
 
 

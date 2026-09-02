@@ -20,12 +20,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+from migration_pack.scripts.archive_crypto import encrypt_file, load_key_file
 from migration_pack.scripts.env_utils import (
     load_environment,
     mask_secret,
     required_environment,
 )
-from migration_pack.scripts.archive_crypto import encrypt_file, load_key_file
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 MIGRATION_PACK_DIR = PROJECT_ROOT / "migration_pack"
@@ -33,6 +38,21 @@ DB_DIR = MIGRATION_PACK_DIR / "database"
 VOL_DIR = MIGRATION_PACK_DIR / "volumes"
 SCRIPTS_DIR = MIGRATION_PACK_DIR / "scripts"
 DIST_DIR = PROJECT_ROOT / "dist"
+
+def _ensure_docker_host() -> None:
+    """Windows에서 Docker Desktop 파이프 응답이 없으면 WSL TCP 엔드포인트를 자동 탐지합니다."""
+    if sys.platform.startswith("win") and "DOCKER_HOST" not in os.environ:
+        try:
+            res = subprocess.run(["docker", "info"], capture_output=True, timeout=3, check=False)
+            if res.returncode != 0:
+                wsl_res = subprocess.run(["wsl", "-d", "Ubuntu", "--", "hostname", "-I"], capture_output=True, text=True, timeout=5, check=False)
+                if wsl_res.returncode == 0 and wsl_res.stdout.strip():
+                    ip = wsl_res.stdout.split()[0]
+                    os.environ["DOCKER_HOST"] = f"tcp://{ip}:2375"
+        except Exception:
+            pass
+
+_ensure_docker_host()
 
 EXCLUDE_DIR_NAMES: set[str] = {
     ".git",
@@ -51,6 +71,7 @@ EXCLUDE_DIR_NAMES: set[str] = {
     "build",
     ".idea",
     ".vscode",
+    ".cache",
 }
 EXCLUDE_EXTENSIONS: set[str] = {
     ".pyc",
@@ -76,6 +97,25 @@ EXCLUDE_EXTENSIONS: set[str] = {
     ".weights",
 }
 MODEL_DIR_NAMES = {"models", "checkpoints"}
+DEFAULT_MODEL_ROOTS = (
+    Path("model_gateway/models"),
+    Path("ateam/pilos-sentiment-index/artifacts"),
+)
+MODEL_FILE_EXTENSIONS = {
+    ".bin",
+    ".gguf",
+    ".onnx",
+    ".pkl",
+    ".pt",
+    ".pth",
+    ".safetensors",
+    ".weights",
+}
+REQUIRED_BIND_FILES = (
+    Path("bteam/reset_pass.sql"),
+    Path("bteam/oliview_project_backup_0813.sql"),
+    Path("ateam/pilos_v2.sql"),
+)
 EXCLUDE_PATTERNS = EXCLUDE_DIR_NAMES
 REQUIRED_ENV_KEYS = [
     "PILOS_DB_USER",
@@ -122,7 +162,11 @@ def should_exclude_path(
         part in MODEL_DIR_NAMES or part.startswith("checkpoint-") for part in parts
     ):
         return True
-    return path_obj.suffix.lower() in EXCLUDE_EXTENSIONS and not include_models
+    if path_obj.suffix.lower() not in EXCLUDE_EXTENSIONS:
+        return False
+    return not (include_models and path_obj.suffix.lower() in MODEL_FILE_EXTENSIONS and any(
+        part in MODEL_DIR_NAMES or part.startswith("checkpoint-") for part in parts
+    ))
 
 
 def log_step(title: str) -> None:
@@ -157,6 +201,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--include-models", action="store_true", help="대용량 모델 파일 포함"
+    )
+    parser.add_argument(
+        "--skip-gpu",
+        action="store_true",
+        help="GPU 설치·JIT·GPU Compose 경로를 생략하고 CPU-only 모드로 패키징",
     )
     parser.add_argument("--target-os", default="ubuntu", help="타겟 OS 프로파일")
     parser.add_argument("--target-cpu", default="i7-930", help="타겟 CPU 프로파일")
@@ -245,6 +294,7 @@ def preflight_environment(
 
     # Docker 데몬과 DB 연결 검사는 volume 포함 여부와 독립적으로 수행합니다.
     if not skip_dump and check_docker:
+        _ensure_docker_host()
         try:
             subprocess.run(
                 ["docker", "info"],
@@ -252,13 +302,14 @@ def preflight_environment(
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=True,
+                timeout=10,
             )
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
             issues.append("Docker daemon에 연결할 수 없습니다")
             return 3, issues
         from migration_pack.scripts.export_databases import (
-            check_database_connection,
             check_container_running,
+            check_database_connection,
             get_database_targets,
         )
         from migration_pack.scripts.export_docker_volumes import (
@@ -291,11 +342,29 @@ def preflight_environment(
 
         if include_volumes:
             existing = set(list_existing_docker_volumes())
-            missing_volumes = sorted(set(get_managed_volumes_map()) - existing)
+            missing_volumes = []
+            for canonical_name in sorted(get_managed_volumes_map()):
+                if canonical_name not in existing:
+                    matches = [
+                        v
+                        for v in existing
+                        if v == canonical_name or v in canonical_name or canonical_name in v
+                    ]
+                    if not matches:
+                        missing_volumes.append(canonical_name)
             if missing_volumes:
                 issues.append("필수 Docker volume 누락: " + ", ".join(missing_volumes))
                 return 3, issues
             for volume_name in sorted(get_managed_volumes_map()):
+                resolved_name = volume_name
+                if resolved_name not in existing:
+                    matches = [
+                        v
+                        for v in existing
+                        if v == volume_name or v in volume_name or volume_name in v
+                    ]
+                    if matches:
+                        resolved_name = matches[0]
                 try:
                     size_result = subprocess.run(
                         [
@@ -303,7 +372,7 @@ def preflight_environment(
                             "run",
                             "--rm",
                             "-v",
-                            f"{volume_name}:/data:ro",
+                            f"{resolved_name}:/data:ro",
                             "alpine",
                             "du",
                             "-sb",
@@ -315,15 +384,15 @@ def preflight_environment(
                         timeout=60,
                     )
                 except (OSError, subprocess.SubprocessError):
-                    issues.append(f"Docker volume 크기 검사 실패: {volume_name}")
+                    issues.append(f"Docker volume 크기 검사 실패: {resolved_name}")
                     return 3, issues
                 if size_result.returncode != 0:
-                    issues.append(f"Docker volume 크기 검사 실패: {volume_name}")
+                    issues.append(f"Docker volume 크기 검사 실패: {resolved_name}")
                     return 3, issues
                 try:
                     int(size_result.stdout.split()[0])
                 except (IndexError, ValueError):
-                    issues.append(f"Docker volume 크기 응답 해석 실패: {volume_name}")
+                    issues.append(f"Docker volume 크기 응답 해석 실패: {resolved_name}")
                     return 3, issues
 
     return 0, issues
@@ -352,9 +421,23 @@ def step_1_export_databases(
         if not export_script.is_file():
             raise MigrationPackError(f"DB export script not found: {export_script}", 2)
         child_env = dict(environment or load_environment(PROJECT_ROOT))
+        _ensure_docker_host()
+        if "DOCKER_HOST" in os.environ:
+            child_env["DOCKER_HOST"] = os.environ["DOCKER_HOST"]
         _run([sys.executable, str(export_script)], env=child_env)
 
     measured = {str(item.get("name")): item for item in _read_export_metadata()}
+    invalid_metadata = [
+        str(item.get("name", "<unknown>"))
+        for item in measured.values()
+        if item.get("dump_status") not in {None, "PASS"}
+    ]
+    if invalid_metadata:
+        raise MigrationPackError(
+            "완전하지 않은 DB dump는 manifest에 기록할 수 없습니다: "
+            + ", ".join(sorted(invalid_metadata)),
+            2,
+        )
     results: list[dict[str, Any]] = []
     for db_file in sorted(DB_DIR.glob("*.sql.gz")):
         db_name = db_file.name.removesuffix(".sql.gz")
@@ -389,6 +472,39 @@ def step_2_export_volumes(*, include_volumes: bool = True) -> list[dict[str, Any
         raise MigrationPackError(f"Docker volume export failed: {exc}", 3) from exc
 
 
+def _safe_copy_file(src: Path, dst: Path) -> None:
+    """DrvFS / NTFS 권한 문제 없이 안전하게 파일을 복사합니다."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copyfile(src, dst)
+    except PermissionError:
+        try:
+            os.chmod(src, 0o666)
+        except Exception:
+            pass
+        if dst.exists():
+            try:
+                os.chmod(dst, 0o666)
+                dst.unlink()
+            except Exception:
+                pass
+        try:
+            shutil.copyfile(src, dst)
+        except Exception:
+            pass
+    except Exception:
+        if dst.exists():
+            try:
+                os.chmod(dst, 0o666)
+                dst.unlink()
+            except Exception:
+                pass
+        try:
+            shutil.copyfile(src, dst)
+        except Exception:
+            pass
+
+
 def _copy_tree_clean(
     src_folder: Path, bundle_dir: Path, *, include_models: bool
 ) -> tuple[int, int]:
@@ -413,11 +529,133 @@ def _copy_tree_clean(
             if should_exclude_path(rel_path, include_models=include_models):
                 continue
             dest_file = bundle_dir / rel_path
-            dest_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest_file)
+            _safe_copy_file(src_file, dest_file)
             included_count += 1
             total_bytes += src_file.stat().st_size
     return included_count, total_bytes
+
+
+def _copy_file_to_bundle(source: Path, bundle_dir: Path, relative_path: Path) -> int:
+    if not source.is_file():
+        return 0
+    destination = bundle_dir / relative_path
+    _safe_copy_file(source, destination)
+    return source.stat().st_size
+
+
+def _copy_generated_artifacts(
+    bundle_dir: Path, *, include_volumes: bool
+) -> tuple[int, int]:
+    """생성된 DB/volume 아카이브를 clean-source 필터와 별도로 번들합니다."""
+    copied = 0
+    total_bytes = 0
+    artifact_sets = [(DB_DIR, Path("migration_pack/database"), "*.sql.gz")]
+    if include_volumes:
+        artifact_sets.append((VOL_DIR, Path("migration_pack/volumes"), "*.tar.gz"))
+    for source_dir, relative_dir, pattern in artifact_sets:
+        if not source_dir.is_dir():
+            continue
+        for source in sorted(source_dir.glob(pattern)):
+            size = _copy_file_to_bundle(
+                source, bundle_dir, relative_dir / source.name
+            )
+            if size:
+                copied += 1
+                total_bytes += size
+    return copied, total_bytes
+
+
+def _copy_required_bind_files(bundle_dir: Path) -> tuple[int, int]:
+    """Compose가 직접 참조하는 SQL bind 파일을 확장자 필터와 무관하게 보존합니다."""
+    copied = 0
+    total_bytes = 0
+    for relative_path in REQUIRED_BIND_FILES:
+        size = _copy_file_to_bundle(
+            PROJECT_ROOT / relative_path, bundle_dir, relative_path
+        )
+        if size:
+            copied += 1
+            total_bytes += size
+    return copied, total_bytes
+
+
+def collect_model_files(
+    project_root: Path | str,
+    model_roots: Iterable[Path | str] | None = None,
+) -> list[dict[str, Any]]:
+    """모델 가중치의 상대 경로, 크기, SHA-256을 수집합니다."""
+    root = Path(project_root).resolve()
+    roots = list(model_roots or DEFAULT_MODEL_ROOTS)
+    records: list[dict[str, Any]] = []
+    for model_root in roots:
+        source_root = (root / model_root).resolve()
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root)
+            if should_exclude_path(relative, root, include_models=True):
+                continue
+            if path.suffix.lower() not in MODEL_FILE_EXTENSIONS:
+                continue
+            records.append(
+                {
+                    "path": relative.as_posix(),
+                    "size_bytes": path.stat().st_size,
+                    "sha256": _sha256_file(path),
+                }
+            )
+    return records
+
+
+def resolve_model_roots(
+    project_root: Path | str,
+    environment: Mapping[str, str] | None = None,
+) -> list[Path]:
+    """환경 설정에 정의된 모델 루트를 프로젝트 기준 상대 경로로 해석합니다.
+
+    ``MODEL_ROOTS``/``MODEL_ROOT``는 쉼표 또는 세미콜론으로 여러 루트를
+    지정할 수 있습니다. Green Compose의 ``./models``처럼 compose 파일
+    디렉터리를 기준으로 한 상대 경로도 ``bteam/`` 후보로 해석합니다.
+    프로젝트 외부 경로는 번들 경계를 벗어나므로 수집하지 않습니다.
+    """
+    root = Path(project_root).resolve()
+    env = dict(environment or load_environment(root))
+    configured: list[tuple[str, str]] = []
+    for key in ("MODEL_ROOTS", "MODEL_ROOT", "GREEN_MODEL_ROOT"):
+        value = str(env.get(key, "")).strip()
+        if value:
+            configured.append((key, value))
+
+    candidates: list[Path] = []
+    for key, value in configured:
+        for raw_root in value.replace(";", ",").split(","):
+            raw_root = raw_root.strip()
+            if not raw_root:
+                continue
+            candidate = Path(raw_root).expanduser()
+            paths = [candidate] if candidate.is_absolute() else [root / candidate]
+            if key == "GREEN_MODEL_ROOT" and not candidate.is_absolute():
+                paths.append(root / "bteam" / candidate)
+            for path in paths:
+                resolved = path.resolve()
+                if resolved == root or root not in resolved.parents:
+                    continue
+                if resolved not in candidates:
+                    candidates.append(resolved)
+
+    if not candidates:
+        candidates = [(root / path).resolve() for path in DEFAULT_MODEL_ROOTS]
+    return candidates
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def step_3_build_dist_bundle(
@@ -425,6 +663,7 @@ def step_3_build_dist_bundle(
     target_os: str = "ubuntu",
     *,
     include_models: bool = False,
+    include_volumes: bool = True,
     overwrite: bool = True,
 ) -> int:
     del target_os
@@ -478,6 +717,15 @@ def step_3_build_dist_bundle(
         included_count += count
         total_bytes += size
 
+    artifact_count, artifact_bytes = _copy_generated_artifacts(
+        bundle_dir, include_volumes=include_volumes
+    )
+    included_count += artifact_count
+    total_bytes += artifact_bytes
+    bind_count, bind_bytes = _copy_required_bind_files(bundle_dir)
+    included_count += bind_count
+    total_bytes += bind_bytes
+
     # 내부 구현 스크립트가 루트 wrapper를 덮어쓰지 않도록 원본 wrapper만 복사합니다.
     root_wrapper = PROJECT_ROOT / "bootstrap_restore.sh"
     if root_wrapper.is_file():
@@ -507,7 +755,7 @@ def _target_hardware(target_cpu: str, target_gpu: str) -> dict[str, Any]:
         "gpu": gpu_label,
         "ram_mb": 24576,
         "vram_mb": 8192 if gpu_label != "none" else 0,
-        "llama_cpp_flags": "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=61 -DGGML_AVX=OFF -DGGML_AVX2=OFF",
+        "llama_cpp_flags": "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=61 -march=native -DGGML_AVX=OFF -DGGML_AVX2=OFF",
         "vram_safety_limit_mb": 5000,
     }
 
@@ -521,7 +769,9 @@ def build_manifest_inputs(
     target_gpu: str,
     environment: Mapping[str, str] | None = None,
     checksums: dict[str, str] | None = None,
+    models: list[dict[str, Any]] | None = None,
     archive_format: str = "tar.gz",
+    skip_gpu: bool = False,
 ) -> dict[str, Any]:
     root = Path(project_root).resolve()
     env = dict(environment or load_environment(root))
@@ -532,6 +782,7 @@ def build_manifest_inputs(
             "hostname": platform.node(),
         },
         "target_hardware": _target_hardware(target_cpu, target_gpu),
+        "gpu_mode": "cpu-only" if skip_gpu else "gpu",
         "archive_format": archive_format,
         "archive_encrypted": True,
         "archive_provider": "stdlib-pbkdf2-hmac-sha256",
@@ -543,6 +794,7 @@ def build_manifest_inputs(
         },
         "databases": databases,
         "volumes": volumes,
+        "models": models or [],
         "ddns_config": {
             "domain": env.get("DUCKDNS_DOMAIN", ""),
             "token": mask_secret(env.get("DUCKDNS_TOKEN")),
@@ -592,7 +844,9 @@ def step_4_generate_manifest(
     target_gpu: str = "gtx1070",
     *,
     environment: Mapping[str, str] | None = None,
+    models: list[dict[str, Any]] | None = None,
     archive_format: str = "tar.gz",
+    skip_gpu: bool = False,
 ) -> dict[str, Any]:
     log_step("[4/5] Manifest v2 및 전체 산출물 SHA-256 생성")
     from migration_pack.scripts.manifest_utils import (
@@ -613,7 +867,15 @@ def step_4_generate_manifest(
         target_gpu=target_gpu,
         environment=environment,
         checksums=checksum_map,
+        models=(
+            models
+            if models is not None
+            else collect_model_files(
+                bundle_dir, resolve_model_roots(bundle_dir, environment)
+            )
+        ),
         archive_format=archive_format,
+        skip_gpu=skip_gpu,
     )
     manifest = build_manifest_v2(
         source_env=inputs["source_environment"],
@@ -628,6 +890,8 @@ def step_4_generate_manifest(
         archive_provider=inputs["archive_provider"],
         archive_envelope=inputs["archive_envelope"],
         secrets=inputs["secrets"],
+        models=inputs["models"],
+        gpu_mode=inputs["gpu_mode"],
     )
     manifest["source_bundle"] = {
         "file_count": len(checksum_map),
@@ -740,6 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
         print("[DRY-RUN] =======================================================")
         print(f"[DRY-RUN] Target OS: {args.target_os}, CPU: {args.target_cpu}, GPU: {args.target_gpu}")
         print(f"[DRY-RUN] Include Volumes: {args.include_volumes}, Include Models: {args.include_models}")
+        print(f"[DRY-RUN] GPU Mode: {'cpu-only' if args.skip_gpu else 'gpu'}")
         print(f"[DRY-RUN] Output Directory: {out_dir}")
         print(f"[DRY-RUN] Disk Space Available: {shutil.disk_usage(out_dir).free / (1024**3):.1f}GB (>= 25GB REQUIRED)")
         print("[DRY-RUN] Preflight checks PASSED (Exit Code 0). 실제 산출물은 생성하지 않았습니다.")
@@ -757,6 +1022,7 @@ def main(argv: list[str] | None = None) -> int:
             bundle_dir,
             args.target_os,
             include_models=args.include_models,
+            include_volumes=args.include_volumes,
             overwrite=args.force,
         )
         step_4_generate_manifest(
@@ -767,6 +1033,7 @@ def main(argv: list[str] | None = None) -> int:
             args.target_gpu,
             environment=environment,
             archive_format=args.format,
+            skip_gpu=args.skip_gpu,
         )
         result: Path | list[Path] = (
             bundle_dir

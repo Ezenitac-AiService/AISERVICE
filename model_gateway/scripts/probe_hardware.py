@@ -151,7 +151,7 @@ def generate_build_profile(
         )
         # -march는 CMake 옵션이 아니므로 실제 compiler flags로 별도 전달합니다.
         compiler_flags.extend(
-            ["-march=nehalem", "-msse4.2", "-mno-avx", "-mno-avx2", "-mno-fma"]
+            ["-march=native", "-msse4.2", "-mno-avx", "-mno-avx2", "-mno-fma"]
         )
     else:
         cmake_flags.append("-march=native")

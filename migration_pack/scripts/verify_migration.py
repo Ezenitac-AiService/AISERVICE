@@ -213,7 +213,7 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
 
 # pytest should not treat this public probe helper as a test when imported by
 # contract test modules.
-test_endpoint.__test__ = False
+test_endpoint.__test__ = False  # type: ignore[attr-defined]
 
 
 def _hardware_detected() -> dict[str, Any]:
@@ -240,6 +240,7 @@ def build_verification_report(
     results: list[dict[str, Any]],
     hardware_detected: dict[str, Any] | None = None,
     data_integrity: dict[str, Any] | None = None,
+    degraded_reason: str | None = None,
 ) -> dict[str, Any]:
     passed = sum(
         1
@@ -251,6 +252,8 @@ def build_verification_report(
     integrity = data_integrity or {}
     integrity_ok = integrity.get("status", "PASS") == "PASS"
     status = "PASS" if failed == 0 and total == 11 and integrity_ok else "FAIL"
+    if status == "PASS" and degraded_reason:
+        status = "DEGRADED"
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
@@ -271,6 +274,8 @@ def build_verification_report(
         "pass_rate_pct": round((passed / max(total, 1)) * 100, 1),
         "overall_status": "HEALTHY" if status == "PASS" else "DEGRADED",
     }
+    if degraded_reason:
+        report["degraded_reason"] = degraded_reason
     return report
 
 
@@ -448,6 +453,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="대상 DB/Chroma 데이터 수 비교를 생략합니다",
     )
+    parser.add_argument(
+        "--degraded-reason",
+        help="검사는 통과했지만 GPU 생략/CPU fallback 등 DEGRADED 사유를 기록합니다",
+    )
     return parser
 
 
@@ -457,7 +466,9 @@ def main(argv: list[str] | None = None) -> int:
     endpoints = build_endpoints(args.gateway_port, args.secondary_gateway_port)
     results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in endpoints]
     integrity = {} if args.skip_data_integrity else collect_data_integrity()
-    report = build_verification_report(results, _hardware_detected(), integrity)
+    report = build_verification_report(
+        results, _hardware_detected(), integrity, args.degraded_reason
+    )
     report["duration_seconds"] = round(time.perf_counter() - started, 3)
     if args.json_report:
         target = Path(args.json_report)
@@ -465,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
         target.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
-    return 0 if report["status"] == "PASS" else 1
+    return 0 if report["status"] in {"PASS", "DEGRADED"} else 1
 
 
 if __name__ == "__main__":

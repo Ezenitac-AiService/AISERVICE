@@ -207,6 +207,7 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+    command: ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.headless=true", "--server.baseUrlPath=bteam/chata", "--server.fileWatcherType=none", "--server.enableCORS=false", "--server.enableXsrfProtection=false"]
     environment:
       PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
@@ -285,6 +286,9 @@ services:
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
       - --max_allowed_packet=512M
+      - --innodb_buffer_pool_size=1G
+      - --innodb_log_file_size=256M
+      - --innodb_flush_log_at_trx_commit=2
     environment:
       MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:?set PILOS_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos_v2}
@@ -300,8 +304,8 @@ services:
       - aiservice-network
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 30
       start_period: 300s
 
