@@ -124,7 +124,7 @@ C:\AISERVICE\
 
 ### 1. Contract-first and test-first
 
-API request/response, SSE event, structured log, prompt, changelog 계약을 먼저 고정한다. 구현 태스크는 계약 검증 및 실패 테스트의 Red 증거가 기록되기 전에는 시작하지 않는다.
+runtime environment, auth transport, API request/판별형 response, product link, pipeline stage SSE event, structured log, prompt, changelog 계약과 frontend quality toolchain을 먼저 고정한다. 구현 태스크는 계약 검증 및 실패 테스트의 Red 증거가 기록되기 전에는 시작하지 않는다.
 
 ### 2. Grounding pipeline
 
