@@ -179,9 +179,40 @@
       margin-bottom: 2.5rem;
     }
 
+    .hero-card {
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(30, 41, 59, 0.85) 100%);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .hero-icon {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.5);
+    }
+
+    .hero-badge {
+      background: rgba(99, 102, 241, 0.3);
+      color: #c7d2fe;
+      border: 1px solid #818cf8;
+    }
+
+    .hero-title {
+      color: #ffffff;
+      font-size: 1.4rem;
+    }
+
+    .hero-desc {
+      color: #cbd5e1;
+      font-size: 0.95rem;
+    }
+
     @media (max-width: 768px) {
       .grid-container {
         grid-template-columns: 1fr;
+      }
+
+      .hero-card {
+        grid-column: span 1;
       }
     }
 
@@ -383,24 +414,20 @@
   <main class="grid-container">
 
     <!-- 0. Hero 2x1 Bento Card: Engineering Evolution -->
-    <a href="/changelog" class="service-card"
-      style="grid-column: span 2; background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(30, 41, 59, 0.85) 100%); border-color: rgba(99, 102, 241, 0.4);">
+    <a href="/changelog" class="service-card hero-card">
       <div>
         <div class="card-top">
-          <div class="icon-box" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5);">✨
-          </div>
-          <span class="badge"
-            style="background: rgba(99, 102, 241, 0.3); color: #c7d2fe; border: 1px solid #818cf8;">MILESTONES</span>
+          <div class="icon-box hero-icon">✨</div>
+          <span class="badge hero-badge">MILESTONES</span>
         </div>
-        <h2 class="card-title" style="color: #ffffff; font-size: 1.4rem;">Engineering Evolution & Architecture Changelog
-        </h2>
-        <p class="card-desc" style="color: #cbd5e1; font-size: 0.95rem;">
+        <h2 class="card-title hero-title">Engineering Evolution & Architecture Changelog</h2>
+        <p class="card-desc hero-desc">
           7대 시스템(ChatA, ChatB, Model Gateway, Nginx, Oliview Web, Core, Pilos)의 엔지니어링 아키텍처 진화 기록과 품질 기준을 확인하세요.
         </p>
       </div>
       <div class="card-meta">
         <span style="color: #a5b4fc;">7 Milestones / 8 Filter Categories</span>
-        <span class="card-link-text" style="color: #818cf8; font-weight: 700;">전체 변경 기록 보기 (/changelog) →</span>
+        <span class="card-link-text">전체 변경 기록 보기 (/changelog) →</span>
       </div>
     </a>
 
