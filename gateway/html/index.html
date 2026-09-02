@@ -436,7 +436,7 @@
       <div>
         <div class="card-top">
           <div class="icon-box">📈</div>
-          <span class="badge badge-a">A-TEAM | v0.8.0-beta 🏆</span>
+          <span class="badge badge-a" id="badgePilos">A-TEAM | v0.8.0-beta 🏆</span>
         </div>
         <h2 class="card-title">Pilos 감정지수 서비스</h2>
         <p class="card-desc">
@@ -454,7 +454,7 @@
       <div>
         <div class="card-top">
           <div class="icon-box">💄</div>
-          <span class="badge badge-b">B-TEAM | v0.8.0-beta 🏆</span>
+          <span class="badge badge-b" id="badgeOliview">B-TEAM | v0.8.0-beta 🏆</span>
         </div>
         <h2 class="card-title">Oliview 메인 서비스</h2>
         <p class="card-desc">
@@ -472,7 +472,7 @@
       <div>
         <div class="card-top">
           <div class="icon-box">🤖</div>
-          <span class="badge badge-chat">CONCIERGE | v0.5.2-alpha 🌱</span>
+          <span class="badge badge-chat" id="badgeChatA">CONCIERGE | v0.5.2-alpha 🌱</span>
         </div>
         <h2 class="card-title">올리챗 (Oliview Chat A - 컨시어지)</h2>
         <p class="card-desc">
@@ -490,7 +490,7 @@
       <div>
         <div class="card-top">
           <div class="icon-box">💬</div>
-          <span class="badge badge-chat">ANALYST | v0.4.1-alpha 🌱</span>
+          <span class="badge badge-chat" id="badgeChatB">ANALYST | v0.4.1-alpha 🌱</span>
         </div>
         <h2 class="card-title">올원챗 (Oliview Chat B - 애널리스트)</h2>
         <p class="card-desc">
@@ -509,7 +509,7 @@
     <div style="display: flex; flex-direction: column; align-items: center; gap: 0.3rem;">
       <div class="status-bar">
         <span class="status-dot"></span>
-        <span>Single Entry Gateway & Model Serving Online (Qwen3.5 Multi-tier)</span>
+        <span>Single Entry Gateway &amp; Model Serving Online (Qwen3.5 Multi-tier)</span>
       </div>
       <p>© 2026 AISERVICE Project. All rights reserved.</p>
     </div>
@@ -518,6 +518,7 @@
   <script>
     // Asynchronous non-blocking fetch to enrich curation highlights if APIs available
     document.addEventListener("DOMContentLoaded", function () {
+      // 1. Curation Stocks Sync
       fetch('/api/stocks')
         .then(function (res) { return res.ok ? res.json() : null; })
         .then(function (data) {
@@ -534,8 +535,39 @@
           if (html) container.innerHTML = html;
         })
         .catch(function (err) {
-          // Graceful fallback to default markup on network error
           console.debug('Async curation stock fetch error:', err);
+        });
+
+      // 2. SSOT Dynamic Version Sync from changelog_data.json
+      fetch('/changelog_data.json')
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (!Array.isArray(data)) return;
+          var latest = {};
+          data.forEach(function (item) {
+            if (!latest[item.subsystem]) {
+              latest[item.subsystem] = item;
+            }
+          });
+          var pilos = document.getElementById('badgePilos');
+          if (pilos && latest.pilos) {
+            pilos.textContent = 'A-TEAM | ' + latest.pilos.version + ' 🏆';
+          }
+          var oliview = document.getElementById('badgeOliview');
+          if (oliview && latest.oliview_web) {
+            oliview.textContent = 'B-TEAM | ' + latest.oliview_web.version + ' 🏆';
+          }
+          var chata = document.getElementById('badgeChatA');
+          if (chata && latest.chat_a) {
+            chata.textContent = 'CONCIERGE | ' + latest.chat_a.version + ' 🌱';
+          }
+          var chatb = document.getElementById('badgeChatB');
+          if (chatb && latest.chat_b) {
+            chatb.textContent = 'ANALYST | ' + latest.chat_b.version + ' 🌱';
+          }
+        })
+        .catch(function (err) {
+          console.debug('Async changelog data fetch error:', err);
         });
     });
   </script>

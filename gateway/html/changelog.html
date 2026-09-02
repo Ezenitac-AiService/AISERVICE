@@ -110,10 +110,8 @@
       background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4);
     }
 
-    .milestone-desc { font-size: 0.95rem; color: #cbd5e1; line-height: 1.65; margin-bottom: 1rem; }
-    .milestone-changes { list-style: square; padding-left: 1.3rem; color: #94a3b8; font-size: 0.88rem; line-height: 1.6; }
+    .milestone-changes { list-style: square; padding-left: 1.3rem; color: #94a3b8; font-size: 0.88rem; line-height: 1.6; margin-top: 0.6rem; }
     .milestone-changes li { margin-bottom: 0.35rem; }
-    .milestone-changes strong { color: #e2e8f0; }
 
     footer { text-align: center; margin-top: 3rem; color: #64748b; font-size: 0.85rem; }
   </style>
@@ -123,7 +121,7 @@
     <div class="header">
       <div class="header-title">
         <h1>Engineering Evolution &amp; Architecture Changelog</h1>
-        <p>Spec 001부터 048까지 이어진 7대 시스템의 아키텍처 진화 역사와 품질 표준 기록</p>
+        <p>Spec 001부터 048까지 이어진 7대 시스템의 아키텍처 진화 역사와 품질 표준 기록 (SSOT JSON Data Driven)</p>
       </div>
       <a href="/" class="btn-back">← 포털 메인으로</a>
     </div>
@@ -131,38 +129,37 @@
     <!-- Quick Stats -->
     <div class="stats-bar">
       <div class="stat-box">
-        <div class="stat-num">48</div>
+        <div class="stat-num" id="statSpecs">48</div>
         <div class="stat-label">Total Specs Built</div>
       </div>
       <div class="stat-box">
-        <div class="stat-num">7</div>
+        <div class="stat-num" id="statSubsystems">7</div>
         <div class="stat-label">Core Subsystems</div>
       </div>
       <div class="stat-box">
-        <div class="stat-num">32</div>
+        <div class="stat-num" id="statTests">32</div>
         <div class="stat-label">Automated Tests (100% Green)</div>
       </div>
       <div class="stat-box">
-        <div class="stat-num">Alpha 🌱 / Beta 🏆</div>
-        <div class="stat-label">Dual Lifecycle Stage</div>
+        <div class="stat-num" id="statMilestones">26</div>
+        <div class="stat-label">Evolutionary Milestones</div>
       </div>
     </div>
 
     <!-- 8 Filter States -->
     <div class="filters" role="tablist" aria-label="Milestone Filters">
-      <button class="filter-btn active" data-filter="all">전체 (All 26)</button>
-      <button class="filter-btn" data-filter="chat_a">Chat A 컨시어지 (5)</button>
-      <button class="filter-btn" data-filter="chat_b">Chat B 애널리스트 (5)</button>
-      <button class="filter-btn" data-filter="model_gateway">Model Gateway (4)</button>
-      <button class="filter-btn" data-filter="nginx_gateway">Nginx Gateway (4)</button>
-      <button class="filter-btn" data-filter="oliview_web">Oliview Web (3)</button>
-      <button class="filter-btn" data-filter="core">Core Utilities (3)</button>
-      <button class="filter-btn" data-filter="pilos">PILOS 플랫폼 (2)</button>
+      <button class="filter-btn active" data-filter="all">전체 (All <span id="countAll">26</span>)</button>
+      <button class="filter-btn" data-filter="chat_a">Chat A 컨시어지 (<span id="countChatA">5</span>)</button>
+      <button class="filter-btn" data-filter="chat_b">Chat B 애널리스트 (<span id="countChatB">5</span>)</button>
+      <button class="filter-btn" data-filter="model_gateway">Model Gateway (<span id="countModelGateway">4</span>)</button>
+      <button class="filter-btn" data-filter="nginx_gateway">Nginx Gateway (<span id="countNginxGateway">4</span>)</button>
+      <button class="filter-btn" data-filter="oliview_web">Oliview Web (<span id="countOliviewWeb">3</span>)</button>
+      <button class="filter-btn" data-filter="core">Core Utilities (<span id="countCore">3</span>)</button>
+      <button class="filter-btn" data-filter="pilos">PILOS 플랫폼 (<span id="countPilos">2</span>)</button>
     </div>
 
     <div class="timeline" id="milestonesList">
-
-      <!-- ==================== CHAT A MILESTONES ==================== -->
+      <!-- Fallback / SSR Milestone Cards (Populated Dynamically from changelog_data.json) -->
       <div class="milestone-card" data-category="chat_a">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -171,67 +168,11 @@
           </div>
           <span class="milestone-tag badge-alpha-tag">v0.5.2-alpha 🌱 (chat_a)</span>
         </div>
-        <p class="milestone-desc">가상 화자('사용자 A/B/C') 날조 0% 원천 차단, 서브스트링 원문 인용 충실도 보증, K=0 하드 기권 및 visualViewport 가상 키보드 방어 레이아웃 구축.</p>
         <ul class="milestone-changes">
-          <li><strong>GroundednessSanitizer</strong>: 가상 사용자 패턴 제거 및 객관적 분석 서술문 자동 치환</li>
-          <li><strong>StreamingTokenInterceptor</strong>: 청크 경계 금지어 쪼개짐(Flash of Forbidden Text) 방어용 캐리 버퍼 구현</li>
-          <li><strong>ProductLinkCard</strong>: 공식몰 파라미터 검증 완료 구조화 상품 링크 카드 연동</li>
+          <li>GroundednessSanitizer: 가상 사용자 패턴('사용자 A/B/C') 날조 0% 원천 차단 및 서술문 자동 치환</li>
+          <li>StreamingTokenInterceptor: 청크 경계 금지어 쪼개짐(Flash of Forbidden Text) 방어용 캐리 버퍼 구현</li>
         </ul>
       </div>
-
-      <div class="milestone-card" data-category="chat_a">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat A: FastAPI 경량 웹 전환 및 실시간 SSE 스트리밍</span>
-            <span class="milestone-spec">Spec 046</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.5.0-alpha (chat_a)</span>
-        </div>
-        <p class="milestone-desc">무거운 Streamlit 전체 Re-run 구조에서 초경량 FastAPI + Vanilla JS SSE 스트리밍 웹 클라이언트로 전면 전환.</p>
-        <ul class="milestone-changes">
-          <li>/api/v1/chat/stream SSE 엔드포인트 구축 및 토큰 단위 점진적 렌더링</li>
-          <li>바텀 시트(Bottom Sheet) 원문 리뷰 팝업 및 마크다운 테이블 렌더러 탑재</li>
-        </ul>
-      </div>
-
-      <div class="milestone-card" data-category="chat_a">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat A: 모바일 헤더 및 썸존(Thumb Zone) 인터랙션 최적화</span>
-            <span class="milestone-spec">Spec 040</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.4.0-alpha (chat_a)</span>
-        </div>
-        <p class="milestone-desc">스마트폰 및 카카오톡 인앱 브라우저를 위한 상단 툴바 0px 잘림 방지 및 하단 40% 썸존 스와이프 칩바 도입.</p>
-        <ul class="milestone-changes">
-          <li>1-클릭 카테고리 질문 칩바(스킨케어, 클렌징, 선케어 등) 가로 스크롤 UI</li>
-          <li>48px 터치 타깃 및 스마트폰 한 손 조작성 강화</li>
-        </ul>
-      </div>
-
-      <div class="milestone-card" data-category="chat_a">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat A: 제품 시리즈(Series) 식별 및 인라인 인용 태그 결속</span>
-            <span class="milestone-spec">Spec 038</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.3.5-alpha (chat_a)</span>
-        </div>
-        <p class="milestone-desc">동일 브랜드 내 다수 라인업(예: 프로폴리스 앰플 vs 쿠션) 혼동 방지 및 리뷰 순위별 [제품명 리뷰 N] 태그 강제 바인딩.</p>
-      </div>
-
-      <div class="milestone-card" data-category="chat_a">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat A: 실시간 추론 단계(Step Event) 시각화 콜백 탑재</span>
-            <span class="milestone-spec">Spec 014</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.1.0-alpha (chat_a)</span>
-        </div>
-        <p class="milestone-desc">사용자 질의 분석 중 검색·재정렬·문맥선별 진행 상태를 시각적으로 보여주는 아코디언 상태 박스 구축.</p>
-      </div>
-
-      <!-- ==================== CHAT B MILESTONES ==================== -->
       <div class="milestone-card" data-category="chat_b">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -240,59 +181,11 @@
           </div>
           <span class="milestone-tag badge-alpha-tag">v0.4.1-alpha 🌱 (chat_b)</span>
         </div>
-        <p class="milestone-desc">데이터 분석가용 프로 대시보드 구축: 검색-재정렬-근거검증-답변합성 4단계 타임라인 관측 및 사실 극성(Polarity Fidelity) 보존.</p>
         <ul class="milestone-changes">
-          <li><strong>NO_THINK_SYSTEM_PROMPT 제거</strong>: 뷰티 분석가 전용 SSOT PersonaType.ANALYST 프롬프트 바인딩</li>
-          <li><strong>사실 극성 일치</strong>: 부정/회의적 리뷰 인용 시 왜곡 없는 객관적 한계점 보고</li>
-          <li><strong>Document Score Threshold UI</strong>: BGE 재정렬 점수 임계값 및 Score Cliff 실시간 슬라이더 연동</li>
+          <li>NO_THINK_SYSTEM_PROMPT 제거: 뷰티 분석가 전용 SSOT PersonaType.ANALYST 프롬프트 바인딩</li>
+          <li>사실 극성 일치(Polarity Fidelity): 부정/회의적 리뷰 인용 시 왜곡 없는 객관적 한계점 보고</li>
         </ul>
       </div>
-
-      <div class="milestone-card" data-category="chat_b">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat B: 제로 서치(Zero-Search) 글로벌 하드 블록 &amp; 카테고리 회복</span>
-            <span class="milestone-spec">Spec 039</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.3.0-alpha (chat_b)</span>
-        </div>
-        <p class="milestone-desc">DB 내 리뷰가 전혀 없는 품목 질의 시 허위 생성을 차단하고, 유사 카테고리 인기 상품 추천 칩으로 안전하게 유도.</p>
-      </div>
-
-      <div class="milestone-card" data-category="chat_b">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat B: 크로스 서비스 LLM 연동 &amp; 인용 번호 초과($N &gt; K$) 방어</span>
-            <span class="milestone-spec">Spec 037</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.2.5-alpha (chat_b)</span>
-        </div>
-        <p class="milestone-desc">컨텍스트 내 유효 리뷰 수(K)를 초과하는 날조 태그 자동 Pruning 및 4B 합성 모델 안정화.</p>
-      </div>
-
-      <div class="milestone-card" data-category="chat_b">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat B: BGE-Reranker 파이프라인 최적화 &amp; 점수 절벽 필터링</span>
-            <span class="milestone-spec">Spec 030</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.2.0-alpha (chat_b)</span>
-        </div>
-        <p class="milestone-desc">BGE-M3 임베딩 및 Reranker 점수 급락(Cliff Delta 0.25) 구간 이후의 무관련 문맥을 자동 배제하는 정밀 필터링 구현.</p>
-      </div>
-
-      <div class="milestone-card" data-category="chat_b">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Chat B: RAG 브랜드 가드레일 &amp; 실시간 2열 대시보드 런칭</span>
-            <span class="milestone-spec">Spec 006</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.1.0-alpha (chat_b)</span>
-        </div>
-        <p class="milestone-desc">올리브영 3,062개 화장품 브랜드 엔티티 정규화 및 FastAPI 기반 고성능 하이브리드 RAG 챗봇 최초 런칭.</p>
-      </div>
-
-      <!-- ==================== MODEL GATEWAY MILESTONES ==================== -->
       <div class="milestone-card" data-category="model_gateway">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -301,47 +194,11 @@
           </div>
           <span class="milestone-tag badge-beta-tag">v0.9.0-beta 🏆 (model_gateway)</span>
         </div>
-        <p class="milestone-desc">Qwen 2.5 3B/4B GGUF 서빙, 4개 동시 요청 연속 배치 슬롯, 하드웨어 OOM 가드레일 및 동적 헬스체크 완비.</p>
         <ul class="milestone-changes">
-          <li><strong>GTX 1070 DEMO 모드</strong>: llama.cpp 단일 노드 안정화 서빙</li>
-          <li><strong>동적 헬스체크</strong>: 8081(LLM), 8090(Embedding), 8091(Reranker) 자동 복구 및 상태 모니터링</li>
+          <li>GTX 1070 DEMO 모드: llama.cpp 단일 노드 안정화 서빙</li>
+          <li>연속 배치 슬롯 4개, 32K 컨텍스트 풀 및 OOM 방어 가드레일 완성</li>
         </ul>
       </div>
-
-      <div class="milestone-card" data-category="model_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Model Gateway: 100% VRAM 온로드 &amp; RAM 오프로드 방지 패치</span>
-            <span class="milestone-spec">Spec 044</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.8.5-beta (model_gateway)</span>
-        </div>
-        <p class="milestone-desc">GPU 가속 레이어(-ngl) 풀 온로드 보장으로 시스템 RAM 오프로드로 인한 추론 지연을 0%로 제거.</p>
-      </div>
-
-      <div class="milestone-card" data-category="model_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Model Gateway: GPU 큐 대기 타임아웃 확장 &amp; 동시성 제어</span>
-            <span class="milestone-spec">Spec 031</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.6.0-beta (model_gateway)</span>
-        </div>
-        <p class="milestone-desc">다중 사용자 접속 시 GPU 락 경합 방지를 위한 비동기 큐 관리자 및 사용자 대기 순번 알림(queue_status) 탑재.</p>
-      </div>
-
-      <div class="milestone-card" data-category="model_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Model Gateway: Qwen 2.5 Multi-Tier 동적 라우팅 엔진</span>
-            <span class="milestone-spec">Spec 013</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.1.0-beta (model_gateway)</span>
-        </div>
-        <p class="milestone-desc">경량 2B(의도분류/초고속 상담) 및 4B(심층 RAG 요약) 모델 티어드 라우팅 아키텍처 최초 수립.</p>
-      </div>
-
-      <!-- ==================== NGINX GATEWAY MILESTONES ==================== -->
       <div class="milestone-card" data-category="nginx_gateway">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -350,47 +207,11 @@
           </div>
           <span class="milestone-tag badge-beta-tag">v0.8.5-beta 🏆 (nginx_gateway)</span>
         </div>
-        <p class="milestone-desc">runtime_environment_schema.json 기반의 nginx.conf.template 렌더러 구축, 드리프트 0% 보장 및 전용 /changelog 라우팅 제공.</p>
         <ul class="milestone-changes">
-          <li><strong>render_gateway_config.py</strong>: 환경변수 및 Pydantic 설정값 기반 자동 검증 렌더링</li>
-          <li><strong>try_files /changelog.html</strong>: 정적 체인지로그 100% 무중단 안정 서빙</li>
+          <li>render_gateway_config.py: 환경변수 및 Pydantic 설정값 기반 자동 검증 렌더링</li>
+          <li>try_files /changelog.html: 정적 체인지로그 100% 무중단 안정 서빙</li>
         </ul>
       </div>
-
-      <div class="milestone-card" data-category="nginx_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Nginx Gateway: B-Team 프로덕션 전환 &amp; 서브패스 라우팅 정합</span>
-            <span class="milestone-spec">Spec 042</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.8.0-beta (nginx_gateway)</span>
-        </div>
-        <p class="milestone-desc">/bteam/chata/, /bteam/chatb/, /bteam/oliview/ 서브패스 역방향 프록시 및 SSE 스트리밍 버퍼링 완전 해제.</p>
-      </div>
-
-      <div class="milestone-card" data-category="nginx_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Nginx Gateway: JSON Analytics 액세스 로그 &amp; Request-ID 추적</span>
-            <span class="milestone-spec">Spec 029</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.7.0-beta (nginx_gateway)</span>
-        </div>
-        <p class="milestone-desc">전체 인입 트래픽에 대한 구조화 JSON 액세스 로깅 및 분산 지연시간(latency) 관측 체계 구축.</p>
-      </div>
-
-      <div class="milestone-card" data-category="nginx_gateway">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Nginx Gateway: 공인 DuckDNS HTTPS &amp; 80/8080 듀얼 게이트웨이</span>
-            <span class="milestone-spec">Spec 002</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.1.0-beta (nginx_gateway)</span>
-        </div>
-        <p class="milestone-desc">Traefik Ingress 연동 Let's Encrypt 자동 갱신 및 공인 도메인(ezenitac.duckdns.org) 단일 진입점 개통.</p>
-      </div>
-
-      <!-- ==================== OLIVIEW WEB MILESTONES ==================== -->
       <div class="milestone-card" data-category="oliview_web">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -399,32 +220,10 @@
           </div>
           <span class="milestone-tag badge-beta-tag">v0.8.0-beta 🏆 (oliview_web)</span>
         </div>
-        <p class="milestone-desc">화장품 리뷰 5.7만 건 기반 5대 핵심 속성(보습, 순함, 제형, 발림성, 진정) 통계 분석 및 React UI 연동.</p>
+        <ul class="milestone-changes">
+          <li>화장품 리뷰 5.7만 건 기반 5대 핵심 속성(보습, 순함, 제형, 발림성, 진정) 통계 분석 및 React UI 연동</li>
+        </ul>
       </div>
-
-      <div class="milestone-card" data-category="oliview_web">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Oliview Web: 풀스택 파이프라인 구조 재편 &amp; Vite React 최적화</span>
-            <span class="milestone-spec">Spec 041</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.7.5-beta (oliview_web)</span>
-        </div>
-        <p class="milestone-desc">Flask 백엔드 REST API와 React 프론트엔드 간 상태 동기화 및 번들 크기 경량화.</p>
-      </div>
-
-      <div class="milestone-card" data-category="oliview_web">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Oliview Web: 브랜드별 상품 상세 페이지 &amp; 리뷰 필터링 수정</span>
-            <span class="milestone-spec">Spec 011</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.5.0-beta (oliview_web)</span>
-        </div>
-        <p class="milestone-desc">타사/자사 브랜드 상품 클릭 시 404 없이 상품 상세 스펙과 감성 분석 리포트를 즉시 열람하도록 라우팅 교정.</p>
-      </div>
-
-      <!-- ==================== CORE UTILITIES MILESTONES ==================== -->
       <div class="milestone-card" data-category="core">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -433,37 +232,11 @@
           </div>
           <span class="milestone-tag badge-alpha-tag">v0.7.0-alpha 🌱 (core)</span>
         </div>
-        <p class="milestone-desc">단일 진실 공급원(Single Source of Truth) 원칙 정립: bteam/oliview_core 마스터와 sync_core.py SHA-256 해시 검증 동기화.</p>
         <ul class="milestone-changes">
-          <li><strong>GroundednessSanitizer</strong>: 가상 사용자 정제 및 서브스트링 인용구 검증</li>
-          <li><strong>PromptPersonaAdapter</strong>: ChatA(컨시어지) / ChatB(애널리스트) 페르소나 어댑터</li>
-          <li><strong>Structured Logging</strong>: PII 마스킹 및 JSON 로깅 보안 계약 준수</li>
+          <li>GroundednessSanitizer: 가상 사용자 정제 및 서브스트링 인용구 검증</li>
+          <li>PromptPersonaAdapter: ChatA(컨시어지) / ChatB(애널리스트) 페르소나 어댑터</li>
         </ul>
       </div>
-
-      <div class="milestone-card" data-category="core">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Core: 프롬프트 인젝션 방어 &amp; 조기 의도 게이트웨이</span>
-            <span class="milestone-spec">Spec 021</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.5.0-alpha (core)</span>
-        </div>
-        <p class="milestone-desc">탈옥(Jailbreak), 시스템 지시문 유출 공격 및 악의적 질의를 모델 호출 전 단계에서 차단하는 정규식/의도 가드레일 탑재.</p>
-      </div>
-
-      <div class="milestone-card" data-category="core">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">Core: Redis 분산 캐시 &amp; 세션 토큰 인프라 구축</span>
-            <span class="milestone-spec">Spec 019</span>
-          </div>
-          <span class="milestone-tag badge-alpha-tag">v0.4.0-alpha (core)</span>
-        </div>
-        <p class="milestone-desc">반복 질의 임베딩/RAG 결과 Redis 캐싱으로 응답 지연시간 80% 단축 및 세션 상태 보존.</p>
-      </div>
-
-      <!-- ==================== PILOS FINANCE MILESTONES ==================== -->
       <div class="milestone-card" data-category="pilos">
         <div class="milestone-header">
           <div class="milestone-title-wrap">
@@ -472,20 +245,10 @@
           </div>
           <span class="milestone-tag badge-beta-tag">v0.8.0-beta 🏆 (pilos)</span>
         </div>
-        <p class="milestone-desc">A-Team 종목별(SK하이닉스, 삼성전자 등) 뉴스 및 수급 데이터 감정 지수 계산, 실시간 큐레이션 및 AI 종합 리포트 서비스 완비.</p>
+        <ul class="milestone-changes">
+          <li>A-Team 종목별(SK하이닉스, 삼성전자 등) 뉴스 및 수급 데이터 감정 지수 계산, 실시간 큐레이션 및 AI 종합 리포트 서비스 완비</li>
+        </ul>
       </div>
-
-      <div class="milestone-card" data-category="pilos">
-        <div class="milestone-header">
-          <div class="milestone-title-wrap">
-            <span class="milestone-title">PILOS: 일일 증권 문서 증분 수집 &amp; 동기화 파이프라인</span>
-            <span class="milestone-spec">Spec 025</span>
-          </div>
-          <span class="milestone-tag badge-beta-tag">v0.7.0-beta (pilos)</span>
-        </div>
-        <p class="milestone-desc">크롤러 수집 데이터 무결성 검증 및 일일 시장 뉴스 증분 배치 동기화 워커 프로세스 상시 가동.</p>
-      </div>
-
     </div>
 
     <footer>
@@ -494,7 +257,7 @@
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    function setupFilters() {
       const filterBtns = document.querySelectorAll(".filter-btn");
       const cards = document.querySelectorAll(".milestone-card");
 
@@ -513,6 +276,93 @@
           });
         });
       });
+    }
+
+    async function loadChangelogData() {
+      try {
+        const res = await fetch("changelog_data.json");
+        if (!res.ok) return;
+        const items = await res.json();
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        const container = document.getElementById("milestonesList");
+        container.textContent = "";
+
+        const counts = { all: items.length, chat_a: 0, chat_b: 0, model_gateway: 0, nginx_gateway: 0, oliview_web: 0, core: 0, pilos: 0 };
+
+        for (const item of items) {
+          if (counts[item.subsystem] !== undefined) {
+            counts[item.subsystem]++;
+          }
+
+          const card = document.createElement("div");
+          card.className = "milestone-card";
+          card.setAttribute("data-category", item.subsystem);
+
+          const header = document.createElement("div");
+          header.className = "milestone-header";
+
+          const titleWrap = document.createElement("div");
+          titleWrap.className = "milestone-title-wrap";
+
+          const title = document.createElement("span");
+          title.className = "milestone-title";
+          title.textContent = item.title;
+          titleWrap.appendChild(title);
+
+          if (item.spec_ref) {
+            const spec = document.createElement("span");
+            spec.className = "milestone-spec";
+            spec.textContent = item.spec_ref;
+            titleWrap.appendChild(spec);
+          }
+          header.appendChild(titleWrap);
+
+          const tag = document.createElement("span");
+          tag.className = "milestone-tag " + (item.stage === "beta" ? "badge-beta-tag" : "badge-alpha-tag");
+          tag.textContent = `${item.version} ${item.stage === "beta" ? "🏆" : "🌱"} (${item.subsystem})`;
+          header.appendChild(tag);
+          card.appendChild(header);
+
+          if (Array.isArray(item.highlights) && item.highlights.length > 0) {
+            const ul = document.createElement("ul");
+            ul.className = "milestone-changes";
+            for (const h of item.highlights) {
+              const li = document.createElement("li");
+              li.textContent = h;
+              ul.appendChild(li);
+            }
+            card.appendChild(ul);
+          }
+
+          container.appendChild(card);
+        }
+
+        const countMap = {
+          countAll: counts.all,
+          countChatA: counts.chat_a,
+          countChatB: counts.chat_b,
+          countModelGateway: counts.model_gateway,
+          countNginxGateway: counts.nginx_gateway,
+          countOliviewWeb: counts.oliview_web,
+          countCore: counts.core,
+          countPilos: counts.pilos,
+          statMilestones: counts.all
+        };
+        for (const [id, count] of Object.entries(countMap)) {
+          const el = document.getElementById(id);
+          if (el) el.textContent = String(count);
+        }
+
+        setupFilters();
+      } catch (err) {
+        console.warn("Using SSR fallback for changelog milestones:", err);
+        setupFilters();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadChangelogData();
     });
   </script>
 </body>
