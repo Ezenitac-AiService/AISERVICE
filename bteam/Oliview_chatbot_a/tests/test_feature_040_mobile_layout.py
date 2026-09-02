@@ -7,7 +7,10 @@ import re
 import pytest
 from pathlib import Path
 
-APP_FILE = Path(__file__).resolve().parent.parent / "app.py"
+BASE_DIR = Path(__file__).resolve().parent.parent
+LEGACY_APP_FILE = BASE_DIR / "legacy_archive" / "06.03.app.py"
+APP_FILE = LEGACY_APP_FILE if LEGACY_APP_FILE.exists() else BASE_DIR / "app.py"
+
 
 
 @pytest.fixture

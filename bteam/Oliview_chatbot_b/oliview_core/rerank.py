@@ -1,33 +1,22 @@
 """
-BGE Cross-Encoder Reranker Module with GPU remote offload and lazy local fallback.
+BGE Cross-Encoder Reranker Module with GPU remote offload and 0ms primary similarity fallback.
+Spec 030 & Feature 045: CPU local CrossEncoder fallback completely removed (FR-007).
 """
 
-import time
 from typing import List, Tuple, Optional
-import numpy as np
 from .client import AiGatewayClient
 from .config import get_settings
+from .logger import get_logger
+
+logger = get_logger("oliview.rerank")
 
 
 class BGEReranker:
-    """High-speed GPU Reranker with lazy local CPU CrossEncoder fallback."""
+    """High-speed GPU Reranker with 0ms primary similarity safe fallback."""
 
     def __init__(self, client: Optional[AiGatewayClient] = None):
         self.client = client or AiGatewayClient()
         self.settings = get_settings()
-        self._local_model = None
-
-    def _get_local_model(self):
-        """Lazy load local CrossEncoder only if remote GPU call fails."""
-        if self._local_model is None:
-            print("[INFO] BGE CrossEncoder 로컬 모델 가중치 로드 중 (Fallback)...")
-            from sentence_transformers import CrossEncoder
-            self._local_model = CrossEncoder(
-                "BAAI/bge-reranker-v2-m3",
-                max_length=512,
-                device="cpu",
-            )
-        return self._local_model
 
     def rerank(
         self,
@@ -40,7 +29,7 @@ class BGEReranker:
         Returns:
           - ranked_indices: List[int] indices in descending score order
           - sorted_scores: List[float] corresponding scores
-          - fallback_used: bool whether local CPU fallback was used
+          - fallback_used: bool whether safe 1st-stage similarity fallback was used
         """
         if not documents:
             return [], [], False
@@ -52,20 +41,13 @@ class BGEReranker:
             if scores is None or len(scores) < len(documents):
                 raise ValueError("Remote GPU reranker returned None or incomplete score list")
         except Exception as e:
-            # 2. Local Fallback
-            print(f"[WARN] GPU 리랭커 실패 -> 로컬 폴백 가동: {e}")
+            # 2. Spec 030 / Feature 045: 0ms Safe Fallback using initial candidate similarity order
+            logger.warning(f"GPU 리랭커 실패 -> 1차 유사도 안전 폴백 가동: {e}")
             fallback_used = True
-            try:
-                local_model = self._get_local_model()
-                pairs = [[query, doc] for doc in documents]
-                raw_scores = local_model.predict(pairs)
-                scores = [float(s) for s in raw_scores]
-            except Exception as fe:
-                print(f"[WARN] 로컬 CrossEncoder 사용 불가, 기본 유사도 점수 반환: {fe}")
-                scores = [0.85 - (i * 0.05) for i in range(len(documents))]
+            scores = [max(0.0, 0.85 - (i * 0.05)) for i in range(len(documents))]
 
         if scores is None or not scores:
-            scores = [0.85 - (i * 0.05) for i in range(len(documents))]
+            scores = [max(0.0, 0.85 - (i * 0.05)) for i in range(len(documents))]
 
         indexed_scores = list(enumerate(scores))
         indexed_scores.sort(key=lambda x: x[1], reverse=True)

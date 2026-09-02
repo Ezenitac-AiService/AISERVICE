@@ -57,3 +57,32 @@ async def test_chat_stream_sse_endpoint():
             assert "event: token" in content
             assert "event: complete" in content
             assert "헤라 " in content
+
+
+@pytest.mark.asyncio
+async def test_chat_history_endpoint():
+    """FastAPI Redis 세션 이력 조회 엔드포인트 검증."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/api/v1/chat/history/test_sess_001")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["session_id"] == "test_sess_001"
+        assert isinstance(data["messages"], list)
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_error_handling():
+    """FastAPI SSE 스트리밍 도중 예외 발생 시 error 이벤트 전송 검증."""
+    with patch("main.orchestrator.stream_rag", side_effect=RuntimeError("GPU Reranker Offline")):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            payload = {
+                "query": "오류 발생 테스트",
+                "session_id": "test_err_sess",
+            }
+            response = await ac.post("/api/v1/chat/stream", json=payload)
+            assert response.status_code == 200
+            assert "event: error" in response.text
+            assert "GPU Reranker Offline" in response.text
+

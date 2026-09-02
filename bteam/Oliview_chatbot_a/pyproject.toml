@@ -29,3 +29,9 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "..", "oliview_core"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+

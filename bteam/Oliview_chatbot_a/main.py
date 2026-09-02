@@ -14,8 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from oliview_core.models.series_models import ChatStreamRequest, ChatStreamEvent
+from oliview_core.models.series_models import (
+    ChatStreamRequest,
+    ChatStreamEvent,
+    SessionHistoryResponse,
+    SessionMessage,
+)
 from oliview_core.graph_orchestrator import MultiTargetGraphOrchestrator
+from oliview_core.session import session_store
 from oliview_core.logger import get_logger, generate_trace_id
 
 logger = get_logger("oliview.fastapi")
@@ -64,6 +70,25 @@ async def health_check():
     return {"status": "ok", "app": "Oliview ChatA FastAPI", "version": "2.0.0"}
 
 
+@app.get("/api/v1/chat/history/{session_id}", response_model=SessionHistoryResponse)
+async def get_chat_history(session_id: str):
+    """Redis 세션 저장소로부터 대화 이력 조회 (새로고침 복원용)."""
+    try:
+        raw_msgs = session_store.get_messages(session_id=session_id)
+        return SessionHistoryResponse(
+            session_id=session_id,
+            messages=raw_msgs,
+            total_count=len(raw_msgs),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to retrieve chat history for session {session_id}: {e}")
+        return SessionHistoryResponse(
+            session_id=session_id,
+            messages=[],
+            total_count=0,
+        )
+
+
 async def sse_event_generator(req: ChatStreamRequest, trace_id: str) -> AsyncGenerator[str, None]:
     """LangGraph 파이프라인 출력을 표준 SSE 포맷으로 스트리밍 변환."""
     try:
@@ -88,6 +113,8 @@ async def sse_event_generator(req: ChatStreamRequest, trace_id: str) -> AsyncGen
             tenant_id="chata",
         ):
             event_type = event.get("event_type", "step_update")
+            if "trace_id" not in event:
+                event["trace_id"] = trace_id
             event_data_json = json.dumps(event, ensure_ascii=False)
             yield f"event: {event_type}\ndata: {event_data_json}\n\n"
 
@@ -123,3 +150,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8501))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+

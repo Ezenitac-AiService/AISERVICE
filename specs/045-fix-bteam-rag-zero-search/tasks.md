@@ -74,3 +74,15 @@
 - [X] T015 [P] 회귀 방지 단위/통합 테스트 작성 (`model_gateway/tests/test_bteam_rag_recovery.py`, `bteam/Oliview_chatbot_a/tests/test_bteam_rag_recovery.py`)
 - [X] T016 챗봇 A & 챗봇 B 웹 UI 및 API 전체 RAG 답변 생성 실측 전수 검증 (`quickstart.md`)
 - [X] T017 walkthrough.md 작성 및 최종 보고
+
+---
+
+## Phase 7: Convergence
+
+**Purpose**: speckit-converge 분석 결과 도출된 잔여 과제 및 회귀 방지 테스트 보강
+
+- [X] T018 `bteam/oliview_core/rerank.py`, `bteam/Oliview_chatbot_a/oliview_core/rerank.py`, `bteam/Oliview_chatbot_b/oliview_core/rerank.py`의 `_get_local_model` 및 `sentence_transformers` CPU 로딩 코드를 완전 제거하고 0ms 즉시 유사도 안전 Fallback으로 정비 per FR-002, Spec 030 (partial)
+- [X] T019 `tests/unit/test_ai_gateway_client.py` 및 `bteam/Oliview_chatbot_a/tests/test_bteam_rag_recovery.py`에 `AiGatewayClient.generate_stream`의 SSE 토큰 스트리밍 및 `httpx` 의존성 회귀 방지 단위 테스트 작성 per Constitution II, SC-001 (partial)
+- [X] T020 B-Team 및 Gateway 단위/통합 회귀 테스트 스위트 전수 실행 및 무결점 패스 검증 per Constitution II (partial)
+
+

@@ -249,7 +249,7 @@ class AiGatewayClient:
         }
 
         inactivity_timeout = self.settings.inactivity_timeout_s
-        timeout_config = httpx.Timeout(timeout=inactivity_timeout, connect=10.0, read=inactivity_timeout)
+        timeout_config = httpx.Timeout(timeout=inactivity_timeout, connect=30.0, read=inactivity_timeout)
 
         try:
             with httpx.Client(timeout=timeout_config) as client:

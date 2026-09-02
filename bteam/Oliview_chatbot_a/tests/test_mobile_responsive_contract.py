@@ -16,7 +16,7 @@ def test_index_html_viewport_and_drawer_structure():
     assert "name=\"viewport\"" in content
 
     # Mobile CSS inclusion
-    assert "/static/css/mobile.css" in content
+    assert "static/css/mobile.css" in content or "/static/css/mobile.css" in content
 
     # Bottom sheet structure
     assert "bottom-sheet-overlay" in content

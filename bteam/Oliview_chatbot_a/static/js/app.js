@@ -105,26 +105,54 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
+  // Session ID 관리 (새로고침 시 유지)
+  let currentSessionId = sessionStorage.getItem("oliview_chata_session_id");
+  if (!currentSessionId) {
+    currentSessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
+    sessionStorage.setItem("oliview_chata_session_id", currentSessionId);
+  }
+
+  // 이전 세션 대화 내역 복원
+  restoreSessionHistory();
+
+  async function restoreSessionHistory() {
+    try {
+      const resp = await fetch(`api/v1/chat/history/${currentSessionId}`);
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.messages && data.messages.length > 0) {
+        for (const msg of data.messages) {
+          if (msg.role === "user") {
+            appendUserMessage(msg.content);
+          } else if (msg.role === "assistant") {
+            const context = createAssistantMessageBubble();
+            if (context.statusBox) context.statusBox.remove();
+            context.contentElem.innerHTML = renderMarkdownWithCitations(msg.content);
+            attachCitationClickHandlers(context.contentElem);
+          }
+        }
+        scrollToBottom();
+      }
+    } catch (e) {
+      console.warn("Session history restoration skipped:", e);
+    }
+  }
+
   async function startChatStream(query, context) {
     setGeneratingState(true);
     currentAbortController = new AbortController();
 
     let fullMarkdownText = "";
-    let statusSteps = {
-      INTENT: "🔍 1. 의도 분석 및 라인명 매칭",
-      SEARCH: "📚 2. 하이브리드 검색 및 시리즈 발굴",
-      RERANK: "🏆 3. BGE-Reranker 정밀 리랭킹",
-      SYNTHESIS: "✍️ 4. 실시간 답변 생성",
-    };
+    const activeCategory = document.querySelector(".cat-pill.active")?.getAttribute("data-cat") || null;
 
     try {
-      const response = await fetch("/api/v1/chat/stream", {
+      const response = await fetch("api/v1/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           query: query,
-          session_id: "web_session_" + Date.now(),
-          category_hint: null,
+          session_id: currentSessionId,
+          category_hint: activeCategory,
           bypass_cache: false,
         }),
         signal: currentAbortController.signal,
@@ -168,13 +196,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (eventType === "step_update" || data.event_type === "step_update") {
               updateStatusBox(context.statusBox, data);
-            } else if (eventType === "token" || data.event_type === "token") {
-              const token = data.token || "";
+            } else if (eventType === "token" || eventType === "token_chunk" || data.event_type === "token" || data.event_type === "token_chunk") {
+              const token = data.content !== undefined ? data.content : (data.token || "");
               fullMarkdownText += token;
               context.contentElem.innerHTML = renderMarkdownWithCitations(fullMarkdownText);
               attachCitationClickHandlers(context.contentElem);
               scrollToBottom();
-            } else if (eventType === "complete" || data.event_type === "complete") {
+            } else if (eventType === "complete" || eventType === "final_result" || data.event_type === "complete" || data.event_type === "final_result") {
               finalizeStatusAndAccordion(context, data, fullMarkdownText);
             } else if (eventType === "error" || data.event_type === "error") {
               context.contentElem.innerHTML += `<p style="color:#EF4444;margin-top:8px;">⚠️ 오류: ${data.error_message}</p>`;
