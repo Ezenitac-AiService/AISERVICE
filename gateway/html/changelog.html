@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AISERVICE Engineering Evolution & Changelog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container { max-width: 1100px; width: 100%; }
+    .header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
+    .btn-back {
+      color: #818cf8; text-decoration: none; font-weight: 700;
+      min-height: 48px; min-width: 48px; display: inline-flex; align-items: center;
+    }
+    .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2rem; }
+    .filter-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #cbd5e1;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      transition: all 0.2s;
+    }
+    .filter-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .filter-btn.active, .filter-btn:hover {
+      background: rgba(99, 102, 241, 0.3);
+      border-color: #818cf8;
+      color: #ffffff;
+    }
+    .timeline { display: flex; flex-direction: column; gap: 1.5rem; }
+    .milestone-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+    .milestone-header { display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
+    .milestone-title { font-size: 1.15rem; font-weight: 700; color: #ffffff; }
+    .milestone-tag {
+      font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.6rem;
+      border-radius: 0.4rem; background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+    .milestone-desc { font-size: 0.95rem; color: #cbd5e1; line-height: 1.6; margin-bottom: 0.75rem; }
+    .milestone-changes { list-style: square; padding-left: 1.2rem; color: #94a3b8; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1 style="font-size: 1.75rem; font-weight: 800;">Architecture & Engineering Changelog</h1>
+        <p style="color: #94a3b8; margin-top: 0.3rem;">AISERVICE Multi-System Evolution Milestones</p>
+      </div>
+      <a href="/" class="btn-back">← 포털 메인으로</a>
+    </div>
+
+    <!-- 8 Filter States -->
+    <div class="filters" role="tablist" aria-label="Milestone Filters">
+      <button class="filter-btn active" data-filter="all">전체 (All)</button>
+      <button class="filter-btn" data-filter="chat_a">Chat A (컨시어지)</button>
+      <button class="filter-btn" data-filter="chat_b">Chat B (애널리스트)</button>
+      <button class="filter-btn" data-filter="model_gateway">Model Gateway</button>
+      <button class="filter-btn" data-filter="nginx_gateway">Nginx Gateway</button>
+      <button class="filter-btn" data-filter="oliview_web">Oliview Web</button>
+      <button class="filter-btn" data-filter="core">Core Utilities</button>
+      <button class="filter-btn" data-filter="pilos">Pilos Finance</button>
+    </div>
+
+    <div class="timeline" id="milestonesList">
+      <!-- 7 Milestones -->
+      <div class="milestone-card" data-category="chat_a">
+        <div class="milestone-header">
+          <span class="milestone-title">Chat A Concierge Real-time Streaming & Safe Viewport</span>
+          <span class="milestone-tag">chat_a</span>
+        </div>
+        <p class="milestone-desc">Spec 038/048: 모바일 퍼스트 100dvh 레이아웃, visualViewport 키보드 대응, 원문 인용 검증 및 가상 화자 라벨 제로화.</p>
+        <ul class="milestone-changes">
+          <li>FastAPI SSE 엔드포인트 (/api/v1/chat/stream) 및 ProductLinkCard 연동</li>
+          <li>StreamingTokenInterceptor 동적 캐리 버퍼 적용</li>
+        </ul>
+      </div>
+
+      <div class="milestone-card" data-category="chat_b">
+        <div class="milestone-header">
+          <span class="milestone-title">Chat B Analyst 4-Stage Pipeline & Timeline Visualization</span>
+          <span class="milestone-tag">chat_b</span>
+        </div>
+        <p class="milestone-desc">Spec 037/048: 데이터 분석가를 위한 4단계(검색-재정렬-근거검증-답변합성) 실시간 타임라인 및 레거시 IT 프롬프트 제거.</p>
+        <ul class="milestone-changes">
+          <li>BGE Reranker 임계값 및 Score Cliff 동적 선별기 (document_top_p.py)</li>
+          <li>사실 극성 보존(Polarity Fidelity) 및 직관적 2컬럼 레이아웃</li>
+        </ul>
+      </div>
+
+      <div class="milestone-card" data-category="model_gateway">
+        <div class="milestone-header">
+          <span class="milestone-title">Local Model Serving Gateway (llama.cpp & vLLM)</span>
+          <span class="milestone-tag">model_gateway</span>
+        </div>
+        <p class="milestone-desc">Spec 024/048: Qwen 2.5 3B/4B GGUF 서빙, 연속 배치 슬롯 4개, 32K 컨텍스트 풀 및 동적 헬스체크.</p>
+        <ul class="milestone-changes">
+          <li>GTX 1070 DEMO 모드 (llama.cpp 전용) 및 분산 클러스터 게이트웨이</li>
+        </ul>
+      </div>
+
+      <div class="milestone-card" data-category="nginx_gateway">
+        <div class="milestone-header">
+          <span class="milestone-title">SSOT Template-Driven Nginx Gateway Configuration</span>
+          <span class="milestone-tag">nginx_gateway</span>
+        </div>
+        <p class="milestone-desc">Spec 048: runtime_environment_schema.json 기반 nginx.conf.template 렌더링 및 /changelog 정적 라우팅.</p>
+        <ul class="milestone-changes">
+          <li>JSON Analytics 액세스 로그 및 Request ID 추적 연동</li>
+        </ul>
+      </div>
+
+      <div class="milestone-card" data-category="oliview_web">
+        <div class="milestone-header">
+          <span class="milestone-title">Oliview React Beauty Sentiment Analytics Web</span>
+          <span class="milestone-tag">oliview_web</span>
+        </div>
+        <p class="milestone-desc">Spec 015/048: 화장품 감정 속성 레이더 차트, 키워드 트렌드 검색 및 통합 포털 연동.</p>
+      </div>
+
+      <div class="milestone-card" data-category="core">
+        <div class="milestone-header">
+          <span class="milestone-title">Single Master Core Package & Atomic 3-Way Sync</span>
+          <span class="milestone-tag">core</span>
+        </div>
+        <p class="milestone-desc">Spec 048 / Constitution Principle III: bteam/oliview_core 단일 진실 공급원 및 SHA-256 원자적 동기화.</p>
+        <ul class="milestone-changes">
+          <li>GroundednessSanitizer, RedisRateLimiter, Structured Logger SSOT</li>
+        </ul>
+      </div>
+
+      <div class="milestone-card" data-category="pilos">
+        <div class="milestone-header">
+          <span class="milestone-title">A-Team Pilos Stock Sentiment Dashboard & AI Report</span>
+          <span class="milestone-tag">pilos</span>
+        </div>
+        <p class="milestone-desc">Spec 001/048: 주식 수급 감정 지수 분석 및 실시간 큐레이션 통합 제공.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const filterBtns = document.querySelectorAll(".filter-btn");
+      const cards = document.querySelectorAll(".milestone-card");
+
+      filterBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          filterBtns.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const filter = btn.getAttribute("data-filter");
+
+          cards.forEach(card => {
+            if (filter === "all" || card.getAttribute("data-category") === filter) {
+              card.style.display = "block";
+            } else {
+              card.style.display = "none";
+            }
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>

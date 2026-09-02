@@ -81,10 +81,11 @@ function updateCategoryPanel(categoryName) {
     exampleContainer.querySelectorAll(".btn-example").forEach(btn => {
       btn.addEventListener("click", () => {
         const query = btn.getAttribute("data-query");
-        const input = document.getElementById("chatInput");
+        const input = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("chatInput"));
         if (input) {
-          input.value = query;
-          document.getElementById("chatForm").dispatchEvent(new Event("submit"));
+          input.value = query || "";
+          const form = document.getElementById("chatForm");
+          if (form) form.dispatchEvent(new Event("submit"));
         }
       });
     });
@@ -348,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".brand-chip").forEach(chip => {
     chip.addEventListener("click", () => {
       const brand = chip.getAttribute("data-brand");
-      const input = document.getElementById("chatInput");
+      const input = /** @type {HTMLTextAreaElement|null} */ (document.getElementById("chatInput"));
       if (input) {
         input.value = `${brand} 인기 제품 분석해줘`;
         input.focus();
@@ -368,4 +369,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 초기 스킨케어 패널 로드
   updateCategoryPanel("스킨케어");
+
+  // visualViewport dynamic keyboard defense
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+      const container = /** @type {HTMLElement|null} */ (document.querySelector(".app-container"));
+      if (container && window.visualViewport) {
+        container.style.height = `${window.visualViewport.height}px`;
+      }
+    });
+  }
 });
+
+/**
+ * Renders validated structured product link cards.
+ */
+function handleSseEvent(eventType, eventData) {
+  if (eventType === "product_link") {
+    renderProductLinkCard(eventData);
+  }
+}
+
+function renderProductLinkCard(cardData) {
+  if (!cardData || !cardData.is_safe_url) return;
+  const cardsContainer = document.getElementById("productCardsContainer");
+  if (!cardsContainer) return;
+
+  const card = document.createElement("div");
+  card.className = "product-link-card";
+  card.innerHTML = `
+    <a href="${cardData.product_url}" target="_blank" rel="noopener noreferrer" class="product-card-link">
+      <strong>${cardData.product_name}</strong>
+      <span>올리브영 공식몰 상품 바로가기 ↗</span>
+    </a>
+  `;
+  cardsContainer.appendChild(card);
+}
+

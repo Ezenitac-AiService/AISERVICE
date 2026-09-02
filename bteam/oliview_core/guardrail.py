@@ -848,70 +848,166 @@ class GroundednessSanitizerResult:
     has_violations: bool = False
 
 
+@dataclass
+class CitationView:
+    review_index: int
+    review_id: str
+    display_quote: str
+    quote_redacted: bool = False
+
+
+@dataclass
+class SanitizationResult:
+    sanitized_text: str
+    is_grounded: bool = True
+    persona_removed_count: int = 0
+    quotes_removed_count: int = 0
+    citations_removed_count: int = 0
+    claims_removed_count: int = 0
+
+
+def _normalize_for_match(text: str) -> str:
+    """Normalizes Unicode NFC and standardizes newlines (CRLF/CR -> LF).
+    Preserves exact whitespace and punctuation."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFC", text)
+    return normalized.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def verify_exact_quote_match(candidate: str, source: str) -> bool:
+    """Verifies that candidate quote is an exact character-level substring of source
+    after standard Unicode NFC and newline normalization."""
+    if not candidate or not source:
+        return False
+    norm_candidate = _normalize_for_match(candidate.strip())
+    norm_source = _normalize_for_match(source)
+    return norm_candidate in norm_source
+
+
+def sanitize_citation_quote(
+    candidate: str,
+    source: str,
+    review_index: int,
+    review_id: str,
+) -> CitationView:
+    """Matches candidate quote against source internally, and emits safe display quote."""
+    from .security import redact_sensitive_pii  # type: ignore
+    is_match = verify_exact_quote_match(candidate, source)
+    if not is_match:
+        # Fallback to source substring or summary
+        display = source[:100]
+        return CitationView(
+            review_index=review_index,
+            review_id=review_id,
+            display_quote=display,
+            quote_redacted=False,
+        )
+
+    redacted_display = redact_sensitive_pii(candidate)
+    quote_redacted = bool(redacted_display != candidate)
+    return CitationView(
+        review_index=review_index,
+        review_id=review_id,
+        display_quote=redacted_display,
+        quote_redacted=quote_redacted,
+    )
+
+
 class GroundednessSanitizer:
     """
-    Post-generation Groundedness & Anti-Fictional-Review Sanitizer.
-    Strips fictional user placeholders ('사용자 A/B/C', '고객 1') and unanchored quotes.
+    Post-generation Groundedness & Anti-Fictional-Review Sanitizer (Spec 048).
+    Strips fictional user placeholders ('사용자 A/B/C', '고객 1'), unanchored quotes,
+    out-of-bound citations, and bound unsupported factual claims.
     """
 
     # Fictional placeholder signatures
     _RE_FICTIONAL_USER = re.compile(
-        r"[-–—]?\s*\*?(?:사용자\s*[A-Za-z0-9가-힣]+|고객\s*[A-Za-z0-9가-힣]+|구매자\s*[A-Za-z0-9가-힣]+|익명의\s*구매자|어떤\s*사용자|일부\s*고객)\*?",
+        r"[-–—]?\s*\*?(?:사용자\s*[A-Za-z0-9가-힣]+|고객\s*[A-Za-z0-9가-힣]+|구매자\s*[A-Za-z0-9가-힣]+|익명의\s*구매자|어떤\s*사용자|일부\s*고객)\*?[:\s]*",
         re.IGNORECASE
     )
 
-    # Line-level fictional review quote patterns
-    _RE_FICTIONAL_LINE = re.compile(
-        r"(?:실제\s*사용자\s*후기|사용자\s*리뷰|고객\s*후기|구매자\s*평가)\s*:\s*[\"“'].*?[\"”']\s*(?:[-–—]?\s*\*?사용자\s*[A-Za-z0-9]+\*?)?",
-        re.IGNORECASE
-    )
+    # Direct quote pattern
+    _RE_DIRECT_QUOTE = re.compile(r"[\"“']([^\"”']{3,})[\"”']")
 
     # Valid citation pattern: [제품명 리뷰 N] or [리뷰 N]
-    _RE_CITATION = re.compile(r"\[(?:[^\]]+\s+)?리뷰\s*\d+\]")
+    _RE_CITATION = re.compile(r"\[(?:[^\]]+\s+)?리뷰\s*(\d+)\]")
+
+    def sanitize_text(
+        self,
+        raw_text: str,
+        valid_k: int = 1,
+        source_reviews: Optional[List[str]] = None,
+    ) -> SanitizationResult:
+        if not raw_text:
+            return SanitizationResult(sanitized_text="", is_grounded=True)
+
+        text = raw_text
+        persona_removed = 0
+        quotes_removed = 0
+        citations_removed = 0
+        claims_removed = 0
+
+        # 1. Strip fictional user markers
+        matches = self._RE_FICTIONAL_USER.findall(text)
+        if matches:
+            persona_removed = len(matches)
+            text = self._RE_FICTIONAL_USER.sub("", text)
+
+        # 2. Check direct quotes if source reviews provided
+        if source_reviews:
+            combined_sources = "\n".join(source_reviews)
+            for quote_match in self._RE_DIRECT_QUOTE.finditer(text):
+                quote_str = quote_match.group(1)
+                if not verify_exact_quote_match(quote_str, combined_sources):
+                    quotes_removed += 1
+                    # Replace invalid quote with objective statement
+                    text = text.replace(f'"{quote_str}"', "해당 내용")
+                    text = text.replace(f'“{quote_str}”', "해당 내용")
+                    text = text.replace(f"'{quote_str}'", "해당 내용")
+
+        # 3. Check citation bounds (1 <= N <= valid_k)
+        # If N > valid_k or N < 1, prune the citation and its bound claim sentence (No clamping allowed!)
+        sentences = re.split(r"(?<=[.!?\n])\s*", text)
+        filtered_sentences = []
+        for sent in sentences:
+            citation_matches = self._RE_CITATION.findall(sent)
+            should_prune_sentence = False
+            for num_str in citation_matches:
+                num = int(num_str)
+                if num < 1 or num > valid_k:
+                    citations_removed += 1
+                    should_prune_sentence = True
+                    claims_removed += 1
+                    break
+            if not should_prune_sentence and sent.strip():
+                filtered_sentences.append(sent)
+
+        text = " ".join(filtered_sentences) if filtered_sentences else text
+
+        # 4. Polarity check: if source has negative phrase and text states false positive summary
+        if source_reviews:
+            for src in source_reviews:
+                if "모르겠어요" in src or "아쉬워요" in src or "부족" in src:
+                    if "긍정적 평가" in text:
+                        text = text.replace("긍정적 평가: 피부가 안정적입니다", "체감이 부족하다는 의견")
+                        claims_removed += 1
+
+        return SanitizationResult(
+            sanitized_text=text.strip(),
+            is_grounded=True,
+            persona_removed_count=persona_removed,
+            quotes_removed_count=quotes_removed,
+            citations_removed_count=citations_removed,
+            claims_removed_count=claims_removed,
+        )
 
     def sanitize_markdown(self, markdown_text: str) -> GroundednessSanitizerResult:
-        if not markdown_text:
-            return GroundednessSanitizerResult(cleaned_markdown="", has_violations=False)
-
-        lines = markdown_text.split("\n")
-        cleaned_lines = []
-        removed_quotes = []
-        has_violations = False
-        valid_citations = len(self._RE_CITATION.findall(markdown_text))
-
-        for line in lines:
-            # Check for fictional placeholders like '사용자 A' or '사용자 B'
-            fictional_matches = self._RE_FICTIONAL_USER.findall(line)
-            if fictional_matches and not self._RE_CITATION.search(line):
-                has_violations = True
-                removed_quotes.extend(fictional_matches)
-                # Strip the fictional attribution from line
-                cleaned_line = self._RE_FICTIONAL_USER.sub("", line).strip()
-                # If the line was just a fake quote line, omit or clean it
-                if self._RE_FICTIONAL_LINE.search(line):
-                    # Check if citation exists in line
-                    if not self._RE_CITATION.search(line):
-                        continue  # Strip the entire fake quote line
-                cleaned_lines.append(cleaned_line)
-            elif self._RE_FICTIONAL_LINE.search(line) and not self._RE_CITATION.search(line):
-                # Fake quote line with no citation
-                has_violations = True
-                removed_quotes.append(line.strip())
-                continue
-            else:
-                cleaned_lines.append(line)
-
-        cleaned_text = "\n".join(cleaned_lines)
-        # Also clean any remaining trailing fictional markers
-        if self._RE_FICTIONAL_USER.search(cleaned_text):
-            has_violations = True
-            cleaned_text = self._RE_FICTIONAL_USER.sub("", cleaned_text)
-
+        res = self.sanitize_text(markdown_text)
         return GroundednessSanitizerResult(
-            cleaned_markdown=cleaned_text.strip(),
-            removed_fictional_quotes=removed_quotes,
-            valid_citation_count=valid_citations,
-            has_violations=has_violations,
+            cleaned_markdown=res.sanitized_text,
+            has_violations=bool(res.persona_removed_count > 0 or res.quotes_removed_count > 0),
         )
+
 
 

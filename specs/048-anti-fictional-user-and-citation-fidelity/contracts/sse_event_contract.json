@@ -161,7 +161,8 @@
           "properties": {
             "status": { "type": "string", "enum": ["answered", "abstained"] },
             "k_bound": { "type": "integer", "minimum": 0, "maximum": 20 },
-            "model_invoked": { "type": "boolean" }
+            "model_invoked": { "type": "boolean" },
+            "completed_at": { "type": "string", "format": "date-time" }
           }
         }
       }

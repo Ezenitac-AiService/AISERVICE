@@ -124,6 +124,9 @@
         "required": ["product_links", "pipeline_stages"],
         "properties": {
           "answer": { "minLength": 1 },
+          "k_bound": { "minimum": 1 },
+          "model_invoked": { "const": true },
+          "citations": { "minItems": 1 },
           "error": { "type": "null" }
         }
       }
@@ -134,6 +137,8 @@
         "required": ["pipeline_stages"],
         "properties": {
           "answer": { "minLength": 1 },
+          "k_bound": { "const": 0 },
+          "model_invoked": { "const": false },
           "citations": { "maxItems": 0 },
           "product_links": { "maxItems": 0 },
           "error": { "type": "null" }
@@ -146,6 +151,7 @@
         "required": ["error"],
         "properties": {
           "answer": { "maxLength": 0 },
+          "k_bound": { "const": 0 },
           "citations": { "maxItems": 0 },
           "product_links": { "maxItems": 0 },
           "error": { "type": "object" }

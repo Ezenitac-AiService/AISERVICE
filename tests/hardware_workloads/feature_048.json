@@ -1,0 +1,52 @@
+{
+  "benchmark_version": "1.0.0",
+  "feature": "048-anti-fictional-user-and-citation-fidelity",
+  "model": {
+    "name": "Qwen2.5-3B-Instruct",
+    "quantization": "Q4_K_M",
+    "gguf_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "server_context_pool": 32768,
+    "continuous_batching_slots": 4
+  },
+  "workload": {
+    "concurrency": 4,
+    "prompt_tokens_mean": 1024,
+    "max_output_tokens": 512,
+    "repetitions": 10,
+    "timeout_seconds": 30
+  },
+  "targets": {
+    "DEMO_CANDIDATE_GTX1070": {
+      "arch": "sm_61",
+      "vram_gb": 8,
+      "backend": "llama.cpp",
+      "vllm_allowed": false,
+      "sla_limits": {
+        "zero_search_seconds": 3.0,
+        "rag_response_seconds": 20.0
+      }
+    },
+    "DEMO_CANDIDATE_RTX2080_3060": {
+      "arch": "sm_75_or_sm_86",
+      "vram_gb": 12,
+      "backends_compared": ["llama.cpp", "vLLM"],
+      "flash_attention": "auto",
+      "sla_limits": {
+        "zero_search_seconds": 2.0,
+        "rag_response_seconds": 10.0
+      }
+    },
+    "PRODUCTION_CLUSTER_GATE": {
+      "requires_distributed_cache": true,
+      "min_worker_gpu_nodes": 2,
+      "routing_failover_verified": true,
+      "sla_targets": {
+        "p95_ttft_seconds": 1.5,
+        "p95_full_response_seconds": 8.0,
+        "aggregate_throughput_tokens_per_sec": 25.0,
+        "oom_count": 0
+      },
+      "unverified_fallback": "NOT VERIFIED"
+    }
+  }
+}

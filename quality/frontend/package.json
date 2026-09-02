@@ -1,0 +1,22 @@
+{
+  "name": "aiservice-frontend-quality",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Frontend static quality gates (ESLint, TypeScript checkJs, HTML-Validate, Stylelint)",
+  "scripts": {
+    "lint:js": "eslint \"../../bteam/Oliview_chatbot_a/static/js/**/*.js\" \"../../bteam/Oliview_chatbot_b/**/*.js\" --no-error-on-unmatched-pattern",
+    "typecheck:js": "tsc -p tsconfig.json --noEmit",
+    "lint:html": "html-validate --config .htmlvalidate.json \"../../gateway/html/*.html\" \"../../bteam/Oliview_chatbot_b/*.html\"",
+    "lint:css": "stylelint \"../../bteam/Oliview_chatbot_a/static/css/**/*.css\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "eslint": "^9.20.0",
+    "globals": "^15.14.0",
+    "html-validate": "^9.4.0",
+    "stylelint": "^16.14.0",
+    "stylelint-config-standard": "^37.0.0",
+    "typescript": "^5.7.3"
+  }
+}
