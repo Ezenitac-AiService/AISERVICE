@@ -19,6 +19,11 @@ def test_portal_cards_and_changelog_structure_red_gate():
     for milestone in ["chat_a", "chat_b", "model_gateway", "nginx_gateway", "oliview_web", "core", "pilos"]:
         assert milestone in changelog_content, f"RED GATE: changelog.html must include milestone {milestone}"
 
+    for version_badge in ["v0.5.2-alpha", "v0.4.1-alpha", "v0.9.0-beta", "v0.8.5-beta", "v0.8.0-beta", "v0.7.0-alpha"]:
+        assert version_badge in changelog_content, f"RED GATE: changelog.html must show version badge {version_badge}"
+        if version_badge in ["v0.5.2-alpha", "v0.4.1-alpha", "v0.8.0-beta"]:
+            assert version_badge in index_content, f"RED GATE: index.html must show service version badge {version_badge}"
+
     nginx_conf = GATEWAY_DIR / "nginx.conf"
     assert nginx_conf.exists(), "gateway/nginx.conf must exist"
     nginx_content = nginx_conf.read_text(encoding="utf-8")
