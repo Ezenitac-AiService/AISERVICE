@@ -18,7 +18,7 @@ from common import (
     load_sample_config,
     clean_think_tags,
     clean_hanja_and_artifacts,
-    NO_THINK_SYSTEM_PROMPT,
+    ANALYST_PROMPT,
     get_fast_model,
     get_synthesis_model,
     budget_context_documents,
@@ -225,7 +225,7 @@ def generate_llm_rag_answer(query_text: str, search_results: List[RecommendedPro
             f"- 분석 속성: {res.display_name} ({res.sentiment_label})\n"
         )
     
-    system_prompt = f"""{NO_THINK_SYSTEM_PROMPT}
+    system_prompt = f"""{ANALYST_PROMPT}
 당신은 올리브영 실사용자 리뷰 데이터에 기반하여 고객에게 가장 정확하고 신뢰할 수 있는 정보를 제공하는 '전문 AI 뷰티 가이드'입니다.
 
 [핵심 작성 원칙]
@@ -325,7 +325,7 @@ def generate_llm_rag_answer_stream(query: str, retrieved_docs: list, model_overr
 
     # 2B 단일화 및 하이브리드 토큰 정책 (기본 2048, 16K 컨텍스트 지원)
     max_tokens = int(os.getenv("SYNTHESIS_MAX_TOKENS", "2048"))
-    system_prompt = NO_THINK_SYSTEM_PROMPT
+    system_prompt = ANALYST_PROMPT
 
     if is_9b:
         budgeted_docs = budget_context_documents(retrieved_docs, budget=1500, is_9b=True)
@@ -1049,7 +1049,7 @@ def fast_chat_with_qwen2b(request_body: FastChatRequest):
     payload = {
         "model": FAST_MODEL_NAME,
         "messages": [
-            {"role": "system", "content": NO_THINK_SYSTEM_PROMPT},
+            {"role": "system", "content": ANALYST_PROMPT},
             {"role": "user", "content": request_body.query}
         ],
         "max_tokens": request_body.max_tokens

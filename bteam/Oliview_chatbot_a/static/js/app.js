@@ -5,8 +5,8 @@
 let currentAbortController = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const chatForm = document.getElementById("chatForm");
-  const chatInput = document.getElementById("chatInput");
+  const chatForm = /** @type {HTMLFormElement} */ (document.getElementById("chatForm"));
+  const chatInput = /** @type {HTMLTextAreaElement} */ (document.getElementById("chatInput"));
   const chatMessages = document.getElementById("chatMessages");
   const chatContainer = document.getElementById("chatContainer");
   const sendBtn = document.getElementById("sendBtn");

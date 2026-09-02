@@ -451,3 +451,97 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     finally:
         if is_lock_owner:
             L5SingleFlightLock.release(l5_key)
+
+
+class StreamingTokenInterceptor:
+    """Dynamic carry buffer streaming interceptor preventing partial forbidden token leak."""
+
+    def __init__(self, forbidden_patterns: Optional[List[str]] = None):
+        self.forbidden_patterns = forbidden_patterns or [
+            "사용자 A", "사용자 B", "사용자 C", "사용자 1", "사용자 2",
+            "고객 A", "고객 B", "고객 1", "구매자 1", "익명의 구매자"
+        ]
+        self.carry_buffer = ""
+
+    def process_chunk(self, chunk: str) -> str:
+        if not chunk:
+            return ""
+
+        self.carry_buffer += chunk
+
+        # Strip any full forbidden patterns directly
+        for pattern in self.forbidden_patterns:
+            if pattern in self.carry_buffer:
+                self.carry_buffer = self.carry_buffer.replace(pattern, "")
+
+        # Check for potential partial match at the tail of carry_buffer
+        max_prefix_len = 0
+        for pattern in self.forbidden_patterns:
+            for l in range(1, len(pattern)):
+                prefix = pattern[:l]
+                if self.carry_buffer.endswith(prefix):
+                    if len(prefix) > max_prefix_len:
+                        max_prefix_len = len(prefix)
+
+        if max_prefix_len > 0:
+            # Emit everything up to the partial match
+            to_emit = self.carry_buffer[:-max_prefix_len]
+            self.carry_buffer = self.carry_buffer[-max_prefix_len:]
+            return to_emit
+        else:
+            to_emit = self.carry_buffer
+            self.carry_buffer = ""
+            return to_emit
+
+    def finalize(self) -> str:
+        from ..guardrail import GroundednessSanitizer
+        sanitizer = GroundednessSanitizer()
+        res = sanitizer.sanitize_text(self.carry_buffer)
+        remaining = res.sanitized_text
+        self.carry_buffer = ""
+        return remaining
+
+
+def execute_synthesis_node(state: Dict[str, Any], llm_client: Any = None) -> Dict[str, Any]:
+    """Synthesis node execution handler with K=0 hard abstention and groundedness gating."""
+    from ..guardrail import GroundednessSanitizer
+    from ..prompts import PromptPersonaAdapter, ServiceIdentity
+
+    k_bound = state.get("k_bound", len(state.get("context_reviews", [])))
+    query = state.get("query", "")
+    reviews = state.get("context_reviews", [])
+
+    if k_bound == 0 or not reviews:
+        # Strict hard abstention - Zero model invocation
+        return {
+            "status": "abstained",
+            "k_bound": 0,
+            "model_invoked": False,
+            "citations": [],
+            "answer": "죄송합니다. 현재 올리브영 데이터베이스에 질문하신 내용에 대한 실제 구매자 리뷰를 찾을 수 없습니다.",
+            "citations_count": 0,
+        }
+
+    # Model invocation branch
+    service = ServiceIdentity(state.get("service", "chat_a"))
+    sys_prompt = PromptPersonaAdapter.get_system_prompt(service)
+    usr_prompt = PromptPersonaAdapter.build_user_prompt(query, reviews, k_bound)
+
+    if llm_client is not None:
+        raw_output = llm_client.generate(prompt=usr_prompt, system_prompt=sys_prompt)
+    else:
+        client = AiGatewayClient()
+        raw_output = "".join(list(client.generate_stream(prompt=usr_prompt, system_prompt=sys_prompt)))
+
+    sanitizer = GroundednessSanitizer()
+    source_texts = [r.get("content", "") for r in reviews[:k_bound]]
+    res = sanitizer.sanitize_text(raw_output, valid_k=k_bound, source_reviews=source_texts)
+
+    return {
+        "status": "answered",
+        "k_bound": k_bound,
+        "model_invoked": True,
+        "answer": res.sanitized_text,
+        "citations_count": res.citations_removed_count,
+    }
+

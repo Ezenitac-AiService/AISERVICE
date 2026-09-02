@@ -45,10 +45,25 @@ body {
 .app-container {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: 2rem 1rem 6.5rem 1rem;
+  padding: 1.5rem 1rem 6.5rem 1rem;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.modal-sheet {
+  max-height: 85svh;
+  overflow-y: auto;
+}
+
+button, input, select, textarea, .btn, .touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ==============================================================================

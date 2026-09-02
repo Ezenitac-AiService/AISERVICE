@@ -15,7 +15,9 @@ import httpx
 from pydantic import BaseModel, Field
 from openai import OpenAI
 
-NO_THINK_SYSTEM_PROMPT = "당신은 IT 및 AI 기술 전문 어시스턴트입니다. 생각 과정(<think>, Thinking Process, Draft/Identify 등)을 절대 작성하지 마시고, 첫 글자부터 즉시 최종 한국어 답변만 작성하세요."
+from oliview_core.prompts import PromptPersonaAdapter, ServiceIdentity, PersonaType
+
+ANALYST_PROMPT = PromptPersonaAdapter.get_system_prompt(ServiceIdentity.CHAT_B)
 
 
 class FastChatRequest(BaseModel):

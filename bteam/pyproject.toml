@@ -3,7 +3,16 @@ name = "bteam-green"
 version = "2.0.0"
 description = "Green workspace for the Oliview B-team services"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "jsonschema>=4.26.0",
+    "openai>=3.7.0",
+    "pydantic>=2.13.5",
+    "pytest-asyncio>=1.4.0",
+    "pytest-mock>=3.15.1",
+    "redis>=8.1.0",
+]
 
 [tool.uv.workspace]
 members = [

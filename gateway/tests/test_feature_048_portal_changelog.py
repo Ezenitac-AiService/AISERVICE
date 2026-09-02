@@ -1,0 +1,20 @@
+from pathlib import Path
+import pytest
+
+GATEWAY_DIR = Path(__file__).resolve().parents[1]
+
+
+def test_portal_cards_and_changelog_structure_red_gate():
+    """RED GATE: Asserts gateway/html/index.html and changelog.html contain the
+    Engineering Evolution 2x1 bento card, 7 milestones, and canonical /changelog link."""
+    index_html = GATEWAY_DIR / "html" / "index.html"
+    assert index_html.exists(), "gateway/html/index.html must exist"
+    index_content = index_html.read_text(encoding="utf-8")
+    assert "Engineering Evolution" in index_content, "RED GATE: index.html must have 2x1 Engineering Evolution card"
+    assert "/changelog" in index_content, "RED GATE: index.html must link to canonical /changelog"
+
+    changelog_html = GATEWAY_DIR / "html" / "changelog.html"
+    assert changelog_html.exists(), "RED GATE: gateway/html/changelog.html must exist"
+    changelog_content = changelog_html.read_text(encoding="utf-8")
+    for milestone in ["chat_a", "chat_b", "model_gateway", "nginx_gateway", "oliview_web", "core", "pilos"]:
+        assert milestone in changelog_content, f"RED GATE: changelog.html must include milestone {milestone}"

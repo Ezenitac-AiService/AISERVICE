@@ -7,3 +7,5 @@
 {"timestamp": "2026-08-28T04:52:41.390240+00:00", "mode": "rollback", "active_target": "BLUE_LEGACY", "src_file": "bteam.rollback.conf", "status": "APPLIED"}
 {"timestamp": "2026-08-28T04:54:52.825025+00:00", "mode": "candidate", "active_target": "GREEN_UNIFIED", "src_file": "bteam.candidate.conf", "status": "APPLIED"}
 {"timestamp": "2026-08-28T04:54:52.865848+00:00", "mode": "rollback", "active_target": "BLUE_LEGACY", "src_file": "bteam.rollback.conf", "status": "APPLIED"}
+{"timestamp": "2026-09-02T15:37:55.833192+00:00", "mode": "candidate", "active_target": "GREEN_UNIFIED", "src_file": "bteam.candidate.conf", "status": "APPLIED"}
+{"timestamp": "2026-09-02T15:37:55.862730+00:00", "mode": "rollback", "active_target": "BLUE_LEGACY", "src_file": "bteam.rollback.conf", "status": "APPLIED"}

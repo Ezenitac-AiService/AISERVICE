@@ -5,18 +5,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>AISERVICE Unified Portal | 통합 AI 서비스 포털</title>
-  
+
   <!-- Open Graph & Social Sharing Metadata -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="AISERVICE">
   <meta property="og:title" content="AISERVICE Unified Portal | 통합 AI 서비스 포털">
-  <meta property="og:description" content="A-Team 주식 수급 감정지수 분석 Pilos와 B-Team 화장품 리뷰 감정분석 Oliview 및 2대 대화형 AI 챗봇을 단일 엔터프라이즈 플랫폼에서 경험하세요.">
+  <meta property="og:description"
+    content="A-Team 주식 수급 감정지수 분석 Pilos와 B-Team 화장품 리뷰 감정분석 Oliview 및 2대 대화형 AI 챗봇을 단일 엔터프라이즈 플랫폼에서 경험하세요.">
   <meta property="og:image" content="https://ezenitac.duckdns.org/static/images/stock-logos/000660.png">
   <meta property="og:url" content="https://ezenitac.duckdns.org/">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AISERVICE 통합 AI 서비스 포털">
   <meta name="twitter:description" content="주식 수급 감정지수 Pilos & 뷰티 리뷰 감정분석 Oliview AI 플랫폼">
-  
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800&display=swap"
@@ -106,8 +107,13 @@
     }
 
     @media (max-width: 768px) {
-      h1 { font-size: 1.85rem; }
-      .curation-section { grid-template-columns: 1fr; }
+      h1 {
+        font-size: 1.85rem;
+      }
+
+      .curation-section {
+        grid-template-columns: 1fr;
+      }
     }
 
     .curation-box {
@@ -376,6 +382,28 @@
 
   <main class="grid-container">
 
+    <!-- 0. Hero 2x1 Bento Card: Engineering Evolution -->
+    <a href="/changelog" class="service-card"
+      style="grid-column: span 2; background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(30, 41, 59, 0.85) 100%); border-color: rgba(99, 102, 241, 0.4);">
+      <div>
+        <div class="card-top">
+          <div class="icon-box" style="background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5);">✨
+          </div>
+          <span class="badge"
+            style="background: rgba(99, 102, 241, 0.3); color: #c7d2fe; border: 1px solid #818cf8;">MILESTONES</span>
+        </div>
+        <h2 class="card-title" style="color: #ffffff; font-size: 1.4rem;">Engineering Evolution & Architecture Changelog
+        </h2>
+        <p class="card-desc" style="color: #cbd5e1; font-size: 0.95rem;">
+          7대 시스템(ChatA, ChatB, Model Gateway, Nginx, Oliview Web, Core, Pilos)의 엔지니어링 아키텍처 진화 기록과 품질 기준을 확인하세요.
+        </p>
+      </div>
+      <div class="card-meta">
+        <span style="color: #a5b4fc;">7 Milestones / 8 Filter Categories</span>
+        <span class="card-link-text" style="color: #818cf8; font-weight: 700;">전체 변경 기록 보기 (/changelog) →</span>
+      </div>
+    </a>
+
     <!-- 1. A-Team Pilos Main -->
     <a href="/ateam/pilos" class="service-card">
       <div>
@@ -412,39 +440,39 @@
       </div>
     </a>
 
-    <!-- 3. B-Team Oliview Chatbot A (올리챗) -->
+    <!-- 3. B-Team Oliview Chatbot A (올리챗 컨시어지) -->
     <a href="/bteam/chata" class="service-card">
       <div>
         <div class="card-top">
           <div class="icon-box">🤖</div>
-          <span class="badge badge-chat">AI CHATBOT</span>
+          <span class="badge badge-chat">CONCIERGE TRACK</span>
         </div>
-        <h2 class="card-title">올리챗 (Oliview Chat A)</h2>
+        <h2 class="card-title">올리챗 (Oliview Chat A - 컨시어지)</h2>
         <p class="card-desc">
-          Streamlit 기반의 실시간 뷰티 상담 챗봇으로 Qwen3.5 2B/4B 및 BGE 임베딩 모델과 연동됩니다.
+          모바일 퍼스트 쇼핑 가이드 어시스턴트: 실시간 SSE 스트리밍, 원문 인용 검증 및 1-클릭 카테고리 뷰티 상담을 제공합니다.
         </p>
       </div>
       <div class="card-meta">
-        <span>Streamlit / RAG</span>
-        <span class="card-link-text">대화 시작 →</span>
+        <span>FastAPI / Mobile-First SSE</span>
+        <span class="card-link-text">컨시어지 대화 →</span>
       </div>
     </a>
 
-    <!-- 4. B-Team Oliview Chatbot B (올원챗) -->
+    <!-- 4. B-Team Oliview Chatbot B (올원챗 애널리스트) -->
     <a href="/bteam/chatb" class="service-card">
       <div>
         <div class="card-top">
           <div class="icon-box">💬</div>
-          <span class="badge badge-chat">RAG AGENT</span>
+          <span class="badge badge-chat">ANALYST TRACK</span>
         </div>
-        <h2 class="card-title">올원챗 (Oliview Chat B)</h2>
+        <h2 class="card-title">올원챗 (Oliview Chat B - 애널리스트)</h2>
         <p class="card-desc">
-          FastAPI 기반의 고성능 하이브리드 RAG 질의응답 챗봇으로 4B 합성 모델을 통한 심층 분석을 제공합니다.
+          데이터 분석가를 위한 심층 RAG 엔진: 4단계 파이프라인 타임라인, BGE 유사도 제어 및 사실 극성 보존 감성 분석을 제공합니다.
         </p>
       </div>
       <div class="card-meta">
-        <span>FastAPI / Uvicorn</span>
-        <span class="card-link-text">상담 연결 →</span>
+        <span>FastAPI / 4-Stage Pipeline</span>
+        <span class="card-link-text">애널리스트 분석 →</span>
       </div>
     </a>
 
@@ -462,23 +490,23 @@
 
   <script>
     // Asynchronous non-blocking fetch to enrich curation highlights if APIs available
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("DOMContentLoaded", function () {
       fetch('/api/stocks')
-        .then(function(res) { return res.ok ? res.json() : null; })
-        .then(function(data) {
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
           if (!data || !data.stocks || !Array.isArray(data.stocks) || data.stocks.length === 0) return;
           var container = document.getElementById('stockCurationTags');
           if (!container) return;
           var html = '';
-          data.stocks.slice(0, 3).forEach(function(stock) {
+          data.stocks.slice(0, 3).forEach(function (stock) {
             var name = stock.stock_name || stock.name || stock.code;
             html += '<a href="/ateam/pilos" class="curation-chip">' +
-                    '<span>' + name + '</span>' +
-                    '<span class="sentiment-positive">수급 분석</span></a>';
+              '<span>' + name + '</span>' +
+              '<span class="sentiment-positive">수급 분석</span></a>';
           });
           if (html) container.innerHTML = html;
         })
-        .catch(function(err) {
+        .catch(function (err) {
           // Graceful fallback to default markup on network error
           console.debug('Async curation stock fetch error:', err);
         });

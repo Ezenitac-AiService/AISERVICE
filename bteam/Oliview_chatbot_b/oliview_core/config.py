@@ -1,5 +1,5 @@
 """
-Centralized Configuration Manager for Oliview Core (Spec 035 - 3-Tier Context Harness).
+Centralized Configuration Manager for Oliview Core (Spec 048 / Constitution Principle VII).
 """
 
 import os
@@ -18,6 +18,62 @@ class AppRunMode(str, Enum):
     """Constitution Principle VI: Dynamic execution environment mode."""
     DEMO = "DEMO"
     PRODUCTION = "PRODUCTION"
+
+
+class CoreSettings(BaseModel):
+    """SSOT Pydantic Settings matching contracts/runtime_environment_schema.json."""
+    APP_RUN_MODE: AppRunMode = Field(default=AppRunMode.DEMO)
+    GATEWAY_PORT: int = Field(default=80, ge=1, le=65535)
+    GATEWAY_ALT_PORT: int = Field(default=8080, ge=1, le=65535)
+    CHATBOT_A_PORT: int = Field(default=8501, ge=1, le=65535)
+    CHATBOT_B_PORT: int = Field(default=8502, ge=1, le=65535)
+    GATEWAY_SERVER_NAMES: str = Field(default="localhost aiservice.local")
+    OLIVIEW_BACKEND_UPSTREAM: str = Field(default="http://127.0.0.1:8000")
+    OLIVIEW_FRONTEND_UPSTREAM: str = Field(default="http://127.0.0.1:3000")
+    CHATBOT_A_UPSTREAM: str = Field(default="http://127.0.0.1:8501")
+    CHATBOT_B_UPSTREAM: str = Field(default="http://127.0.0.1:8502")
+    PILOS_WEB_UPSTREAM: str = Field(default="http://127.0.0.1:8503")
+    LLM_BASE_URL: str = Field(default="http://127.0.0.1:8001/v1")
+    EMBEDDING_BASE_URL: str = Field(default="http://127.0.0.1:8002/v1")
+    RERANK_BASE_URL: str = Field(default="http://127.0.0.1:8003/v1")
+    MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://127.0.0.1:8001/health")
+    CHATA_HEALTH_URL: str = Field(default="http://127.0.0.1:8501/health")
+    CHATB_HEALTH_URL: str = Field(default="http://127.0.0.1:8502/health")
+    REDIS_ENDPOINT: str = Field(default="redis://127.0.0.1:6379/0")
+    ENABLE_EXTERNAL_VLLM: bool = Field(default=False)
+    CHAT_BEARER_SECRET_REF: str = Field(default="vault://keys/chat_bearer")
+    CHAT_SESSION_COOKIE_NAME: str = Field(default="aiservice_session")
+    CHAT_SESSION_TTL_SECONDS: int = Field(default=86400, ge=60)
+    CHAT_CSRF_HEADER_NAME: str = Field(default="X-CSRF-Token")
+    CHAT_RATE_LIMIT_REQUESTS: int = Field(default=60, ge=1)
+    CHAT_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60, ge=1)
+    CHAT_SERVICE_CONCURRENCY: int = Field(default=10, ge=1)
+    CHAT_QUERY_MAX_CHARS: int = Field(default=4000, ge=1)
+    CHAT_OUTPUT_TOKEN_CAP: int = Field(default=2048, ge=1)
+    CHAT_TIMEOUT_MS: int = Field(default=20000, ge=1000)
+
+    @classmethod
+    def from_env(cls) -> "CoreSettings":
+        data = {}
+        for field_name in cls.model_fields.keys():
+            if field_name in os.environ:
+                val = os.environ[field_name]
+                field_type = cls.model_fields[field_name].annotation
+                if field_type is int or field_type == int:
+                    try:
+                        data[field_name] = int(val)
+                    except ValueError:
+                        data[field_name] = val
+                elif field_type is bool or field_type == bool:
+                    data[field_name] = val.lower() in ("true", "1", "yes")
+                else:
+                    data[field_name] = val
+        return cls(**data)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> CoreSettings:
+    return CoreSettings.from_env()
 
 
 def _is_running_in_docker() -> bool:
@@ -44,7 +100,7 @@ def _detect_default_db_host() -> str:
 
 @dataclass
 class ModelDiscoveryCache:
-    """In-memory cache for dynamic active model and context discovery (Spec 033 / Spec 035)."""
+    """In-memory cache for dynamic active model and context discovery."""
     discovered_model: str = "qwen3.5-2b"
     discovered_n_ctx: int = 16384
     last_synced_at: float = 0.0
@@ -59,172 +115,30 @@ class ModelDiscoveryCache:
         self.last_synced_at = time.time()
 
 
-def compute_context_harness_profile(n_ctx: int = 16384) -> ContextHarnessProfile:
-    """
-    3-Tier Agentic Context Harness Profile 계산기 (Spec 035).
-    게이트웨이 유효 컨텍스트 윈도우 크기에 따라 토큰 예산과 선별 리뷰 수를 동적 산정합니다.
-    """
-    if n_ctx >= 65536:
-        # Tier 3: Ultra (64K~128K+)
-        return ContextHarnessProfile(
-            total_n_ctx=n_ctx,
-            tier_name="ULTRA",
-            max_input_tokens=48000,
-            max_output_tokens=8192,
-            max_compare_output_tokens=8192,
-            tokens_per_target=15000,
-            reranked_per_target=20,
-            candidates_per_target=30,
-            max_history_turns=50,
-            raw_history_turns=10,
-            summary_history_turns=40,
-        )
-    elif n_ctx >= 32768:
-        # Tier 2: 32K Standard (32,768 tokens)
-        return ContextHarnessProfile(
-            total_n_ctx=n_ctx,
-            tier_name="32K_STANDARD",
-            max_input_tokens=22000,
-            max_output_tokens=4096,
-            max_compare_output_tokens=4096,
-            tokens_per_target=7000,
-            reranked_per_target=12,
-            candidates_per_target=20,
-            max_history_turns=30,
-            raw_history_turns=5,
-            summary_history_turns=25,
-        )
-    else:
-        # Tier 1: 16K Baseline (16,384 tokens)
-        return ContextHarnessProfile(
-            total_n_ctx=max(16384, n_ctx),
-            tier_name="16K_BASELINE",
-            max_input_tokens=10000,
-            max_output_tokens=2048,
-            max_compare_output_tokens=3072,
-            tokens_per_target=3500,
-            reranked_per_target=6,
-            candidates_per_target=15,
-            max_history_turns=15,
-            raw_history_turns=5,
-            summary_history_turns=10,
-        )
+_discovery_cache = ModelDiscoveryCache()
 
 
-class CoreSettings(BaseModel):
-    # Model Gateway Configuration
+class Settings(BaseModel):
+    """Legacy Settings compatibility wrapper."""
+    app_run_mode: AppRunMode = Field(default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO")))
     server_host: str = Field(default_factory=_detect_default_server_host)
-    main_port: int = Field(default_factory=lambda: int(os.getenv("MAIN_PORT", "8081")))
-    embed_port: int = Field(default_factory=lambda: int(os.getenv("EMBED_PORT", "8090")))
-    rerank_port: int = Field(default_factory=lambda: int(os.getenv("RERANK_PORT", "8091")))
-
-    # Model Names (Spec 033: Dynamic Discovery & Hardware Alignment)
-    fast_llm_model: str = Field(default_factory=lambda: os.getenv("FAST_LLM_MODEL", "qwen3.5-2b"))
-    synthesis_llm_model: str = Field(default_factory=lambda: os.getenv("SYNTHESIS_LLM_MODEL", "qwen3.5-2b"))
-    auto_discover_model: bool = Field(default_factory=lambda: os.getenv("AUTO_DISCOVER_MODEL", "true").lower() in ("true", "1", "yes"))
-    discovery_ttl_seconds: float = Field(default=60.0, description="동적 모델 탐색 캐시 TTL (초)")
-    min_required_n_ctx: int = Field(default=16384, description="최소 보장 대용량 컨텍스트 윈도우")
-    rerank_model: str = Field(default_factory=lambda: os.getenv("RERANK_MODEL", "bge-reranker-v2-m3"))
-    embedding_model: str = Field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "bge-m3"))
-
-    # Database & Connection Pool Configuration
+    llm_endpoint: str = Field(default_factory=lambda: os.getenv("LLM_BASE_URL", f"{_detect_default_server_host()}:8001/v1"))
+    embedding_endpoint: str = Field(default_factory=lambda: os.getenv("EMBEDDING_BASE_URL", f"{_detect_default_server_host()}:8002/v1"))
+    rerank_endpoint: str = Field(default_factory=lambda: os.getenv("RERANK_BASE_URL", f"{_detect_default_server_host()}:8003/v1"))
     db_host: str = Field(default_factory=_detect_default_db_host)
-    db_port: int = Field(default_factory=lambda: int(os.getenv("DB_PORT", "3306")))
-    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "gp123"))
-    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", "GP123!"))
-    db_name: str = Field(default_factory=lambda: os.getenv("DB_NAME", "oliview_project"))
-    db_pool_size: int = 10
-    db_max_overflow: int = 20
-    db_pool_recycle: int = 1800
+    db_port: int = Field(default=3306)
+    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "oliview"))
+    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", "oliview1234"))
+    db_name: str = Field(default_factory=lambda: os.getenv("DB_NAME", "oliview_db"))
+    redis_endpoint: str = Field(default_factory=lambda: os.getenv("REDIS_ENDPOINT", "redis://127.0.0.1:6379/0"))
 
-    # Redis In-Memory Infrastructure Configuration (Spec 019 / 030 / 035)
-    redis_host: str = Field(default_factory=lambda: os.getenv("REDIS_HOST", "127.0.0.1" if not _is_running_in_docker() else "redis"))
-    redis_port: int = Field(default_factory=lambda: int(os.getenv("REDIS_PORT", "6379")))
-    redis_socket_timeout: float = 0.2     # Spec 030 FR-024: Fail-Fast 소켓 타임아웃
-    redis_ttl_session: int = 259200       # L4: 3 days (LangGraph checkpoint & turn history)
-    redis_ttl_embedding: int = 604800     # L2: 7 days (BGE-M3 embedding)
-    redis_ttl_rerank: int = 86400         # L3: 24 hours (Reranker scores)
-    redis_ttl_search_pool: int = 43200    # L1: 12 hours (1차 검색 풀 캐시)
-    redis_ttl_llm_response: int = 43200   # L5: 12 hours (Spec 032: LLM 완성 응답 캐시)
-    redis_ttl_llm_jitter: int = 3600      # L5: ±1 hour 무작위 Jitter 분산
-    enable_l5_cache: bool = Field(
-        default_factory=lambda: os.getenv("ENABLE_L5_CACHE", "true").lower() in ("true", "1", "yes")
-    )
-
-    # ChromaDB Vector Index Optimization (Spec 019)
-    chroma_hnsw_search_ef: int = 64
-    faiss_index_dir: Optional[str] = Field(default_factory=lambda: os.getenv("FAISS_INDEX_DIR", None))
-
-    # Operation Mode & Lenient Timeout Profiles (Constitution Principle VI: DEMO vs PRODUCTION)
-    app_run_mode: AppRunMode = Field(
-        default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO").upper())
-        if os.getenv("APP_RUN_MODE", "DEMO").upper() in ("DEMO", "PRODUCTION")
-        else AppRunMode.DEMO,
-        description="Constitution Principle VI: Dynamic operating mode (DEMO vs PRODUCTION)"
-    )
-    rag_operation_mode: str = Field(
-        default_factory=lambda: os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower()
-    )
-
-    @property
-    def zero_search_sla_sec(self) -> float:
-        """SLA threshold for Zero-Search Fast Abstention (DEMO <= 3.0s, PRODUCTION <= 0.5s)."""
-        return 3.0 if self.app_run_mode == AppRunMode.DEMO else 0.5
-
-    @property
-    def rag_sla_sec(self) -> float:
-        """SLA threshold for full multi-target RAG (DEMO <= 20.0s, PRODUCTION <= 8.0s)."""
-        return 20.0 if self.app_run_mode == AppRunMode.DEMO else 8.0
-
-    # Lenient Timeouts (seconds) - Spec 037 POC Demo Friendly
-    timeout_search_sec: float = Field(default_factory=lambda: 10.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 5.0)
-    timeout_rerank_sec: float = Field(default_factory=lambda: 20.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc") else 5.0)
-    timeout_llm_sec: float = Field(default_factory=lambda: 180.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc", "demo") else 120.0)
-    inactivity_timeout_s: float = Field(default_factory=lambda: 180.0 if os.getenv("ENVIRONMENT_MODE", os.getenv("RAG_OPERATION_MODE", "development")).lower() in ("development", "dev", "poc", "demo") else 90.0)
-
-    # 2-Stage Sampling Defaults (Spec 037: Top-P Nucleus Sampling)
-    default_top_p: float = Field(default=0.85, description="Qwen 3.5 Token-level Nucleus Sampling Top-P")
-    default_temperature: float = Field(default=0.3, description="Qwen 3.5 Token Generation Temperature")
-    default_repetition_penalty: float = Field(default=1.05, description="Repetition Penalty")
-
-    # 3-Tier Dynamic Context Harness Defaults
-    max_targets: int = 3
-    gpu_concurrency_limit: int = 3
-    candidates_per_target: int = 15
-    reranked_per_target: int = 6
-    tokens_per_target: int = 3500
-    max_single_output_tokens: int = 1024
-    max_compare_output_tokens: int = 3072
-    max_input_context_tokens: int = 10000
-
-    # Security & Early Intent Guardrail Configuration
-    enable_early_guardrail: bool = Field(default_factory=lambda: os.getenv("ENABLE_EARLY_GUARDRAIL", "true").lower() in ("true", "1", "yes"))
-    enable_prompt_guard_86m: bool = Field(default_factory=lambda: os.getenv("ENABLE_PROMPT_GUARD_86M", "true").lower() in ("true", "1", "yes"))
-    prompt_guard_model_name: str = Field(default_factory=lambda: os.getenv("PROMPT_GUARD_MODEL_NAME", "meta-llama/Llama-Prompt-Guard-2-86M"))
-
-    # Hot-Swap Feature Flag (Spec 030 FR-030)
-    feature_langgraph_rag: bool = Field(
-        default_factory=lambda: os.getenv("FEATURE_LANGGRAPH_RAG", "true").lower() in ("true", "1", "yes")
-    )
-
-    def get_context_harness(self, n_ctx: Optional[int] = None) -> ContextHarnessProfile:
-        target_ctx = n_ctx or self.min_required_n_ctx
-        return compute_context_harness_profile(target_ctx)
-
-    @property
-    def llm_endpoint(self) -> str:
-        return f"{self.server_host.rstrip('/')}:{self.main_port}/v1"
-
-    @property
-    def embed_endpoint(self) -> str:
-        return f"{self.server_host.rstrip('/')}:{self.embed_port}/v1"
-
-    @property
-    def rerank_endpoint(self) -> str:
-        return f"{self.server_host.rstrip('/')}:{self.rerank_port}/v1"
+    # Spec 048 Retrieval Parameters (Initial Candidates)
+    document_score_threshold: float = Field(default=0.85)
+    second_score_threshold: float = Field(default=0.60)
+    cliff_delta: float = Field(default=0.25)
+    max_selected_reviews: int = Field(default=20)
 
 
 @lru_cache(maxsize=1)
-def get_settings() -> CoreSettings:
-    """Returns singleton settings instance."""
-    return CoreSettings()
+def get_legacy_settings() -> Settings:
+    return Settings()
