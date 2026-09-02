@@ -12,6 +12,7 @@ import urllib.request
 import urllib.error
 from typing import List, Dict, Any, Iterator, AsyncIterator, Optional
 
+import httpx
 import numpy as np
 
 from .config import get_settings
