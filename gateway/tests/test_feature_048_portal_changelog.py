@@ -27,6 +27,10 @@ def test_portal_cards_and_changelog_structure_red_gate():
     nginx_conf = GATEWAY_DIR / "nginx.conf"
     assert nginx_conf.exists(), "gateway/nginx.conf must exist"
     nginx_content = nginx_conf.read_text(encoding="utf-8")
+    assert "location = /changelog_data.json" in nginx_content, "gateway/nginx.conf must route changelog_data.json"
     assert "location /changelog" in nginx_content, "gateway/nginx.conf must define canonical location /changelog"
     assert "changelog.html" in nginx_content, "gateway/nginx.conf must route /changelog to changelog.html"
+
+    changelog_json = GATEWAY_DIR / "html" / "changelog_data.json"
+    assert changelog_json.exists(), "gateway/html/changelog_data.json must exist"
 

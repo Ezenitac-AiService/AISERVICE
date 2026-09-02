@@ -94,6 +94,14 @@ http {
             add_header Cache-Control "no-store, no-cache, must-revalidate";
         }
 
+        # Canonical Changelog Data JSON
+        location = /changelog_data.json {
+            root /usr/share/nginx/html;
+            try_files /changelog_data.json =404;
+            default_type application/json;
+            add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
+
         # Canonical Changelog Path
         location /changelog {
             root /usr/share/nginx/html;
