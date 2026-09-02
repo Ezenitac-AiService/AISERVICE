@@ -27,16 +27,16 @@ python make_migration_pack.py --dry-run
 python make_migration_pack.py --include-volumes --format tar.gz
 ```
 
-GPU 설치·JIT·GPU Compose 경로를 사용하지 않는 패키지는 다음처럼 생성합니다:
+---
 
-```powershell
-python make_migration_pack.py --include-volumes --skip-gpu --format tar.gz
-```
+## 2. 🖥️ 사전 전제조건 (Prerequisites)
 
-이 옵션은 manifest의 `gpu_mode`를 `cpu-only`로 기록하며, 타겟 복원 시 CPU fallback과 `DEGRADED` 검증 상태를 사용합니다.
-
-- **산출물**: `dist/AISERVICE_Migration_Pack_<timestamp>.tar.gz.enc` (기본 암호화 아카이브; `--format zip`은 `.zip.enc`, `--format both`는 두 형식 생성)
-- **키 정책**: 암호화 키는 결과물에 포함하지 않으며, 매니페스트·로그·체크섬에는 원문 시크릿을 기록하지 않음.
+### 1) 타겟 서버 요구사항
+- **OS**: Linux (Ubuntu 22.04/24.04 LTS 권장, Debian, RHEL) 또는 Windows 10/11 (Docker Desktop + WSL2)
+- **Docker Engine**: Docker 24.0+ 및 Docker Compose v2 (또는 `docker-compose` v2.20+)
+- **디스크 공간**: 최소 **15 GB** 이상의 여유 디스크 공간 (DB 압축 덤프 및 볼륨 공간)
+- **메모리(RAM)**: 최소 **16 GB** 권장 (vLLM/Qwen 모델 및 MySQL 8.0 버퍼)
+- **GPU (선택/권장)**: NVIDIA GPU (VRAM 8GB+ 및 `nvidia-container-toolkit` 설치 시 vLLM GPU 가속 구동)
 
 ---
 
@@ -71,16 +71,14 @@ sudo ./bootstrap_restore.sh -y
 7. DuckDNS DDNS IPv4(`curl -4`) 갱신 및 5분 주기 크론 자동 등록
 8. 10개 HTTP + Redis TCP PING으로 구성된 11개 검사 수행 및 `verification_report.json` 발행
 
-GPU 경로 판정:
-- 정상 GTX 1070 GPU 서빙은 `status: "PASS"`입니다.
-- GPU가 없거나 `--skip-gpu`를 사용한 CPU fallback은 `status: "DEGRADED"`와 `degraded_reason`을 기록합니다.
-- `PASS`와 `DEGRADED` 모두 11개 검사가 성공하면 종료 코드 0이며, 검사 실패는 `FAIL`입니다.
-
----
-
-## 4. 11개 검사(10개 HTTP + Redis TCP PING) E2E 헬스체크 및 확인
-
-복원 완료 후 아래 명령어로 언제든지 전체 서비스 정상 동작을 재검증할 수 있습니다:
+타겟 서버에서 아래의 **단일 명령어**를 실행하면 다음 작업이 완전 무인 자동화로 처리됩니다:
+1. Docker 및 Compose 환경 검사
+2. `checksums.sha256` 기반 데이터베이스 덤프 무결성 100% 검증
+3. `.env` 환경 설정 파일 자동 프로비저닝
+4. `pilos-db`, `bteam_db`, `redis` 컨테이너 선행 기동 및 MySQL 준비 대기
+5. `pilos_v2`(3.4GB) 및 `oliview_project`(950MB) 덤프 스트리밍 무손실 복원
+6. 10개 전 서비스 컨테이너 일괄 빌드 및 기동
+7. 11개 엔드포인트 자동 헬스체크 검증 수행
 
 ```bash
 python3 migration_pack/scripts/verify_migration.py

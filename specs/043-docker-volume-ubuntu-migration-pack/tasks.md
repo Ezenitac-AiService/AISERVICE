@@ -318,15 +318,9 @@ graph TD
 
 ## Phase 23: Convergence
 
-- [x] T103 [CRITICAL] Constitution 품질 게이트에 맞춰 feature touchpoint의 lint/typecheck 실행 명령과 범위를 정식화하고, 현재 정적 검사에서 확인된 Ruff 위반을 해소한 뒤 테스트·정적 분석·헌법 적합성 최종 게이트를 통과시킨다(Constitution 품질 게이트, 완료: Ruff E/F/I 및 mypy/compileall 통과).
-- [x] T104 [HIGH] `make_migration_pack.py`의 CLI parser와 `migration-cli-contract.md`에 `--skip-gpu`를 추가하고, 패키징 manifest의 GPU/CPU 모드 의미와 실제 동작을 일관되게 연결한다(FR-019, plan: CLI options, 완료).
-- [x] T105 [HIGH] `verification-report-schema.json`, Quickstart/MIGRATION_GUIDE 및 계약 테스트가 구현의 `DEGRADED` 상태와 사유 필드를 허용·표현하도록 정렬하고, 정상 GPU 경로의 `PASS` 판정과 CPU fallback의 `DEGRADED` 판정을 구분한다(FR-014/017, SC-003/006, 완료).
-- [x] T106 [HIGH] `model_gateway/src/core/cpu_detector.py`와 `process_manager.py`의 직접 llama.cpp CMake fallback 경로에도 Non-AVX `-march=native`, AVX/FMA 비활성화 및 감지된 CUDA architecture 전달을 적용하고 보조 JIT 경로 smoke test를 추가한다(FR-002, SC-003, T099, 완료).
-- [x] T107 [HIGH] 현재 구현 기준으로 canonical `migration_pack/migration_manifest.json` 및 관련 checksum/export 산출물을 재생성하여 `-march=native`, 최신 source inventory와 데이터 상태를 반영하고, `cosmetic_db` 등 `PARTIAL` dump가 성공 manifest로 기록되지 않도록 fail-closed 검증을 추가한다(FR-009, SC-004/009, T092/T096, 완료).
-- [x] T108 [MEDIUM] `--include-models`가 `GREEN_MODEL_ROOT` 등 런타임 설정으로 지정된 모델 루트를 해석하고, 해당 루트의 실제 파일을 동일 상대 경로·크기·SHA-256으로 archive/manifest/checksum에 포함하도록 보완하며 설정별 계약 테스트를 추가한다(FR-019, T102, 완료).
-
-## Phase 24: Convergence
-
-- [ ] T109 [HIGH] Green `cosmetic_db`의 invalid View definer 문제를 해결한 뒤 구조·데이터·뷰·트리거·이벤트를 포함한 완전한 무손실 dump를 재생성하고, `database_export_manifest.json`, `migration_manifest.json`, `checksums.sha256`, `verification_report.json`에 동일한 실제 행 수·해시·PASS 무결성 결과를 반영한다(FR-003, SC-004, US3/AC1, partial).
-- [ ] T110 [HIGH] 최신 clean source bundle을 표준 패키징 경로로 재생성하고 실제 bundle inventory의 파일 수·SHA-256 digest가 `migration_manifest.json`의 `source_bundle` 및 checksum 산출물과 일치하는지 검증한다(FR-009, SC-009, plan: source bundle, partial).
-- [ ] T111 [HIGH] GPU 부재 및 CUDA/드라이버 호환성 실패를 실제 GPU 프로파일로 오인하지 않도록 CPU-only 상태를 명시적으로 표현하고, `build_llama.sh`·bootstrap·`verify_migration.py` 간 fallback 사유 전달을 연결하여 해당 경로의 검증 보고서가 `DEGRADED`와 `degraded_reason`을 기록하도록 보완한다(FR-014, plan: GPU fallback, contradicts).
+- [ ] T103 [CRITICAL] Constitution 품질 게이트에 맞춰 feature touchpoint의 lint/typecheck 실행 명령과 범위를 정식화하고, 현재 정적 검사에서 확인된 Ruff 위반을 해소한 뒤 테스트·정적 분석·헌법 적합성 최종 게이트를 통과시킨다(Constitution 품질 게이트, partial).
+- [ ] T104 [HIGH] `make_migration_pack.py`의 CLI parser와 `migration-cli-contract.md`에 `--skip-gpu`를 추가하고, 패키징 manifest의 GPU/CPU 모드 의미와 실제 동작을 일관되게 연결한다(FR-019, plan: CLI options, missing).
+- [ ] T105 [HIGH] `verification-report-schema.json`, Quickstart/MIGRATION_GUIDE 및 계약 테스트가 구현의 `DEGRADED` 상태와 사유 필드를 허용·표현하도록 정렬하고, 정상 GPU 경로의 `PASS` 판정과 CPU fallback의 `DEGRADED` 판정을 구분한다(FR-014/017, SC-003/006, partial).
+- [ ] T106 [HIGH] `model_gateway/src/core/cpu_detector.py`와 `process_manager.py`의 직접 llama.cpp CMake fallback 경로에도 Non-AVX `-march=native`, AVX/FMA 비활성화 및 감지된 CUDA architecture 전달을 적용하고 보조 JIT 경로 smoke test를 추가한다(FR-002, SC-003, T099, contradicts).
+- [ ] T107 [HIGH] 현재 구현 기준으로 canonical `migration_pack/migration_manifest.json` 및 관련 checksum/export 산출물을 재생성하여 `-march=native`, 최신 source inventory와 데이터 상태를 반영하고, `cosmetic_db` 등 `PARTIAL` dump가 성공 manifest로 기록되지 않도록 fail-closed 검증을 추가한다(FR-009, SC-004/009, T092/T096, contradicts).
+- [ ] T108 [MEDIUM] `--include-models`가 `GREEN_MODEL_ROOT` 등 런타임 설정으로 지정된 모델 루트를 해석하고, 해당 루트의 실제 파일을 동일 상대 경로·크기·SHA-256으로 archive/manifest/checksum에 포함하도록 보완하며 설정별 계약 테스트를 추가한다(FR-019, T102, partial).

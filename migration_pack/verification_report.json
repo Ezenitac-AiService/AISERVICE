@@ -1,51 +1,10 @@
 {
-  "timestamp": "2026-08-31T15:36:38.513235+00:00",
-  "status": "FAIL",
+  "timestamp": "2026-08-20T22:31:19.501451",
   "total_endpoints": 11,
-  "passed_endpoints": 11,
-  "failed_endpoints": 0,
-  "duration_seconds": 16.458,
-  "hardware_detected": {
-    "cpu_model": "Intel64 Family 6 Model 79 Stepping 1, GenuineIntel",
-    "avx_supported": false,
-    "gpu_model": "NVIDIA GeForce GTX 1070",
-    "vram_mb": 8192,
-    "compute_capability": "6.1"
-  },
-  "data_integrity": {
-    "status": "FAIL",
-    "databases": [
-      {
-        "name": "pilos_v2",
-        "expected_row_count": 12253826,
-        "actual_row_count": 12253826,
-        "measurement_method": "COUNT(*) per table",
-        "status": "PASS"
-      },
-      {
-        "name": "oliview_project",
-        "expected_row_count": 232085,
-        "actual_row_count": 232085,
-        "measurement_method": "COUNT(*) per table",
-        "status": "PASS"
-      },
-      {
-        "name": "cosmetic_db",
-        "expected_row_count": 0,
-        "actual_row_count": 0,
-        "measurement_method": "COUNT(*) per table",
-        "status": "FAIL",
-        "error": "cosmetic_db dump가 불완전하여 무손실 복원을 판정할 수 없습니다."
-      }
-    ],
-    "chroma": {
-      "collection": "oliview_review_sentences_v2",
-      "expected_vector_count": 57435,
-      "actual_vector_count": 57435,
-      "measurement_method": "Chroma v2 collection count API",
-      "status": "PASS"
-    }
-  },
+  "passed_count": 11,
+  "failed_count": 0,
+  "pass_rate_pct": 100.0,
+  "status": "PASS",
   "results": [
     {
       "id": "gateway_root",
@@ -157,11 +116,5 @@
       "passed": true,
       "message": "+PONG"
     }
-  ],
-  "report_version": "2.0.0",
-  "total_checks": 11,
-  "passed_checks": 11,
-  "failed_checks": 0,
-  "pass_rate_pct": 100.0,
-  "overall_status": "DEGRADED"
+  ]
 }

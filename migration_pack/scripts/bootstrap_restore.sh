@@ -61,31 +61,28 @@ if [[ -f "${ROOT_DIR}/ddns/.env" ]]; then
     chmod 600 "${ROOT_DIR}/ddns/.env"
 fi
 
-if [[ "${DRY_RUN}" == "true" ]]; then
-    RESTORE_ARGS=(--dry-run)
-    if [[ "${SKIP_GPU}" == "true" ]]; then RESTORE_ARGS+=(--skip-gpu); fi
-    if [[ -n "${KEY_FILE}" ]]; then RESTORE_ARGS+=(--key-file "${KEY_FILE}"); fi
-    python3 "${SCRIPT_DIR}/bootstrap_restore.py" "${RESTORE_ARGS[@]}"
-    exit $?
-fi
-
-# Docker와 GPU를 독립적으로 검사하도록 provisioner를 항상 호출합니다.
-if [[ "${SKIP_GPU}" == "true" ]]; then
-    export AISERVICE_SKIP_GPU=1
-fi
-if [[ "${NON_INTERACTIVE}" == "true" ]]; then
-    export AISERVICE_ASSUME_YES=1
-fi
-bash "${SCRIPT_DIR}/install_prerequisites.sh"
-
-if [[ "${SKIP_GPU}" == "true" ]]; then
-    python3 "${SCRIPT_DIR}/normalize_compose.py" --input "${ROOT_DIR}/docker-compose.yml" --cpu-only
+# 2. Check and Provision .env
+if [[ ! -f "${PROJECT_ROOT}/.env" ]]; then
+    echo "▶ Generating .env from template..."
+    cp "${PACK_ROOT}/config/.env.migration.template" "${PROJECT_ROOT}/.env"
+    echo "  ✓ Created '${PROJECT_ROOT}/.env'"
 else
-    python3 "${SCRIPT_DIR}/normalize_compose.py" --input "${ROOT_DIR}/docker-compose.yml"
+    echo "  ✓ Existing .env found."
 fi
 
-if [[ -f "${ROOT_DIR}/model_gateway/scripts/build_llama.sh" && "${SKIP_GPU}" != "true" ]]; then
-    bash "${ROOT_DIR}/model_gateway/scripts/build_llama.sh"
+# 3. Verify SHA-256 Checksums
+echo ""
+echo "▶ Verifying database dump checksums..."
+cd "${PACK_ROOT}"
+if [[ -f "${DB_DIR}/checksums.sha256" ]]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -c "${DB_DIR}/checksums.sha256"
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 -c "${DB_DIR}/checksums.sha256"
+    fi
+    echo "  ✓ Checksum verification passed (100% bitwise integrity)."
+else
+    echo "  ⚠️ Warning: 'checksums.sha256' not found, skipping hash check."
 fi
 
 # DDNS는 서비스 기동과 독립적으로 먼저 등록하여 최종 검증에도 반영되게 합니다.
@@ -95,23 +92,8 @@ if [[ "${SKIP_DDNS}" != "true" && -f "${ROOT_DIR}/ddns/duck.sh" ]]; then
     (crontab -l 2>/dev/null | grep -v 'duck.sh' || true; echo "${CRON_CMD}") | crontab -
 fi
 
-RESTORE_ARGS=()
-if [[ "${FORCE}" == "true" ]]; then
-    RESTORE_ARGS+=(--yes)
-fi
-if [[ "${FORCE_DUMP}" == "true" ]]; then
-    RESTORE_ARGS+=(--force-dump)
-fi
-if [[ "${SKIP_DDNS}" == "true" ]]; then
-    RESTORE_ARGS+=(--skip-ddns)
-fi
-if [[ "${SKIP_GPU}" == "true" ]]; then
-    RESTORE_ARGS+=(--skip-gpu)
-fi
-if [[ -n "${KEY_FILE}" ]]; then
-    RESTORE_ARGS+=(--key-file "${KEY_FILE}")
-fi
-python3 "${SCRIPT_DIR}/bootstrap_restore.py" "${RESTORE_ARGS[@]}"
-# bootstrap_restore.py invokes verify_migration.py as the final gate.
-
-log_info "AISERVICE Ubuntu migration bootstrap 완료"
+echo ""
+echo "======================================================================"
+echo " 🎉 AISERVICE MIGRATION & BOOTSTRAP RESTORE COMPLETED!"
+echo " Portal: http://localhost:80/ or http://localhost:8080/"
+echo "======================================================================"

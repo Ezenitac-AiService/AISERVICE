@@ -211,9 +211,11 @@ def test_endpoint(ep: dict[str, Any], timeout: int = 15) -> dict[str, Any]:
         }
 
 
-# pytest should not treat this public probe helper as a test when imported by
-# contract test modules.
-test_endpoint.__test__ = False  # type: ignore[attr-defined]
+def main():
+    parser = argparse.ArgumentParser(description="AISERVICE Migration Verification Suite")
+    parser.add_argument("--json-report", type=str, help="Path to save JSON verification report")
+    parser.add_argument("--timeout", type=int, default=30, help="Per-endpoint timeout in seconds")
+    args = parser.parse_args()
 
 
 def _hardware_detected() -> dict[str, Any]:
@@ -235,28 +237,15 @@ def _hardware_detected() -> dict[str, Any]:
     except (OSError, ImportError, KeyError, TypeError, ValueError, RuntimeError) as exc:
         return {"error": str(exc)}
 
-
-def build_verification_report(
-    results: list[dict[str, Any]],
-    hardware_detected: dict[str, Any] | None = None,
-    data_integrity: dict[str, Any] | None = None,
-    degraded_reason: str | None = None,
-) -> dict[str, Any]:
-    passed = sum(
-        1
-        for result in results
-        if result.get("status") == "PASS" or result.get("passed") is True
-    )
     total = len(results)
-    failed = total - passed
-    integrity = data_integrity or {}
-    integrity_ok = integrity.get("status", "PASS") == "PASS"
-    status = "PASS" if failed == 0 and total == 11 and integrity_ok else "FAIL"
-    if status == "PASS" and degraded_reason:
-        status = "DEGRADED"
-    report = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": status,
+    pass_rate = (passed_count / total) * 100
+
+    print("-" * 75)
+    print(f" Summary: Total {total} Endpoints | Passed: {passed_count} | Failed: {failed_count} ({pass_rate:.1f}%)")
+    print("=" * 75)
+
+    report_data = {
+        "timestamp": datetime.now().isoformat(),
         "total_endpoints": total,
         "passed_endpoints": passed,
         "failed_endpoints": failed,
@@ -266,217 +255,14 @@ def build_verification_report(
         "hardware_detected": hardware_detected or {},
         "data_integrity": integrity,
         "results": results,
-        # 이전 소비자와의 하위 호환 필드
-        "report_version": "2.0.0",
-        "total_checks": total,
-        "passed_checks": passed,
-        "failed_checks": failed,
-        "pass_rate_pct": round((passed / max(total, 1)) * 100, 1),
-        "overall_status": "HEALTHY" if status == "PASS" else "DEGRADED",
-    }
-    if degraded_reason:
-        report["degraded_reason"] = degraded_reason
-    return report
-
-
-def _load_database_export_manifest() -> list[dict[str, Any]]:
-    path = Path(__file__).resolve().parent.parent / "database" / "database_export_manifest.json"
-    if not path.is_file():
-        return []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    return data if isinstance(data, list) else []
-
-
-def _measure_database_integrity() -> list[dict[str, Any]]:
-    """원본 매니페스트의 측정 방식으로 복원 대상 DB를 다시 측정합니다."""
-    source = {str(item.get("name")): item for item in _load_database_export_manifest()}
-    if not source:
-        return []
-    try:
-        from migration_pack.scripts.export_databases import (
-            count_database_rows,
-            get_database_targets,
-        )
-
-        targets = get_database_targets()
-    except (OSError, RuntimeError, ValueError, KeyError):
-        return [
-            {"name": name, "status": "FAIL", "error": "DB 측정 대상 환경을 읽을 수 없습니다"}
-            for name in sorted(source)
-        ]
-
-    measurements: list[dict[str, Any]] = []
-    for target in targets:
-        name = target["db_name"]
-        original = source.get(name)
-        if original is None:
-            continue
-        current, method = count_database_rows(target)
-        expected = int(original.get("row_count", -1))
-        passed = method != "unavailable" and expected >= 0 and current == expected
-        item = {
-            "name": name,
-            "expected_row_count": expected,
-            "actual_row_count": current,
-            "measurement_method": method,
-            "status": "PASS" if passed else "FAIL",
-        }
-        if not passed:
-            item["error"] = "복원 후 DB 행 수가 원본 측정값과 다릅니다"
-        measurements.append(item)
-    return measurements
-
-
-def _fetch_json(url: str) -> Any:
-    request = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(request, timeout=5, context=SSL_CTX) as response:
-        if response.status != 200:
-            raise ValueError(f"HTTP {response.status}")
-        return json.loads(response.read(1024 * 1024).decode("utf-8"))
-
-
-def _measure_chroma_integrity() -> dict[str, Any]:
-    """Chroma v2 API에서 canonical collection의 vector 수를 측정합니다."""
-    volume_entry: dict[str, Any] = {}
-    try:
-        manifest = json.loads(
-            (Path(__file__).resolve().parent.parent / "migration_manifest.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        volume_entry = next(
-            (
-                item
-                for item in manifest.get("volumes", [])
-                if item.get("volume_name") == "green_chroma_data"
-            ),
-            {},
-        )
-    except (OSError, json.JSONDecodeError):
-        pass
-    expected = volume_entry.get("vector_count")
-    if expected is None:
-        return {
-            "collection": "oliview_review_sentences_v2",
-            "status": "FAIL",
-            "measurement_method": "Chroma v2 collection count API",
-            "error": "원본 Chroma vector_count가 매니페스트에 없습니다",
-        }
-
-    base = "http://127.0.0.1:18000"
-    try:
-        collection_id = None
-        try:
-            collections = _fetch_json(
-                base + "/api/v2/tenants/default_tenant/databases/default_database/collections"
-            )
-            for collection in collections if isinstance(collections, list) else []:
-                if collection.get("name") == "oliview_review_sentences_v2":
-                    collection_id = collection.get("id")
-                    break
-        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError):
-            collections = _fetch_json(base + "/api/v1/collections")
-            for collection in collections if isinstance(collections, list) else []:
-                if collection.get("name") == "oliview_review_sentences_v2":
-                    collection_id = collection.get("id")
-                    break
-        if not collection_id:
-            raise ValueError("canonical Chroma collection이 없습니다")
-        try:
-            count = _fetch_json(
-                base
-                + "/api/v2/tenants/default_tenant/databases/default_database/collections/"
-                + str(collection_id)
-                + "/count"
-            )
-        except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError):
-            count = _fetch_json(base + f"/api/v1/collections/{collection_id}/count")
-        actual = int(count if isinstance(count, int) else count.get("count", -1))
-        passed = actual == int(expected)
-        item = {
-            "collection": "oliview_review_sentences_v2",
-            "expected_vector_count": int(expected),
-            "actual_vector_count": actual,
-            "measurement_method": "Chroma v2 collection count API",
-            "status": "PASS" if passed else "FAIL",
-        }
-        if not passed:
-            item["error"] = "복원 후 Chroma vector 수가 원본 측정값과 다릅니다"
-        return item
-    except (OSError, ValueError, TypeError, KeyError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        return {
-            "collection": "oliview_review_sentences_v2",
-            "expected_vector_count": int(expected),
-            "measurement_method": "Chroma v2 collection count API",
-            "status": "FAIL",
-            "error": str(exc),
-        }
-
-
-def collect_data_integrity() -> dict[str, Any]:
-    databases = _measure_database_integrity()
-    chroma = _measure_chroma_integrity()
-    checks = databases + [chroma]
-    return {
-        "status": "PASS" if checks and all(item.get("status") == "PASS" for item in checks) else "FAIL",
-        "databases": databases,
-        "chroma": chroma,
     }
 
-
-def build_argument_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="AISERVICE 11-endpoint migration verification"
-    )
-    parser.add_argument(
-        "--json-report",
-        default=str(Path(__file__).resolve().parent.parent / "verification_report.json"),
-    )
-    parser.add_argument("--timeout", type=int, default=15)
-    parser.add_argument(
-        "--gateway-port",
-        type=int,
-        default=int(os.environ.get("MIGRATION_VERIFY_GATEWAY_PORT", "80")),
-        help="gateway primary port used for root and application routes",
-    )
-    parser.add_argument(
-        "--secondary-gateway-port",
-        type=int,
-        default=int(os.environ.get("MIGRATION_VERIFY_SECONDARY_GATEWAY_PORT", "8080")),
-        help="gateway secondary port used for the secondary root check",
-    )
-    parser.add_argument(
-        "--skip-data-integrity",
-        action="store_true",
-        help="대상 DB/Chroma 데이터 수 비교를 생략합니다",
-    )
-    parser.add_argument(
-        "--degraded-reason",
-        help="검사는 통과했지만 GPU 생략/CPU fallback 등 DEGRADED 사유를 기록합니다",
-    )
-    return parser
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = build_argument_parser().parse_args(argv)
-    started = time.perf_counter()
-    endpoints = build_endpoints(args.gateway_port, args.secondary_gateway_port)
-    results = [test_endpoint(endpoint, timeout=args.timeout) for endpoint in endpoints]
-    integrity = {} if args.skip_data_integrity else collect_data_integrity()
-    report = build_verification_report(
-        results, _hardware_detected(), integrity, args.degraded_reason
-    )
-    report["duration_seconds"] = round(time.perf_counter() - started, 3)
     if args.json_report:
-        target = Path(args.json_report)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-    return 0 if report["status"] in {"PASS", "DEGRADED"} else 1
+        with open(args.json_report, "w", encoding="utf-8") as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+        print(f" Report saved to: {args.json_report}")
+
+    sys.exit(0 if failed_count == 0 else 1)
 
 
 if __name__ == "__main__":

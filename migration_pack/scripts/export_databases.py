@@ -8,110 +8,10 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
-import time
-from collections.abc import Mapping
-from pathlib import Path
-from typing import Any
+from datetime import datetime, timezone
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from migration_pack.scripts.env_utils import load_environment, required_environment
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-PACK_ROOT = SCRIPT_DIR.parent
-PROJECT_ROOT = PACK_ROOT.parent
-DB_DIR = PACK_ROOT / "database"
-DB_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _ensure_docker_host() -> None:
-    if sys.platform.startswith("win") and "DOCKER_HOST" not in os.environ:
-        try:
-            res = subprocess.run(["docker", "info"], capture_output=True, timeout=3, check=False)
-            if res.returncode != 0:
-                wsl_res = subprocess.run(["wsl", "-d", "Ubuntu", "--", "hostname", "-I"], capture_output=True, text=True, timeout=5, check=False)
-                if wsl_res.returncode == 0 and wsl_res.stdout.strip():
-                    ip = wsl_res.stdout.split()[0]
-                    os.environ["DOCKER_HOST"] = f"tcp://{ip}:2375"
-        except Exception:
-            pass
-
-_ensure_docker_host()
-
-
-class DatabaseExportError(RuntimeError):
-    """DB export contract failure."""
-
-
-def get_database_targets(
-    environment: Mapping[str, str] | None = None,
-) -> list[dict[str, str]]:
-    """현재 번들의 `.env`에서 기본 및 Green MySQL 대상을 구성합니다."""
-    env = dict(environment or load_environment(PROJECT_ROOT))
-    required = [
-        "PILOS_DB_USER",
-        "PILOS_DB_PASSWORD",
-        "PILOS_DB_ROOT_PASSWORD",
-        "PILOS_DB_NAME",
-        "BTEAM_DB_USER",
-        "BTEAM_DB_PASSWORD",
-        "BTEAM_DB_ROOT_PASSWORD",
-        "BTEAM_DB_NAME",
-        "GREEN_DB_USER",
-        "GREEN_DB_PASSWORD",
-        "GREEN_DB_ROOT_PASSWORD",
-        "GREEN_DB_NAME",
-    ]
-    missing = required_environment(env, required)
-    if missing:
-        raise DatabaseExportError("필수 DB 환경 변수 누락: " + ", ".join(missing))
-    targets = [
-        {
-            "db_name": env["PILOS_DB_NAME"],
-            "container": env.get("PILOS_DB_CONTAINER", "pilos-db"),
-            "user": env["PILOS_DB_USER"],
-            "password": env["PILOS_DB_PASSWORD"],
-            "root_password": env["PILOS_DB_ROOT_PASSWORD"],
-            "output_file": str(DB_DIR / f"{env['PILOS_DB_NAME']}.sql.gz"),
-        },
-        {
-            "db_name": env["BTEAM_DB_NAME"],
-            "container": env.get("BTEAM_DB_CONTAINER", "bteam_db"),
-            "user": env["BTEAM_DB_USER"],
-            "password": env["BTEAM_DB_PASSWORD"],
-            "root_password": env["BTEAM_DB_ROOT_PASSWORD"],
-            "output_file": str(DB_DIR / f"{env['BTEAM_DB_NAME']}.sql.gz"),
-        },
-    ]
-    targets.append(
-        {
-            "db_name": env["GREEN_DB_NAME"],
-            "container": env.get("GREEN_DB_CONTAINER", "mysql-green"),
-            "user": env["GREEN_DB_USER"],
-            "password": env["GREEN_DB_PASSWORD"],
-            "root_password": env["GREEN_DB_ROOT_PASSWORD"],
-            "output_file": str(DB_DIR / f"{env['GREEN_DB_NAME']}.sql.gz"),
-        }
-    )
-    return targets
-
-
-def _docker_env(password: str) -> list[str]:
-    # MYSQL_PWD를 사용해 비밀번호가 명령행 인자/일반 로그에 노출되지 않게 합니다.
-    return ["-e", f"MYSQL_PWD={password}"]
-
-
-def resolve_running_container(name_or_service: str) -> str | None:
-    """정확한 이름, Compose 라벨 및 이름 패턴 기반으로 실행 중인 DB 컨테이너를 탐색합니다."""
-    if not name_or_service:
-        return None
+# Windows Console UTF-8 safety
+if sys.platform.startswith("win"):
     try:
         result = subprocess.run(
             ["docker", "ps", "--format", "{{.Names}}\t{{.Labels}}"],
@@ -250,93 +150,15 @@ def check_database_connection(target: Mapping[str, str]) -> bool:
     return result.returncode == 0
 
 
-def count_database_rows(target: Mapping[str, str]) -> tuple[int, str]:
-    """각 테이블의 COUNT(*)를 합산해 정확한 논리 행 수를 측정합니다."""
-    container = resolve_running_container(target["container"]) or target["container"]
-    db_name = target["db_name"].replace("`", "``")
-    list_command = [
-        "docker",
-        "exec",
-        *_docker_env(target["root_password"]),
-        container,
-        "mysql",
-        "-uroot",
-        "-s",
-        "-N",
-        "-e",
-        "SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA='"
-        + target["db_name"].replace("'", "''")
-        + "' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME;",
-    ]
-    try:
-        tables = subprocess.run(
-            list_command, capture_output=True, text=True, check=True, timeout=30
-        ).stdout.splitlines()
-        if not tables:
-            return 0, "COUNT(*) per table"
+def dump_database(target: dict) -> tuple[int, str]:
+    db = target["db_name"]
+    container = target["container"]
+    user = target["user"]
+    pw = target["password"]
+    out_path = target["output_file"]
 
-        # 단일 SQL 쿼리로 모든 테이블의 COUNT(*)를 합산하여 Docker socket 부하를 방지합니다.
-        subqueries = [
-            f"(SELECT COUNT(*) FROM `{db_name}`.`{t.strip().replace('`', '``')}`)"
-            for t in tables
-            if t.strip()
-        ]
-        if not subqueries:
-            return 0, "COUNT(*) per table"
-        total_query = "SELECT " + " + ".join(subqueries) + ";"
-        result = subprocess.run(
-            [
-                "docker",
-                "exec",
-                *_docker_env(target["root_password"]),
-                container,
-                "mysql",
-                "-uroot",
-                "-s",
-                "-N",
-                "-e",
-                total_query,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=120,
-        )
-        value = result.stdout.strip()
-        if not value.isdigit():
-            raise ValueError(f"행 수 응답이 숫자가 아닙니다: {value}")
-        return int(value), "COUNT(*) per table"
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return 0, "unavailable"
-
-
-def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
-    """MySQL dirty-page 정합성을 확보한 뒤 gzip 스트리밍 덤프를 생성합니다."""
-    container = resolve_running_container(target["container"])
-    if not container:
-        raise DatabaseExportError(f"컨테이너가 실행 중이 아닙니다: {target['container']}")
-
-    db_name = target["db_name"]
-    output_path = Path(target["output_file"])
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count, row_source = count_database_rows(target)
-    view_meta = inspect_view_definers(target, container)
-    invalid_view_definers = find_invalid_view_definers(target, container, view_meta)
-    if invalid_view_definers:
-        output_path.unlink(missing_ok=True)
-        details = ", ".join(
-            f"{view.get('table_name', '<unknown>')} ({view.get('definer', '<unknown>')})"
-            for view in invalid_view_definers
-        )
-        raise DatabaseExportError(
-            f"invalid View DEFINER가 있어 무손실 dump를 생성할 수 없습니다: {details}"
-        )
-    command = [
-        "docker",
-        "exec",
-        *_docker_env(target["root_password"]),
-        "-i",
-        container,
+    cmd = [
+        "docker", "exec", container,
         "mysqldump",
         "-uroot",
         "--single-transaction",
@@ -346,9 +168,8 @@ def dump_database(target: Mapping[str, str]) -> dict[str, Any]:
         "--events",
         "--hex-blob",
         "--default-character-set=utf8mb4",
-        "--max_allowed_packet=1024M",
-        "--net_buffer_length=16384",
-        db_name,
+        "--max_allowed_packet=512M",
+        db,
     ]
 
     start = time.time()
