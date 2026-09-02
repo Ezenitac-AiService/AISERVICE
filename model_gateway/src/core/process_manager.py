@@ -654,6 +654,13 @@ class ProcessManager:
     @staticmethod
     def _runtime_backend_from_profile() -> str:
         """JIT 프로파일의 실제 probe 결과를 읽어 backend 선택에 사용합니다."""
+        if os.environ.get("MODEL_GATEWAY_CPU_ONLY", os.environ.get("AISERVICE_SKIP_GPU", "0")) in {
+            "1",
+            "true",
+            "TRUE",
+            "yes",
+        }:
+            return "llama.cpp-cpu-openblas"
         try:
             from src.config import (
                 attempt_runtime_backends,
@@ -1013,7 +1020,13 @@ class ProcessManager:
 
         # Force 100% GPU VRAM Offloading environment variables
         env = dict(os.environ)
-        env["CUDA_VISIBLE_DEVICES"] = "0"
+        cpu_only = os.environ.get(
+            "MODEL_GATEWAY_CPU_ONLY", os.environ.get("AISERVICE_SKIP_GPU", "0")
+        ).lower() in {"1", "true", "yes"}
+        if cpu_only:
+            env.pop("CUDA_VISIBLE_DEVICES", None)
+        else:
+            env["CUDA_VISIBLE_DEVICES"] = "0"
 
         bind_host = "0.0.0.0"
 
@@ -1030,12 +1043,13 @@ class ProcessManager:
         from src.config import get_runtime_fallback_chain, is_runtime_compatibility_error
 
         selected_backend = self._runtime_backend_from_profile()
-        backend_order = [selected_backend]
-        backend_order.extend(
-            backend
-            for backend in get_runtime_fallback_chain()
-            if backend not in backend_order
-        )
+        backend_order = ["llama.cpp-cpu-openblas"] if cpu_only else [selected_backend]
+        if not cpu_only:
+            backend_order.extend(
+                backend
+                for backend in get_runtime_fallback_chain()
+                if backend not in backend_order
+            )
         self.runtime_backend_failures = []
 
         for backend in backend_order:

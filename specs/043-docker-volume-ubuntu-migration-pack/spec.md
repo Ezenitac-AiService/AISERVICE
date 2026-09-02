@@ -52,7 +52,7 @@ AISERVICE는 A-Team(Pilos 주식 감정지수 및 수급 분석), B-Team(Oliview
 
 본 피처의 핵심 범위:
 1. **클린 Ubuntu 24.04 LTS 사전 환경 무인 점검 (`DEBIAN_FRONTEND=noninteractive`, Snap Docker 방지) 및 공식 Docker / NVIDIA GPU 드라이버 / `nvidia-container-toolkit` 자동 설치 프로비저닝**
-2. **타겟 하드웨어(i7-930 Non-AVX SSE4.2 CPU + GTX 1070 sm_61 8GB GPU)에 맞춘 `llama.cpp` Pascal/Nehalem 최적화 자동 JIT 컴파일 및 8GB VRAM 내 3대 모델(Qwen 2B + BGE-M3 + Reranker) 100% GPU 가속 서빙**
+2. **타겟 하드웨어(i7-930 Non-AVX SSE4.2 CPU + GTX 1070 sm_61 8GB GPU)에 맞춘 `llama.cpp` Pascal/Nehalem 최적화 자동 JIT 컴파일 및 8GB VRAM 내 3대 모델(Qwen 2B + BGE-M3 + Reranker) 100% GPU 가속 서빙** (세부 기준과 fallback 판정은 §7.1을 따름)
 3. **실사용 환경 변수(`.env`) 및 시크릿(DB 비밀번호, API 키, 토큰 등)의 암호화 보존 및 Zero-Config 자동 구성 (`chmod 600` 보안)**
 4. **MySQL 데이터베이스 논리 덤프 및 물리 도커 볼륨(Docker Volume)의 Mutex 상호 배제 무손실 추출/복원 (InnoDB Dirty Page 플러시 적용)**
 5. **ChromaDB v2 SQLite WAL 체크포인트 보존 및 Redis BGSAVE 상태의 완전 보존**
@@ -276,6 +276,10 @@ AISERVICE_Migration_Pack/
 ---
 
 ## 7. 가정 및 제약사항 (Assumptions & Constraints)
+
+### 7.1 규범 기준 및 판정 원천
+
+타겟 하드웨어 프로파일, GPU/CPU fallback, 시크릿 보호 및 archive 판정의 현재 규범은 이 절과 FR/SC에 정의합니다. Clarification(Q1–Q7), Overview 및 `plan.md`의 반복 내용은 결정 기록 또는 구현 요약이며, 값이 충돌할 경우 이 절과 FR/SC를 우선합니다.
 
 - **마이그레이션 성격**: 본 마이그레이션은 동일 개발/실증(DEV/DEMO) 모드의 호스트 환경 이전(Windows $\rightarrow$ Ubuntu Linux)이므로, `.env` 내의 실사용 시크릿을 암호화된 번들에 포함하되 키는 외부 보호 경로에서 주입합니다. 복원 후 기능에는 원문 값을 사용하지만 로그·매니페스트·체크섬·평문 전송에는 기록하지 않습니다.
 - **타겟 하드웨어 프로파일**: 타겟 서버는 Intel Core i7-930 CPU (Non-AVX, SSE4.2), 24GB RAM, NVIDIA GeForce GTX 1070 8GB GPU를 탑재한 Ubuntu 24.04 LTS 환경을 표준으로 합니다.

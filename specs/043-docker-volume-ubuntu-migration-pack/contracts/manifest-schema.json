@@ -95,6 +95,18 @@
         }
       }
     },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer" },
+          "sha256": { "type": "string" }
+        }
+      }
+    },
     "ddns_config": {
       "type": "object",
       "required": ["domain", "token", "cron_interval_minutes"],

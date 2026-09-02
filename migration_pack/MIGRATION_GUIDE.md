@@ -1,99 +1,153 @@
-# AISERVICE 우분투 서버 마이그레이션 운영 가이드 (v2.0)
+# 📦 AISERVICE 크로스 플랫폼 마이그레이션 실행 매뉴얼 (MIGRATION_GUIDE.md)
 
-본 문서는 Windows(WSL2) 환경에서 구축된 **AISERVICE 전체 인프라(도커 볼륨, DB, 실사용 `.env`, AI 모델 서빙 게이트웨이, DuckDNS DDNS)**를 **Ubuntu 24.04 LTS 서버(Intel i7-930, GTX 1070 8GB, 24GB RAM)**로 100% 무손실 이전하고 Zero-Config로 원클릭 복원하는 절차를 안내합니다.
-
----
-
-## 1. 마이그레이션 아키텍처 개요
-
-- **마이그레이션 모드**: `DEV_PLATFORM_TRANSFER` (개발 환경 1:1 완벽 보존 이전)
-- **보안 및 환경설정**: 실사용 `.env` 및 `ddns/.env`의 모든 시크릿(DB 비밀번호, 키움 API 키, DuckDNS 토큰 등)을 암호화된 아카이브에 100% 보존하여 타겟 서버에서 사용자 수동 입력 0회(Zero-Config, 복호화 후 `chmod 600`)로 즉시 구동. 복호화 키는 아카이브 외부의 보호된 경로에서 주입.
-- **타겟 하드웨어 프로파일**:
-  - **CPU**: Intel Core i7-930 (Nehalem 1세대, SSE4.2 지원, Non-AVX) $\rightarrow$ `-march=native -DGGML_AVX=OFF` 자동 적용
-  - **GPU**: NVIDIA GeForce GTX 1070 8GB (Pascal `sm_61`) $\rightarrow$ `CMAKE_CUDA_ARCHITECTURES=61`, `VRAM_SAFETY_LIMIT_MB=5000`
-  - **RAM**: 24GB
+AISERVICE 전체 멀티 에이전트 서비스 생태계(A-Team Pilos, B-Team Oliview, Model Gateway, Redis, Nginx 프록시)와 컨테이너 내부 데이터베이스(`pilos_v2` 3.4GB, `oliview_project` 950MB)를 **다른 플랫폼(Linux Ubuntu/Debian/RHEL, AWS EC2, GCP Compute Engine, On-Premise GPU 서버, 다른 Windows 호스트 등)**으로 무손실, 원클릭 이전하기 위한 완전 안내서입니다.
 
 ---
 
-## 2. 윈도우(개발 호스트) 패키징 실행
+## 1. 📋 마이그레이션 팩 구성 (`migration_pack/`)
 
-윈도우 개발 PC에서 터미널(PowerShell 또는 CMD)을 열고 아래 명령어를 실행하여 단일 배포 아카이브를 생성합니다:
-
-```powershell
-# 1. 사전 유효성 검사 (시뮬레이션)
-python make_migration_pack.py --dry-run
-
-# 2. 실데이터 및 볼륨 포함 전체 마이그레이션 팩 생성
-python make_migration_pack.py --include-volumes --format tar.gz
+```text
+migration_pack/
+├── database/                        # 무손실 압축 DB 백업
+│   ├── pilos_v2.sql.gz              # A-Team Pilos MySQL 8.0 덤프 (481.2 MB 압축본 / 원본 2.8GB)
+│   ├── oliview_project.sql.gz       # B-Team Oliview 1024차원 벡터 덤프 (512.4 MB 압축본 / 원본 1.2GB)
+│   └── checksums.sha256             # SHA-256 비트 무결성 체크섬 매니페스트
+├── scripts/                         # 원클릭 자동화 도구 (Linux Bash & Windows Batch)
+│   ├── export_databases.sh/.bat     # [소스 호스트] DB 덤프 및 해시 생성 도구
+│   ├── bootstrap_restore.sh/.bat    # [타겟 호스트] 원클릭 DB 복원 및 서비스 오케스트레이터
+│   ├── pack_archive.sh/.bat         # [소스 호스트] 단일 아카이브(.tar.gz / .zip) 압축 도구
+│   ├── export_offline_models.sh/.bat# [소스 호스트] 폐쇄망용 오프라인 모델 가중치 번들러 (선택)
+│   ├── configure_env.py             # [타겟 호스트] 환경 변수 프로파일러 및 검증기
+│   └── verify_migration.py          # [타겟 호스트] 11개 엔드포인트 E2E 자동 검증기
+├── config/                          # 환경 설정 매트릭스
+│   ├── .env.migration.template      # 통합 환경 변수 프로파일 템플릿
+│   ├── ddns.env.template            # DuckDNS 및 도메인 템플릿
+│   └── nginx.conf                   # Nginx 역방향 프록시 설정
+├── docker-compose.yml               # 다중 플랫폼 호환 Docker Compose 매니페스트
+├── migration_manifest.json          # 마이그레이션 메타데이터 정본
+└── MIGRATION_GUIDE.md               # 본 실행 매뉴얼
 ```
 
-- **산출물**: `dist/AISERVICE_Migration_Pack_<timestamp>.tar.gz.enc` (기본 암호화 아카이브; `--format zip`은 `.zip.enc`, `--format both`는 두 형식 생성)
-- **키 정책**: 암호화 키는 결과물에 포함하지 않으며, 매니페스트·로그·체크섬에는 원문 시크릿을 기록하지 않음.
+---
+
+## 2. 🖥️ 사전 전제조건 (Prerequisites)
+
+### 1) 타겟 서버 요구사항
+- **OS**: Linux (Ubuntu 22.04/24.04 LTS 권장, Debian, RHEL) 또는 Windows 10/11 (Docker Desktop + WSL2)
+- **Docker Engine**: Docker 24.0+ 및 Docker Compose v2 (또는 `docker-compose` v2.20+)
+- **디스크 공간**: 최소 **15 GB** 이상의 여유 디스크 공간 (DB 압축 덤프 및 볼륨 공간)
+- **메모리(RAM)**: 최소 **16 GB** 권장 (vLLM/Qwen 모델 및 MySQL 8.0 버퍼)
+- **GPU (선택/권장)**: NVIDIA GPU (VRAM 8GB+ 및 `nvidia-container-toolkit` 설치 시 vLLM GPU 가속 구동)
 
 ---
 
-## 3. 우분투 서버(타겟 호스트) 전송 및 복원
+## 3. 🚀 마이그레이션 단계별 절차 (Step-by-Step)
 
-### 3.1 파일 전송 (SCP / SFTP / USB)
+### [1단계] 소스 서버에서 마스터 마이그레이션 팩 생성 (반복 실행 가능)
+프로젝트 루트에서 **단일 명령어**를 실행하면 실시간 DB 덤프 추출, 소스코드 정제, 체크섬 발행, 단일 배포 아카이브(`dist/AISERVICE_Migration_Pack_*.zip` 또는 `.tar.gz`) 생성이 완전 자동화로 진행됩니다:
+
 ```bash
-# 타겟 우분투 서버로 전송
-scp dist/AISERVICE_Migration_Pack_*.tar.gz.enc user@ubuntu-server:/home/user/
+# Windows 소스 호스트 (원클릭 마스터 빌더)
+.\make_migration_pack.bat
+
+# Linux / macOS / WSL2 소스 호스트 (원클릭 마스터 빌더)
+chmod +x make_migration_pack.sh
+./make_migration_pack.sh
+
+# 또는 Python 직접 실행
+python make_migration_pack.py
 ```
 
-### 3.2 원클릭 자동 복원 및 부트스트랩 실행
-```bash
-# 1. 타겟 호스트의 보호된 키 경로를 주입하고 승인된 복호화 절차로 .tar.gz를 준비
-export MIGRATION_PACK_KEY_FILE=/etc/aiservice/migration-pack.key
+- **옵션 안내**:
+  - `--skip-dump`: DB 덤프는 기존 것을 재사용하고 소스코드/설정만 즉시 패키징할 때 사용
+  - `--format <zip|tar.gz>`: 압축 포맷 선택
+  - `--no-archive`: 단일 압축 파일 대신 `dist/AISERVICE_Migration_Pack/` 폴더 형태로 생성
 
-# 2. 복호화된 아카이브 압축 해제
-tar -xzf <DECRYPTED_ARCHIVE>
+---
+
+### [2단계] 타겟 서버로 전송 (Transfer to Target Server)
+
+`make_migration_pack` 실행 후 `dist/` 폴더에 생성된 압축 아카이브(또는 폴더)를 타겟 서버로 전송합니다.
+
+```bash
+# 단일 압축본 전송 예시 (SCP)
+scp dist/AISERVICE_Migration_Pack_*.zip user@target-server-ip:/opt/
+# 또는 Linux tar.gz 전송
+scp dist/AISERVICE_Migration_Pack_*.tar.gz user@target-server-ip:/opt/
+```
+
+타겟 서버에서 압축을 해제합니다:
+```bash
+# Linux 타겟 서버에서 압축 해제
+cd /opt
+tar -xzvf AISERVICE_Migration_Pack_*.tar.gz
 cd AISERVICE
 
-# 3. 원클릭 부트스트랩 실행 (무인 자동 설치 모드)
-sudo ./bootstrap_restore.sh -y
+# Windows 타겟 서버에서 압축 해제
+Expand-Archive -Path .\dist\AISERVICE_Migration_Pack_*.zip -DestinationPath C:\
+cd C:\AISERVICE
 ```
 
-`bootstrap_restore.sh`가 아래 작업을 완전 자동(Zero-Touch)으로 수행합니다:
-1. `chmod 600 .env` 보안 권한 적용 및 실행 스크립트 권한 부여
-2. Clean Ubuntu 24.04 필수 패키지, 공식 APT Docker, NVIDIA Container Toolkit 자동 설치
-3. WSL2 디바이스(`/dev/dxg`) 제거 및 Native Linux GPU Compose 자동 변환
-4. i7-930 Non-AVX 및 GTX 1070 `sm_61` 하드웨어 감지 및 JIT 최적화 빌드
-5. Docker Named Volume(`ateam_db_data`, `bteam_bteam_mysql_data`, `green_mysql_data`, `green_chroma_data`, `aiservice_redis_data`) 복원
-6. Mutex 데이터베이스 중복 충돌 방지 및 안전 기동
-7. DuckDNS DDNS IPv4(`curl -4`) 갱신 및 5분 주기 크론 자동 등록
-8. 10개 HTTP + Redis TCP PING으로 구성된 11개 검사 수행 및 `verification_report.json` 발행
+### [3단계] 타겟 서버에서 원클릭 복원 및 자동 부트스트랩
 
----
-
-## 4. 11개 검사(10개 HTTP + Redis TCP PING) E2E 헬스체크 및 확인
-
-복원 완료 후 아래 명령어로 언제든지 전체 서비스 정상 동작을 재검증할 수 있습니다:
+타겟 서버에서 아래의 **단일 명령어**를 실행하면 다음 작업이 완전 무인 자동화로 처리됩니다:
+1. Docker 및 Compose 환경 검사
+2. `checksums.sha256` 기반 데이터베이스 덤프 무결성 100% 검증
+3. `.env` 환경 설정 파일 자동 프로비저닝
+4. `pilos-db`, `bteam_db`, `redis` 컨테이너 선행 기동 및 MySQL 준비 대기
+5. `pilos_v2`(3.4GB) 및 `oliview_project`(950MB) 덤프 스트리밍 무손실 복원
+6. 10개 전 서비스 컨테이너 일괄 빌드 및 기동
+7. 11개 엔드포인트 자동 헬스체크 검증 수행
 
 ```bash
-python3 migration_pack/scripts/verify_migration.py
-```
+# 타겟 서버가 Linux인 경우
+cd /opt/aiservice/migration_pack
+chmod +x scripts/*.sh
+./scripts/bootstrap_restore.sh --force
 
-| 포트 | 서비스명 | 확인 URL | 비고 |
-|:---|:---|:---|:---|
-| **80** | Nginx 통합 게이트웨이 | `http://<서버IP>/` | 전체 포털 진입점 |
-| **8080** | Nginx 보조 포트 게이트웨이 | `http://<서버IP>:8080/` | 보조 포털 진입점 |
-| **8081** | Model Gateway (Qwen 2B) | `http://<서버IP>:8081/health` | LLM 추론 API |
-| **8090** | BGE-M3 Dense Embedding | `http://<서버IP>:8090/v1/models` | 임베딩 API |
-| **8091** | BGE-Reranker v2 | `http://<서버IP>:8091/v1/models` | 리랭커 API |
-| **8080** | A-Team Pilos 대시보드 | `http://<서버IP>:8080/ateam/pilos/` | 감성지수 웹 |
-| **8080** | B-Team Oliview 프론트 | `http://<서버IP>:8080/bteam/oliview/` | 화장품 랭킹 UI |
-| **8080** | B-Team Oliview 백엔드 | `http://<서버IP>:8080/bteam/oliview/api/health` | API health |
-| **8080** | B-Team 올리챗 A | `http://<서버IP>:8080/bteam/chata/` | Streamlit 챗봇 |
-| **8080** | B-Team 올원챗 B | `http://<서버IP>:8080/bteam/chatb/` | FastAPI 챗봇 |
-| **6379** | Redis 7 | TCP `localhost:6379` | PING/PONG 세션·캐시 검사 |
+# 타겟 서버가 Windows인 경우
+cd C:\AISERVICE\migration_pack
+.\scripts\bootstrap_restore.bat --force
+```
 
 ---
 
-## 5. 트러블슈팅 가이드
+## 4. 🧪 복원 완료 후 11개 엔드포인트 무결성 검증
 
-1. **GPU 컨테이너 인식 실패 (`nvidia-smi` 오류)**:
-   - `sudo systemctl restart docker` 실행 후 `sudo docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi`로 점검.
-2. **DuckDNS 갱신 실패**:
-   - `cat ddns/duckdns.log` 확인 및 수동 실행: `bash ddns/duck.sh`.
-3. **i7-930 CPU 크래시 (`Illegal instruction`)**:
-   - `python3 model_gateway/scripts/probe_hardware.py`로 `-DGGML_AVX=OFF` 플래그 확인 후 `bash model_gateway/scripts/build_llama.sh` 재실행.
+복원 완료 후 언제든지 아래 검증기를 실행하여 모든 서비스가 정상 작동하는지 확인할 수 있습니다:
+
+```bash
+python migration_pack/scripts/verify_migration.py --json-report verification_report.json
+```
+
+### ✅ 11개 전수 검증 엔드포인트 목록
+1. **통합 포털 게이트웨이**: `http://127.0.0.1:8080/` (HTTP 200)
+2. **Model Gateway Health**: `http://127.0.0.1:8081/health` (HTTP 200)
+3. **Model Gateway 카탈로그**: `http://127.0.0.1:8081/v1/models` (HTTP 200)
+4. **Qwen LLM 추론**: `http://127.0.0.1:8081/v1/chat/completions` (HTTP 200, < 1s)
+5. **BGE-M3 밀집 임베딩**: `http://127.0.0.1:8090/v1/embeddings` (1024차원 벡터 반환)
+6. **A-Team Pilos 대시보드**: `http://127.0.0.1:8080/ateam/pilos/` (HTTP 200)
+7. **A-Team Pilos API**: `http://127.0.0.1:8080/api/stocks` (HTTP 200)
+8. **B-Team Oliview 프론트엔드**: `http://127.0.0.1:8080/bteam/oliview/` (HTTP 200)
+9. **B-Team Oliview 백엔드**: `http://127.0.0.1:8080/bteam/oliview/api/health` (HTTP 200)
+10. **B-Team 올리챗 A**: `http://127.0.0.1:8080/bteam/chata/` (HTTP 200)
+11. **B-Team 올리뷰챗 B**: `http://127.0.0.1:8080/bteam/chatb/` (HTTP 200)
+
+---
+
+## 5. 🛠️ 트러블슈팅 가이드 (Troubleshooting)
+
+### Q1. 타겟 서버에 포트 80 또는 8080이 이미 사용 중인 경우
+타겟 서버의 `.env` 파일에서 `GATEWAY_PORT` 및 `GATEWAY_ALT_PORT`를 비어있는 포트로 변경합니다:
+```ini
+GATEWAY_PORT=8000
+GATEWAY_ALT_PORT=8888
+```
+이후 `docker compose up -d gateway`를 실행하면 Nginx가 즉시 새 포트로 리바인딩됩니다.
+
+### Q2. 타겟 서버에 NVIDIA GPU가 없는 CPU 전용 서버인 경우
+`model_gateway` 컨테이너는 CPU 환경에서도 자동 폴백(Transformers/llama.cpp CPU 모드)을 지원합니다.
+`docker-compose.yml`에서 `devices: [/dev/dxg]` 및 `NVIDIA_VISIBLE_DEVICES` 블록을 주석 처리하고 기동하시면 됩니다.
+
+### Q3. 폐쇄망(인터넷 차단 환경)으로 이전하는 경우
+소스 서버에서 `.\migration_pack\scripts\export_offline_models.bat`를 실행하여 모델 가중치를 `migration_pack/models/`에 번들링한 후 타겟 서버로 이전하십시오.
