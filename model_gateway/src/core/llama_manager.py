@@ -329,6 +329,34 @@ class LlamaManager:
                 self.config_manager.update_config(current_model="qwen3.5-2b", current_n_ctx=65536)
                 await self.ensure_default_model_resident("qwen3.5-2b")
 
+    async def check_and_recover_crashes(self) -> None:
+        """FR-004 & FR-007: 메인 LLM 프로세스 비정상 종료(Exit 137 / OOM) 감지 시 자동 재스폰 자가치유."""
+        if self.is_ready():
+            return
+
+        if self.process_manager.state.status == ProcessStatusEnum.LOADING:
+            return
+
+        print("[LlamaManager] ⚠️ 메인 LLM(8089) 프로세스 부재 또는 크래시 감지 -> 자동 자가치유 재스폰 시작...")
+        try:
+            default_model = self.config_manager.get_default_model()
+            target_n_ctx = int(self.config_manager.get_config().get("current_n_ctx", 65536))
+            await self.load_model_with_download(default_model, n_ctx=target_n_ctx)
+        except Exception as e:
+            print(f"[LlamaManager] ❌ 자동 복구 실패: {e}")
+
+    async def start_health_monitor(self, interval_seconds: float = 3.0) -> None:
+        """FR-004: 백그라운드 주기적 프로세스 헬스체크 및 자가치유 모니터 루프."""
+        print(f"[LlamaManager] 메인 LLM 프로세스 헬스 모니터 시작 (간격: {interval_seconds}초)")
+        while True:
+            try:
+                await asyncio.sleep(interval_seconds)
+                await self.check_and_recover_crashes()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[LlamaManager] 헬스 모니터 예외: {e}")
+
     async def unload_model(self):
         async with self.lock:
             await self._unload_model_internal()
@@ -341,3 +369,4 @@ class LlamaManager:
 # Global instances
 config_manager = ConfigManager()
 llama_manager = LlamaManager(config_manager)
+

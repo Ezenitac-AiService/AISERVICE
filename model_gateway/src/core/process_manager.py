@@ -945,7 +945,10 @@ class ProcessManager:
                         "--type_k", str(type_kv_int),
                         "--type_v", str(type_kv_int),
                     ])
-                cmd.extend(["--n_batch", "512"])
+                batch_sz = 256 if n_ctx >= 32768 else 512
+                cmd.extend(["--n_batch", str(batch_sz), "--n_ubatch", str(batch_sz)])
+                cmd.extend(["--interrupt_requests", "False"])
+                cmd.extend(["--cache", "False"])
 
             if clip_file and os.path.exists(clip_file):
                 cmd.extend(["--clip_model_path", clip_file])

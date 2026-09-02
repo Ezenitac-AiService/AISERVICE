@@ -64,6 +64,7 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(safe_startup_llm())
     asyncio.create_task(safe_startup_aux())
+    asyncio.create_task(llama_manager.start_health_monitor(interval_seconds=3.0))
     yield
     # Cleanup on shutdown
     await app.state.http_client.aclose()
