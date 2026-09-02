@@ -96,9 +96,13 @@ http {
 
         # Canonical Changelog Path
         location = /changelog {
-            root /usr/share/nginx/html;
-            try_files /changelog.html =404;
+            default_type text/html;
+            alias /usr/share/nginx/html/changelog.html;
             add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
+
+        location = /changelog/ {
+            return 301 /changelog;
         }
 
         location = /changelog.html {

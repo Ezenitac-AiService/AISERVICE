@@ -18,12 +18,21 @@ SCHEMA_PATH = CONTRACTS_DIR / "runtime_environment_schema.json"
 TEMPLATE_PATH = ROOT_DIR / "gateway" / "nginx.conf.template"
 OUTPUT_PATH = ROOT_DIR / "gateway" / "nginx.conf"
 
+if str(ROOT_DIR / "bteam") not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR / "bteam"))
+
 
 def load_and_validate_env(custom_env: dict | None = None) -> dict:
     if custom_env is not None:
-        raw_env = custom_env
+        raw_env = dict(custom_env)
     else:
-        raw_env = dict(os.environ)
+        # Load defaults from CoreSettings
+        try:
+            from oliview_core.config import CoreSettings
+            defaults = CoreSettings().model_dump()
+        except Exception:
+            defaults = {}
+        raw_env = {**defaults, **dict(os.environ)}
 
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         schema = json.load(f)

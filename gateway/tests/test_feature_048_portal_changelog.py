@@ -18,3 +18,10 @@ def test_portal_cards_and_changelog_structure_red_gate():
     changelog_content = changelog_html.read_text(encoding="utf-8")
     for milestone in ["chat_a", "chat_b", "model_gateway", "nginx_gateway", "oliview_web", "core", "pilos"]:
         assert milestone in changelog_content, f"RED GATE: changelog.html must include milestone {milestone}"
+
+    nginx_conf = GATEWAY_DIR / "nginx.conf"
+    assert nginx_conf.exists(), "gateway/nginx.conf must exist"
+    nginx_content = nginx_conf.read_text(encoding="utf-8")
+    assert "location = /changelog" in nginx_content, "gateway/nginx.conf must define canonical location = /changelog"
+    assert "changelog.html" in nginx_content, "gateway/nginx.conf must route /changelog to changelog.html"
+
