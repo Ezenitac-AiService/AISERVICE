@@ -105,11 +105,11 @@ Expected: policy-controlled fields are redacted before model transmission, logs 
 
 Use `<script>`, inline event handlers, malformed Markdown and `javascript:` links in model/review/brand/changelog data.
 
-Expected: no script executes; unsafe URLs are rejected; plain text or sanitized allowlisted markup is rendered.
+Expected: no script executes; unsafe URLs are rejected; plain text or sanitized allowlisted markup is rendered. Clickable product cards are created only from structured `product_link` events with parsed Olive Young HTTPS host and `host_validated=true`.
 
 ### Resource controls
 
-Test missing/invalid Settings-injected Bearer credentials, oversized query/output requests, timeouts, per-principal/service rate keys, excessive service concurrency, rate limits and required-setting omission.
+Test missing/invalid Settings-injected Bearer credentials, Secure/HttpOnly/SameSite browser session, session-bound CSRF failures, browser storage secret scans, oversized query/output requests, `min(client, server_cap)` timeout/output rules, Redis atomic per-principal/service rate keys, concurrency lease TTL, PRODUCTION Redis failure and required-setting omission.
 
 Expected: standard bounded error responses and SSE error events; no unbounded model work.
 
@@ -120,7 +120,7 @@ Expected: standard bounded error responses and SSE error events; no unbounded mo
 Validate 360, 375, 390, 414, 768 and 1024 CSS-pixel widths plus representative Kakao/WebKit devices.
 
 - ChatA: `100dvh`, `visualViewport`, `85svh`, chip bar, review dialog and allowlisted Olive Young HTTPS link card.
-- ChatB: mobile drawer, tablet collapsible controls, desktop two-column panel and four-stage pipeline timeline.
+- ChatB: mobile drawer, tablet collapsible controls, desktop two-column panel and actual `pipeline_stage` status/latency-driven four-stage timeline.
 - Portal/changelog: 48px targets, keyboard operation, visible/non-obscured focus, logical DOM order and announced dynamic status.
 - Do not treat CSS declaration presence as proof; exercise the focused input with the virtual keyboard open.
 
@@ -134,6 +134,8 @@ ${BASE_URL}/changelog
 ```
 
 Also verify HTTP-to-HTTPS redirect, invalid authentication and SSE reconnect behavior.
+
+Both ChatA and ChatB Playwright suites must record zero forbidden/unverified DOM mutations. ChatA additionally verifies structured product links; ChatB verifies real `pipeline_stage` transitions rather than static success labels.
 
 ---
 
@@ -158,3 +160,19 @@ T048 creates `verification-report.md` containing:
 - accessibility/browser/DOM zero-flicker matrix;
 - independent container build/up/health/test and network-isolation results;
 - DEMO single-node and PRODUCTION cluster benchmark or `NOT VERIFIED`, plus unresolved risks.
+
+## 8. Static Quality Gate Commands
+
+Run from `C:\AISERVICE` with the approved lockfiles:
+
+```powershell
+uv run --project bteam ruff check bteam/oliview_core bteam/Oliview_chatbot_a/main.py bteam/Oliview_chatbot_b/common.py bteam/Oliview_chatbot_b/project_ragapi.py scripts/render_gateway_config.py
+uv run --project bteam mypy bteam/oliview_core bteam/Oliview_chatbot_a/main.py bteam/Oliview_chatbot_b/common.py bteam/Oliview_chatbot_b/project_ragapi.py scripts/render_gateway_config.py
+npm --prefix quality/frontend ci
+npm --prefix quality/frontend run lint:js
+npm --prefix quality/frontend run typecheck:js
+npm --prefix quality/frontend run lint:html
+npm --prefix quality/frontend run lint:css
+```
+
+`quality/frontend/package.json` scripts must enumerate the ChatA, ChatB and gateway files changed by this feature; an empty target set is a gate failure.

@@ -47,7 +47,9 @@ The API uses `document_score_threshold`; it does not overload `top_p`, which is 
 - System instructions, untrusted context and user input are explicitly delimited.
 - PII and credentials are redacted before model transmission, logging and browser rendering. Exact quote matching may use the protected server-side source, but only `display_quote` and `quote_redacted` cross the response boundary.
 - Generated and retrieved strings use safe DOM sinks by default; allowed Markdown is sanitized.
-- Settings-injected Bearer validation fails closed. Query/output size, timeout, per-principal/service rate key, service concurrency and rate limit are enforced in code and contracts.
+- Direct clients use Settings-injected Bearer validation. Browsers use a Secure/HttpOnly/SameSite opaque session cookie plus session-bound CSRF token; JavaScript storage never receives Bearer or session material.
+- Both flows normalize to a principal. Redis atomic operation/TTL shares principal+service rate and concurrency leases across workers; PRODUCTION Redis failure is fail-closed.
+- Query/output size and timeout use `effective=min(client_request, server_cap)`; errors use discriminated response/SSE contracts.
 
 Primary references:
 
@@ -88,9 +90,16 @@ References:
 
 - JSON contracts use Draft 2020-12 and reject unexpected properties where practical.
 - Request, response, SSE event and structured log contracts are separate.
+- Persona is endpoint-bound and absent from the client request contract. Response status branches are discriminated, product cards use structured allowlisted `product_link` data, and ChatB receives actual `pipeline_stage` status/latency events.
 - Structured logs record correlation ID, service, event, latency, model invocation, abstention and guardrail counters; raw query, review, prompt and tokens are prohibited.
 
 Reference: JSON Schema Draft 2020-12 release notes: <https://json-schema.org/draft/2020-12/release-notes>
+
+### Decision 9: Cross-runtime configuration and frontend quality gates
+
+- `contracts/runtime_environment_schema.json` validates the feature-owned environment subset and is the shared SSOT for Pydantic Settings and Nginx template rendering.
+- `gateway/nginx.conf` is generated from `gateway/nginx.conf.template`; unresolved variables, arbitrary defaults and generated-file drift fail closed.
+- Python uses Ruff/Mypy. Vanilla JavaScript, HTML and CSS use lockfile-based ESLint, TypeScript `checkJs`, html-validate and Stylelint commands from `quality/frontend/`.
 
 ---
 
