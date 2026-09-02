@@ -95,7 +95,7 @@
 ## Phase 5: User Story 5 Portal & Changelog
 
 - [ ] T039 [P][US5] `gateway/html/index.html`의 ChatA/ChatB descriptions와 canonical `/changelog`를 가리키는 Engineering Evolution 2x1 hero card를 구현한다 (T017, FR-014, FR-015).
-- [ ] T040 [P][US5] `gateway/html/changelog.html`에 `chat_a`, `chat_b`, `model_gateway`, `nginx_gateway`, `oliview_web`, `core`, `pilos` 7 milestones와 `all` UI filter를 구현하고 `gateway/nginx.conf`에 exact `/changelog` 정적 제공 및 `/changelog.html` canonical redirect 정책을 추가한다 (T017, FR-015, FR-016, SC-007).
+- [ ] T040 [P][US5] `gateway/html/changelog.html`에 `chat_a`, `chat_b`, `model_gateway`, `nginx_gateway`, `oliview_web`, `core`, `pilos` 7 milestones와 `all` UI filter를 구현하고 `gateway/nginx.conf.template`에 exact `/changelog` 정적 제공 및 `/changelog.html` canonical redirect 정책을 추가한다. T019 renderer로 `gateway/nginx.conf`를 재생성하고 drift가 없음을 확인한다 (T003, T017, T019, FR-015, FR-016, FR-023, SC-007).
 - [ ] T041 [US5] 두 페이지의 dynamic strings를 safe sink로 렌더링하고 keyboard, focus, DOM order, dialog/status semantics, 48px target를 구현한다 (T017, FR-017, FR-020).
 - [ ] T042 [US5] `gateway/tests/test_feature_048_portal_changelog.py`를 Green으로 전환한다 (SC-007, SC-009).
 
@@ -104,7 +104,7 @@
 ## Phase 6: Calibration, Regression, Performance & Live Verification
 
 - [ ] T043 T006 corpus로 `document_score_threshold=0.85`, second score `0.60`, cliff `0.25` 후보를 retrieval/claim precision·recall, groundedness, context utilization, abstention trade-off로 calibration하고 승인값을 Settings/config documentation에 반영한다. Public schema에는 calibration 후보를 `default`로 고정하지 않는다 (FR-007, FR-012, FR-023).
-- [ ] T044 calibration 반영 후 `pytest --collect-only -q`로 baseline을 갱신하고 core, ChatA, ChatB, gateway tests 전체를 실행하여 collected tests 100% PASS를 확인한다. 이어 feature touchpoint에 Ruff와 Mypy를 실행하여 모두 exit code 0인 증거를 보존한다 (SC-008, Constitution 품질 게이트).
+- [ ] T044 calibration 반영 후 `pytest --collect-only -q`로 baseline을 갱신하고 core, ChatA, ChatB, gateway tests 전체를 실행하여 collected tests 100% PASS를 확인한다. Python touchpoint에 Ruff/Mypy를 실행하고, `npm --prefix quality/frontend ci` 후 lockfile 기반 `lint:js`, `typecheck:js`, `lint:html`, `lint:css` scripts로 ChatA/ChatB/gateway JavaScript·HTML·CSS touchpoint를 검사하여 모두 exit code 0인 증거를 보존한다 (SC-008, Constitution 품질 게이트).
 - [ ] T045 T006 corpus를 반복 실행하여 fictional labels, quote mismatch, invalid citations, polarity inversion, prompt injection, PII/XSS와 SC-004 thresholds 결과를 기록한다 (SC-001~SC-005, SC-009).
 - [ ] T046 `tests/test_hardware_concurrency.py`와 T007 workload로 GTX 1070 llama.cpp 및 RTX 2080/3060 single-node candidates를 DEMO/용량 결과로 측정한다. PRODUCTION은 분산 캐시와 2개 이상 model-serving worker GPU cluster에서 동일 workload, routing/failover 및 worker 1개 장애를 측정해 SC-011을 판정하며 topology 미확보 시 `NOT VERIFIED`로 기록하고 승인하지 않는다.
 - [ ] T047 ChatA·ChatB·Model Gateway·Nginx Gateway를 각각 독립 container로 build/up/health/test하고 network isolation 및 Compose/Nginx contract를 검증한다. 이어 환경변수 `BASE_URL`의 HTTPS endpoint에서 Playwright `MutationObserver` zero-flicker, ChatA/ChatB, canonical `/changelog`, HTTP→HTTPS, auth failure, rate limit, SSE reconnect, 360/375/390/414/768/1024px device matrix와 승인된 실제 카카오톡 인앱 브라우저 점검을 수행한다 (SC-002, SC-006, SC-007, FR-021, FR-023, Constitution III).
