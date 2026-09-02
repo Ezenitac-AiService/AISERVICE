@@ -31,6 +31,38 @@
         }
       }
     },
+    "product_links": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "url", "host_validated"],
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://([A-Za-z0-9-]+\\.)*oliveyoung\\.co\\.kr(?:/|$)"
+          },
+          "host_validated": { "const": true }
+        }
+      }
+    },
+    "pipeline_stages": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "status", "latency_ms"],
+        "properties": {
+          "stage": { "type": "string", "enum": ["search", "rerank", "grounding", "synthesis"] },
+          "status": { "type": "string", "enum": ["pending", "running", "completed", "skipped", "failed"] },
+          "latency_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
     "error": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -43,5 +75,41 @@
         "message": { "type": "string", "maxLength": 500 }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "answered" } }, "required": ["status"] },
+      "then": {
+        "required": ["product_links", "pipeline_stages"],
+        "properties": {
+          "answer": { "minLength": 1 },
+          "error": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "abstained" } }, "required": ["status"] },
+      "then": {
+        "required": ["pipeline_stages"],
+        "properties": {
+          "answer": { "minLength": 1 },
+          "citations": { "maxItems": 0 },
+          "product_links": { "maxItems": 0 },
+          "error": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "error" } }, "required": ["status"] },
+      "then": {
+        "required": ["error"],
+        "properties": {
+          "answer": { "maxLength": 0 },
+          "citations": { "maxItems": 0 },
+          "product_links": { "maxItems": 0 },
+          "error": { "type": "object" }
+        }
+      }
+    }
+  ]
 }

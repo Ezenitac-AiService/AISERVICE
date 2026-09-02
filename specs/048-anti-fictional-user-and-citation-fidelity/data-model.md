@@ -19,6 +19,7 @@
 
   PromptPersonaAdapter
    ├── persona: PersonaType (CONCIERGE | ANALYST)
+   ├── source: ServiceIdentity (CHAT_A | CHAT_B, client override 금지)
    ├── get_system_prompt() -> str
    └── format_user_prompt(query, context, registry) -> str
 
@@ -33,6 +34,22 @@
    ├── review_id: str
    ├── display_quote: str (안전한 원문 substring 또는 동일 정책으로 redaction한 표시 문자열)
    └── quote_redacted: bool
+
+  ProductLinkCard
+   ├── label: str
+   ├── url: str (HTTPS, allowlisted Olive Young host)
+   └── host_validated: Literal[True]
+
+  PipelineStageEvent
+   ├── stage: PipelineStage (SEARCH | RERANK | GROUNDING | SYNTHESIS)
+   ├── status: StageStatus (PENDING | RUNNING | COMPLETED | SKIPPED | FAILED)
+   └── latency_ms: int
+
+  AuthPrincipalContext
+   ├── principal_id: str (로그에는 비가역 상관 식별자만 사용)
+   ├── service_id: ServiceIdentity
+   ├── auth_method: AuthMethod (BEARER | BROWSER_SESSION)
+   └── csrf_verified: bool
 
   GroundednessSanitizerResult
    ├── sanitized_text: str
@@ -87,6 +104,7 @@
 - **책임**: 단일 SSOT 프롬프트 모듈(`bteam/oliview_core/prompts.py`)의 공통 integrity base prompt를 공유하고, 2-Track 페르소나별 어조와 텍스트 서식만 조합.
 - **Attributes**:
   - `PersonaType`: `Enum("PersonaType", ["CONCIERGE", "ANALYST"])`
+  - `ServiceIdentity`: ChatA는 `CONCIERGE`, ChatB는 `ANALYST`로 서버에서 고정하며 client payload의 persona override를 허용하지 않음.
 - **Functions**:
   - `build_beauty_system_prompt(persona: PersonaType, k_bound: int) -> str`
   - `build_rag_user_prompt(query: str, context: str, registry: ContextReviewRegistry) -> str`

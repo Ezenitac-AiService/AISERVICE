@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ChatApiRequestContract",
-  "description": "Validated JSON body contract for ChatA and ChatB. Transport policy requires fail-closed Authorization: Bearer validation and settings-injected request correlation, per-principal rate limiting, bounded service concurrency and timeout enforcement.",
+  "description": "Validated JSON body contract for ChatA and ChatB. Persona is bound by the server endpoint and is not client-controlled. Direct clients use Bearer auth; browsers use an HttpOnly session plus CSRF token. Transport policy applies settings-injected caps and shared Redis limits.",
   "type": "object",
   "additionalProperties": false,
   "required": ["query"],
@@ -10,11 +10,6 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 4000
-    },
-    "persona": {
-      "type": "string",
-      "enum": ["CONCIERGE", "ANALYST"],
-      "default": "CONCIERGE"
     },
     "document_score_threshold": {
       "type": "number",
@@ -47,13 +42,13 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 4096,
-      "default": 1024
+      "description": "Optional client request. effective_max_output_tokens = min(client value, Settings server cap)."
     },
     "timeout_ms": {
       "type": "integer",
       "minimum": 1000,
       "maximum": 30000,
-      "default": 20000
+      "description": "Optional client request. effective_timeout_ms = min(client value, Settings server cap)."
     },
     "request_id": {
       "type": "string",

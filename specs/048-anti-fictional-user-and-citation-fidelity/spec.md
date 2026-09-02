@@ -184,13 +184,13 @@
 
 #### [ChatA: 올리뷰 컨시어지 (C-End & Mobile-First)]
 - **FR-008**: ChatA는 `PersonaType.CONCIERGE` 프롬프트 어댑터를 사용하여 일반 소비자를 위한 친절·공감 뷰티 쇼핑 큐레이션 답변을 생성해야 한다.
-- **FR-009**: ChatA UI는 카카오톡/스마트폰 접속에 대응하여 전체 레이아웃 `height: 100dvh`, `visualViewport` 기반 가상 키보드 방어, 입력창 상단 **하단 40% 썸존 스와이프 칩바**, 인용 터치 시 `max-height: 85svh` **리뷰 원문 바텀시트**, 우측 페이드 그라데이션 스크롤 인디케이터가 적용된 가로 스크롤 테이블 래퍼를 제공해야 한다. 제품 링크 카드는 서버가 검증한 올리브영 HTTPS 허용 도메인 URL만 클릭 가능하게 렌더링하고 그 외 URL은 비활성 텍스트로 표시해야 한다.
+- **FR-009**: ChatA UI는 카카오톡/스마트폰 접속에 대응하여 전체 레이아웃 `height: 100dvh`, `visualViewport` 기반 가상 키보드 방어, 입력창 상단 **하단 40% 썸존 스와이프 칩바**, 인용 터치 시 `max-height: 85svh` **리뷰 원문 바텀시트**, 우측 페이드 그라데이션 스크롤 인디케이터가 적용된 가로 스크롤 테이블 래퍼를 제공해야 한다. 제품 링크 카드는 응답/SSE 계약의 구조화된 `product_links[]`만 사용하고, 서버가 URL parser로 검증한 올리브영 HTTPS 허용 호스트의 `url`, 표시용 `label`, `host_validated=true`가 모두 존재할 때만 클릭 가능하게 렌더링하며 그 외 URL은 비활성 텍스트로 표시해야 한다.
 
 #### [ChatB: 올리뷰 애널리스트 (B-End / Pro & Adaptive Dashboard)]
-- **FR-010**: ChatB는 `PersonaType.ANALYST` 프롬프트 어댑터를 사용하여 전문적이고 객관적인 데이터 분석 리포트를 생성해야 하며, 레거시 `NO_THINK_SYSTEM_PROMPT`(IT 어시스턴트)를 전면 제거해야 한다.
+- **FR-010**: ChatB는 서버가 endpoint/service identity로 고정한 `PersonaType.ANALYST` 프롬프트 어댑터를 사용하여 전문적이고 객관적인 데이터 분석 리포트를 생성해야 하며, 레거시 `NO_THINK_SYSTEM_PROMPT`(IT 어시스턴트)를 전면 제거해야 한다. 클라이언트는 persona를 지정하거나 변경할 수 없어야 한다.
 - **FR-011**: ChatB UI는 모바일(<768px)에서 '⚙️ 분석 파라미터' 바텀 드로어, tablet(768px~1023px)에서 단일 열과 접을 수 있는 분석 제어 영역, 데스크탑(≥1024px)에서 2열 고정 패널을 제공해야 한다.
 - **FR-012**: ChatB UI는 레거시 Top-K 입력을 Document Score Threshold(초기 후보 `0.85`), Score Cliff Delta(초기 후보 `0.25`), 최대 선별 리뷰 수 제어로 교체하고, API 필드명은 생성 샘플링 `top_p`와 충돌하지 않는 `document_score_threshold`를 사용하며 DB(`v_active_rag_catalog`)의 실시간 유효 브랜드를 동적 로드해야 한다.
-- **FR-013**: ChatB UI는 검색·재정렬·근거 검증·답변 합성의 4단계 파이프라인 타임라인과 BGE-Reranker 점수 분포를 모바일/데스크탑 친화적 막대 그래프(Progress Bar) 및 채택/탈락 뱃지로 시각화해야 한다.
+- **FR-013**: ChatB UI는 응답 계약의 `pipeline_stages[]`와 SSE `pipeline_stage` 이벤트를 사용하여 검색·재정렬·근거 검증·답변 합성의 4단계별 `stage`, `status`, `latency_ms`를 실제 실행 상태로 표시해야 한다. BGE-Reranker 점수 분포는 모바일/데스크탑 친화적 막대 그래프(Progress Bar) 및 채택/탈락 뱃지로 시각화해야 하며 정적 성공 상태를 위조해서는 안 된다.
 
 #### [Main Portal & 전용 이력 페이지]
 - **FR-014**: 메인 포털(`gateway/html/index.html`)의 서비스 카드를 업데이트하여, ChatA(올리뷰 컨시어지)와 ChatB(올리뷰 애널리스트)의 차별화된 2-Track 성격을 명확히 반영해야 한다.
@@ -202,9 +202,9 @@
 - **FR-018**: 검색 리뷰와 사용자 입력을 비신뢰 데이터로 구분하고, 시스템 지시와 명확히 격리하며 직접·간접 prompt injection 및 다국어·난독화 공격에 대한 입력·출력 검증과 adversarial 테스트를 수행해야 한다.
 - **FR-019**: 사용자 질의, 실제 리뷰, 로그 및 외부 모델 전송 데이터에서 정책상 민감정보와 인증정보를 탐지·마스킹하고 원문이 로그에 남지 않음을 검증해야 한다. 직접 인용은 FR-003의 서버 내부 exact-match 후 redacted `display_quote` 전송 규칙을 따라야 한다.
 - **FR-020**: LLM·리뷰·브랜드·changelog의 비신뢰 문자열은 안전한 DOM sink 또는 허용목록 기반 sanitizer를 통해 렌더링하고, inline script/event handler 실행을 금지해야 한다.
-- **FR-021**: Chat API는 `Authorization: Bearer` 인증을 강제하고, validator와 credential은 환경 설정으로 주입하며 누락·오류 credential은 fail-closed `401`로 처리해야 한다. rate key는 인증된 principal과 service 조합으로 계산하고, query/input token, output token, timeout, per-principal rate limit, service-wide concurrency 한계는 모두 양의 유한값으로 설정 SSOT에서 주입해야 한다. 초과·timeout·인증 실패는 표준 오류 응답 및 SSE 이벤트 계약으로 일관되게 반환해야 한다.
+- **FR-021**: Chat API의 machine-to-machine/direct client는 `Authorization: Bearer` 인증을 사용하고 validator와 credential reference를 환경 설정으로 주입해야 한다. 브라우저는 JavaScript가 읽을 수 없는 `Secure; HttpOnly; SameSite=Lax` opaque session cookie와 요청별 CSRF token을 사용하며, 서버가 이를 동일한 `principal`로 변환해야 한다. 정적 Bearer secret을 HTML/JavaScript/localStorage/sessionStorage에 노출해서는 안 된다. 인증정보 누락·오류 및 CSRF 실패는 fail-closed `401/403`으로 처리한다. rate key는 `principal + service`이며 Redis의 atomic operation과 TTL을 사용해 모든 worker가 공유하고 Redis 장애 시 PRODUCTION은 fail-closed `503`을 반환해야 한다. query/input token, output token, timeout, per-principal rate limit, service-wide concurrency 한계는 설정 SSOT에서 주입하고, 선택적 client request 값의 실효값은 `min(client_request, server_cap)`으로 계산해야 한다. 초과·timeout·인증 실패는 판별형 표준 오류 응답 및 SSE 이벤트 계약으로 일관되게 반환해야 한다.
 - **FR-022**: 서비스 간 호출, latency, 오류, 모델 호출 여부, 기권 및 guardrail 결과를 correlation ID가 포함된 구조화 로그로 기록하되 민감 원문은 기록하지 않아야 한다.
-- **FR-023**: 포트·내부 URL·healthcheck·운영 모드·외부 vLLM 연동·검색 후보값·API token/rate/concurrency/timeout 한계·DEMO/PRODUCTION SLA 임계치는 `bteam/oliview_core/config.py`의 환경변수 기반 SSOT만 사용해야 한다. 외부 연동은 기본 비활성화하고, 필수 설정 누락은 fail-closed 처리하며, 셀프 루프백과 포트 충돌을 차단해야 한다.
+- **FR-023**: 포트·내부 URL·healthcheck·운영 모드·외부 vLLM 연동·검색 후보값·인증/session/Redis·API token/rate/concurrency/timeout 한계·DEMO/PRODUCTION SLA 임계치는 공통 `specs/048-anti-fictional-user-and-citation-fidelity/contracts/runtime_environment_schema.json`과 검증된 환경변수를 SSOT로 사용해야 한다. `bteam/oliview_core/config.py`는 같은 스키마의 Python consumer이고, `gateway/nginx.conf`는 `gateway/nginx.conf.template`을 `scripts/render_gateway_config.py`가 동일 환경에서 fail-closed로 렌더링한 산출물이어야 한다. 생성 산출물 직접 편집과 임의 기본값은 금지한다. 외부 연동은 기본 비활성화하고 필수 설정 누락, 미해결 template 변수, 셀프 루프백 및 포트 충돌을 차단해야 한다.
 
 ---
 
@@ -212,7 +212,10 @@
 
 - **ContextReviewRegistry**: 해당 질의에 대해 Document Score Threshold를 통과하여 `<context>`에 주입된 실제 유효 리뷰 목록 ($K$건) 및 유효 인용 태그 인덱스 매핑 테이블.
 - **StreamingTokenInterceptor**: 호환성을 위해 기존 이름을 유지하지만 UTF-8로 디코딩된 SSE 텍스트 chunk를 입력으로 받고, 금지 패턴의 최대 접두어 길이에 기반한 동적 carry buffer로 경계 분할을 방어하는 실시간 필터.
-- **PromptPersonaAdapter**: 요청 파라미터(`persona`)에 따라 `CONCIERGE`(ChatA)와 `ANALYST`(ChatB)의 어조 및 리포트 서식을 동적 전환하는 프롬프트 어댑터.
+- **PromptPersonaAdapter**: 클라이언트 입력이 아니라 서버 endpoint/service identity에 따라 `CONCIERGE`(ChatA)와 `ANALYST`(ChatB)의 어조 및 리포트 서식을 고정하는 프롬프트 어댑터.
+- **ProductLinkCard**: 서버가 URL parser로 scheme/host를 검증한 `label`, `url`, `host_validated` 구조이며 response/SSE에서만 UI로 전달되는 제품 링크 카드.
+- **PipelineStageEvent**: `search`, `rerank`, `grounding`, `synthesis` 단계의 실제 `status`와 `latency_ms`를 response/SSE에 전달하는 관측 이벤트.
+- **AuthPrincipalContext**: Bearer 또는 HttpOnly session/CSRF 검증 결과를 공통 `principal_id`, `service_id`로 정규화하고 Redis limiter key에 결속하는 서버 내부 인증 컨텍스트.
 - **GroundednessSanitizerResult**: 가상 사용자 라벨 소거, 초과 인용 태그 정제, 사실 정합성 검증 결과를 담는 방어 객체.
 - **ChangelogMilestoneEntry**: 전용 이력 페이지에 표시되는 마일스톤 버전(`version`), 서브시스템 뱃지(`subsystem`), 라이프사이클 상태(`stage`: Beta / Alpha), 릴리즈 일자(`date`: ISO `YYYY-MM-DD`), 주요 변경 요약 목록(`highlights`) 엔티티.
 
@@ -223,14 +226,14 @@
 ### Measurable Outcomes
 
 - **SC-001**: 버전 고정 평가 코퍼스와 adversarial corpus에서 ChatA 및 ChatB 최종 답변의 가상 인물 라벨 및 원문 불일치 직접 인용 노출 건수 **0건**.
-- **SC-002**: 모든 문자/SSE 경계 분할 fixture를 Playwright 브라우저에서 반복 재생할 때, 응답 컨테이너의 `MutationObserver` 기록과 최종 DOM에 가상 인물 라벨 또는 검증 전 partial text가 삽입된 횟수 **0건**.
+- **SC-002**: ChatA와 ChatB 각각에서 모든 문자/SSE 경계 분할 fixture를 Playwright 브라우저로 반복 재생할 때, 응답 컨테이너의 `MutationObserver` 기록과 최종 DOM에 가상 인물 라벨 또는 검증 전 partial text가 삽입된 횟수 **0건**.
 - **SC-003**: 실제 리뷰 개수 $K$건 환경에서 $N > K$ 또는 $N < 1$인 무효 인용 태그(`[리뷰 2]` ~ `[리뷰 6]`, `[리뷰 0]` 등) 발생률 **0.0%**.
 - **SC-004**: 버전 고정 긍정·부정·혼합 극성 평가셋의 모든 반복에서 명백한 극성 반전 오류 **0건**, 근거가 필요한 factual claim의 claim-evidence precision **1.00**, 관련 근거가 존재하는 케이스의 context utilization **0.90 이상**을 달성해야 한다.
 - **SC-005**: ChatB 스트리밍 시 IT 어시스턴트 프롬프트 누출 0건, $K=0$ 제로 서치 모델 호출 0회 및 Document Score Threshold 파라미터 제어 정상 연동 **100%**.
 - **SC-006**: 360·375·390·414px 모바일 및 768·1024px 경계 viewport의 자동 브라우저 테스트와 승인된 실제 카카오톡 인앱 브라우저 점검에서 `100dvh` 가림 없는 레이아웃, `visualViewport` 키보드 방어, `85svh` 바텀시트, 썸존 칩바/바텀 드로어 및 링크 카드의 기대 케이스가 **100% 통과**해야 한다.
 - **SC-007**: 메인 포털(`index.html`) 2x1 벤또 카드 렌더링, canonical URL `/changelog` 이동, `changelog.html` 정적 자산 제공 및 서브시스템 탭 필터링 기대 케이스가 **100% 통과**해야 한다.
-- **SC-008**: `bteam/oliview_core/tests/`, `bteam/Oliview_chatbot_a/tests/`, `bteam/Oliview_chatbot_b/tests/` 및 `gateway/tests/` 전체 회귀 테스트 통과율 **100% PASS**이고 feature touchpoint의 Ruff와 Mypy가 exit code 0이어야 한다.
-- **SC-009**: prompt injection, PII, XSS, 비정상 입력 크기, SSE 경계 분할로 구성된 고정 보안 코퍼스의 차단 기대 케이스가 모두 통과하고 원문 비밀정보가 응답·로그에 노출되지 않아야 한다.
+- **SC-008**: `bteam/oliview_core/tests/`, `bteam/Oliview_chatbot_a/tests/`, `bteam/Oliview_chatbot_b/tests/` 및 `gateway/tests/` 전체 회귀 테스트 통과율 **100% PASS**여야 한다. Python touchpoint의 Ruff/Mypy와 JavaScript·HTML·CSS touchpoint의 ESLint, TypeScript `checkJs`, html-validate 및 Stylelint는 lockfile 기반 명령으로 모두 exit code 0이어야 한다.
+- **SC-009**: prompt injection, PII, XSS, 비정상 입력 크기, SSE 경계 분할, Bearer/session/CSRF 실패, Redis 원자적 rate limit과 PRODUCTION fail-closed로 구성된 고정 보안 코퍼스의 차단 기대 케이스가 모두 통과하고 원문 비밀정보가 응답·로그·브라우저 저장소에 노출되지 않아야 한다.
 - **SC-010**: 모든 ChatA/ChatB 요청에서 correlation ID, service, latency, model invocation, abstention, guardrail 결과가 구조화 로그로 남고 금지 필드·민감 원문 노출 건수는 0건이어야 한다.
 - **SC-011**: 하드웨어 benchmark는 모델 해시·양자화·context pool·slot·prompt/output 길이·GPU·driver·서버 버전·cache/cluster topology를 고정해 재현할 수 있어야 한다. DEMO 단일 노드 후보는 제로 서치 3초 및 일반 RAG 20초 상한을 충족해야 한다. PRODUCTION 승인은 분산 캐시와 2개 이상 model-serving worker의 GPU cluster topology에서 4-slot workload 기준 P95 TTFT 1.5초 이하, P95 전체 응답 8초 이하, aggregate throughput 25 tokens/s 이상, OOM 0건 및 worker 1개 장애 시 안전한 기권/재시도 정책을 충족한 경우에만 부여한다. 해당 topology를 검증할 수 없으면 결과를 `NOT VERIFIED`로 기록하고 단일 GPU를 PRODUCTION 승인으로 대체하지 않는다.
 

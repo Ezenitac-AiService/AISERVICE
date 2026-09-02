@@ -6,6 +6,8 @@
     { "$ref": "#/$defs/startEvent" },
     { "$ref": "#/$defs/deltaEvent" },
     { "$ref": "#/$defs/citationEvent" },
+    { "$ref": "#/$defs/productLinkEvent" },
+    { "$ref": "#/$defs/pipelineStageEvent" },
     { "$ref": "#/$defs/abstentionEvent" },
     { "$ref": "#/$defs/doneEvent" },
     { "$ref": "#/$defs/errorEvent" }
@@ -73,6 +75,52 @@
               "description": "Exact source substring when safe, otherwise the server-side exact-matched substring after the shared redaction policy."
             },
             "quote_redacted": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "productLinkEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "product_link" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["label", "url", "host_validated"],
+          "properties": {
+            "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://([A-Za-z0-9-]+\\.)*oliveyoung\\.co\\.kr(?:/|$)"
+            },
+            "host_validated": { "const": true }
+          }
+        }
+      }
+    },
+    "pipelineStageEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "pipeline_stage" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stage", "status", "latency_ms"],
+          "properties": {
+            "stage": { "type": "string", "enum": ["search", "rerank", "grounding", "synthesis"] },
+            "status": { "type": "string", "enum": ["pending", "running", "completed", "skipped", "failed"] },
+            "latency_ms": { "type": "integer", "minimum": 0 }
           }
         }
       }
