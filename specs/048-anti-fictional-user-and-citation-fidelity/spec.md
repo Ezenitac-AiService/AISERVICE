@@ -17,14 +17,14 @@
   → **A**: **3단계 다중 방어 아키텍처 + 스트림 경계 안전 인터셉터 채택**. (1) 프롬프트 제약(가상 페르소나 금지 & $K$건 상한 명시) + (2) 컨텍스트 유효 인용 태그 레지스트리 바인딩 + (3) `synthesis_node.py`에서 UTF-8로 디코딩된 SSE 텍스트 조각을 검사하고, 등록된 금지 패턴의 최대 접두어 길이 이상을 미방출 상태로 유지하는 동적 carry buffer와 배치 `GroundednessSanitizer` 검증. 모델 토큰 수나 SSE 이벤트 경계를 보안 경계로 간주하지 않는다.
 - **Q2 (사실 감성 극성 일치 및 제로 서치 기권)**: 수집된 리뷰가 소수(1~2건)이면서 부정·의구심(예: '진정 효과 좋은지 모르겠어요') 피드백일 때, 요약표 및 답변 결론의 감성 극성을 어떻게 처리할까요?
   → **A**: **사실 감성 극성 일치(Fact Polarity Alignment)**. 긍정으로 왜곡하지 않고 "실제 수집된 리뷰에서 진정 효과에 대한 체감이 부족하다는 의견이 확인되었습니다"와 같이 솔직한 피드백으로 분류하고, 요약표에도 과장 없는 객관적 평을 반영. $K=0$인 경우 모델 호출 없이 즉각 하드 기권(Abstention) 카드로 안내.
-- **Q3 (2단계 Document Top-P 연동 & 컨텍스트 고갈 방어)**: Document Top-P로 선별된 유효 리뷰 개수($K$)를 프롬프트 및 검증에 어떻게 연계할 것인가?
+- **Q3 (Document Score Threshold 연동 & 컨텍스트 고갈 방어)**: Document Score Threshold로 선별된 유효 리뷰 개수($K$)를 프롬프트 및 검증에 어떻게 연계할 것인가?
   → **A**: 컨텍스트에 엄선된 $K$건의 인용 태그 목록(`[제품명 리뷰 1]` ~ `[제품명 리뷰 K]`)을 명시하고, $K=1$인 경우 복수 사용자 일반화 서술을 방지하는 **적응형 프롬프트(Adaptive Prompting)**를 적용. `0.60` 절대 점수와 `0.25` 절벽 차이는 초기 후보 기본값이며, 고정 평가 코퍼스의 검색 정밀도·재현율·근거 충실도 결과로 보정한 뒤 운영 기본값으로 승인한다.
 - **Q4 (프롬프트 SSOT 일원화)**: ChatA와 ChatB에 산재된 하드코딩 프롬프트(ChatB의 레거시 IT 어시스턴트 포함)를 어떻게 통합 관리할 것인가?
-  → **A**: `bteam/oliview_core/prompts.py`를 단일 진실 공급원(SSOT)으로 신설하여 ChatA와 ChatB가 100% 동일한 무환각 뷰티 프롬프트 모듈을 호출하도록 일원화.
+  → **A**: `bteam/oliview_core/prompts.py`를 단일 진실 공급원(SSOT)으로 신설한다. ChatA와 ChatB는 동일한 integrity base prompt와 무환각 규칙을 사용하되, 출력 어조와 보고서 형식만 `PersonaType.CONCIERGE/ANALYST` 어댑터 계층에서 분리한다.
 - **Q5 (ChatA vs ChatB 2-Track 차별화 전략)**: 코어는 통합하되 두 챗봇의 성격과 UI를 어떻게 차별화할 것인가?
   → **A**: **2-Track 차별화 전략 확정**.
   - **ChatA (올리뷰 컨시어지 - C-End)**: 일반 소비자용 친절·공감 뷰티 쇼핑 큐레이터 (모바일 퍼스트 1열 채팅, 썸존 스와이프 칩바, 뷰티 케어 루틴 제안).
-  - **ChatB (올리뷰 애널리스트 - B-End/Pro)**: 올리브영 MD/기획자용 객관적 데이터 분석관 (모바일 드로어/데스크탑 2열 프로 대시보드, 동적 브랜드/감성 필터, Document Top-P 제어 슬라이더, BGE-Reranker 점수 분포 및 파이프라인 관측성 시각화).
+  - **ChatB (올리뷰 애널리스트 - B-End/Pro)**: 올리브영 MD/기획자용 객관적 데이터 분석관 (모바일 드로어/데스크탑 2열 프로 대시보드, 동적 브랜드/감성 필터, Document Score Threshold 제어 슬라이더, BGE-Reranker 점수 분포 및 파이프라인 관측성 시각화).
 - **Q6 (2026 UI/UX & 모바일 카카오톡 최적화)**: 접속 트래픽의 대다수를 차지하는 스마트폰/카카오톡 환경을 어떻게 지원할 것인가?
   → **A**: **하이브리드 뷰포트(`100dvh` 레이아웃 + `85svh` 바텀시트), `visualViewport` 가상 키보드 방어, 하단 40% 썸존(Thumb Zone) 액션바, 테이블 우측 그라데이션 페이드 스크롤 인디케이터**를 전면 적용.
 - **Q7 (서브시스템 라이프사이클 분화 - Alpha vs Beta)**: 시스템 구성 요소별 성숙도를 어떻게 구분하여 반영할 것인가?
@@ -35,7 +35,7 @@
     - **`Oliview Web`**: `v0.8.0-beta` 🏆 (B-Team 5.7만 건 리뷰 속성 통계 및 React/Flask 풀스택 대시보드)
     - **`Core/Gateway`**: `v0.7.0-alpha` 🌱 (3단계 무환각 방어, SSOT 프롬프트 레지스트리 구축)
     - **`ChatA`**: `v0.5.2-alpha` 🌱 (올리뷰 컨시어지: 썸존 스와이프 칩바 & 모바일 100dvh 바텀시트)
-    - **`ChatB`**: `v0.4.1-alpha` 🌱 (올리뷰 애널리스트: 2열 프로 RAG 관측 대시보드 & Document Top-P 제어)
+    - **`ChatB`**: `v0.4.1-alpha` 🌱 (올리뷰 애널리스트: 2열 프로 RAG 관측 대시보드 & Document Score Threshold 제어)
 - **Q8 (메인 포털 2x1 히어로 벤또 카드 & 전용 이력 페이지)**: 릴리즈 히스토리를 메인 화면에 어떻게 배치할 것인가?
   → **A**: **메인 포털 2x1 와이드 히어로 벤또 카드 ➔ 전용 이력 페이지(`gateway/html/changelog.html`) 링크 구조 확정**. 메인 포털에는 Liquid Glass 스타일의 2x1 히어로 벤또 위젯을 배치하고, 전용 페이지에서 서브시스템별 탭 필터링 및 7대 마일스톤 상세 엔지니어링 카드를 제공.
 - **Q9 (64K/32K 컨텍스트 및 4슬롯 Continuous Batching VRAM 수용성)**: GTX 1070 8GB VRAM에서 다중 슬롯 동시 요청 처리가 가능한가?
@@ -68,13 +68,13 @@
 
 [결함 4. ChatB 프롬프트 분절 및 레거시 UI 불일치]
  ➔ ChatB 스트리밍 시 "당신은 IT 및 AI 기술 전문 어시스턴트입니다"라는 레거시 프롬프트 누출
- ➔ ChatB UI에 2026 Document Top-P와 불일치하는 레거시 Top-K(fetch_k=20, top_n=3) 슬라이더 잔존
+ ➔ ChatB UI에 Document Score Threshold 방식과 불일치하는 레거시 Top-K(fetch_k=20, top_n=3) 슬라이더 잔존
 
 [결함 5. 모바일/카카오톡 인앱 환경 UX 미흡]
  ➔ 스마트폰/카카오톡 접속 시 상하단 툴바 및 가상 키보드 가림 현상, 한 손 조작 썸존 칩 부재
 ```
 
-이는 대한민국 헌법 제6조(100% 무환각 및 실존 리뷰 인라인 인용 결속 절대 원칙) 및 Spec 038/039의 가상 사용자(사용자 A/B/C) 발생률 0.0% 원칙을 정면으로 위반하는 치명적인 신뢰성 결함입니다.
+이는 프로젝트 헌법 Principle VI(100% 무환각 및 실존 리뷰 인라인 인용 결속 절대 원칙) 및 Spec 038/039의 가상 사용자(사용자 A/B/C) 발생률 0.0% 원칙을 정면으로 위반하는 치명적인 신뢰성 결함입니다.
 
 ---
 
@@ -91,7 +91,7 @@
 
 **Acceptance Scenarios**:
 1. **Given** 실제 리뷰가 제공되었을 때, **When** LLM이 분석 답변을 생성하면, **Then** 가상 사용자 라벨('사용자 A/B/C' 등)을 사용하지 않고 속성별/문맥별 사실 요약 문장으로만 답변을 구성해야 한다.
-2. **Given** 리뷰 텍스트에 없는 주장을 작성하려 할 때, **When** Groundedness 가드레일 및 스트리밍 토큰 인터셉터가 감지하면, **Then** 허위 날조 문장을 즉각 차단 및 정제해야 한다.
+2. **Given** 답변이 직접 인용, 인용 태그, 감성 극성 또는 명시적 claim-evidence 정책을 위반할 때, **When** Groundedness 가드레일과 평가 가능한 claim validator가 감지하면, **Then** 해당 주장을 제거하거나 검증된 객관적 요약으로 대체하고 검증에 실패하면 기권해야 한다.
 
 ---
 
@@ -112,12 +112,12 @@
 
 ### User Story 3 - SSOT 프롬프트 레지스트리 및 스트리밍 토큰 인터셉터 (Priority: P2)
 
-프롬프트 지침뿐만 아니라 `bteam/oliview_core/prompts.py`를 신설하여 ChatA와 ChatB의 시스템 프롬프트를 완전 일원화하고, SSE 스트리밍 도중 가상 인물 라벨이 찰나에 노출되는 현상을 슬라이딩 윈도우 토큰 인터셉터로 원천 차단해야 한다.
+프롬프트 지침뿐만 아니라 `bteam/oliview_core/prompts.py`를 신설하여 ChatA와 ChatB의 시스템 프롬프트를 완전 일원화하고, SSE 스트리밍 도중 가상 인물 라벨이 찰나에 노출되는 현상을 UTF-8/SSE 경계 안전 carry buffer 인터셉터로 차단해야 한다.
 
 **Why this priority**: 소형 모델(Qwen 2B)의 경우 프롬프트만으로는 환각을 100% 억제하기 어려우므로 스트리밍 토큰 버퍼와 결정론적 가드레일 방어선이 필수적이다.
 
 **Independent Test**:
-- 모델이 스트리밍 중 '사용자 A: "..."' 토큰을 방출하려 할 때, 슬라이딩 윈도우 인터셉터가 이를 감지하여 브라우저에 단 1프레임의 깜빡임도 없이 정제된 텍스트만 전송하는지 검증.
+- 모델이 스트리밍 중 '사용자 A: "..."' 문자열을 방출하려 할 때, UTF-8 경계 안전 동적 carry buffer 인터셉터가 이를 감지하여 브라우저 DOM mutation 기록에 금지 문자열이 단 한 번도 삽입되지 않고 정제된 텍스트만 표시되는지 검증.
 - ChatB 스트리밍 질의 시 `NO_THINK_SYSTEM_PROMPT`(IT 어시스턴트) 프롬프트가 주입되지 않고 `prompts.py`의 뷰티 시스템 프롬프트가 정상 동작하는지 검증.
 
 **Acceptance Scenarios**:
@@ -128,7 +128,7 @@
 
 ### User Story 4 - ChatA vs ChatB 2-Track 페르소나 및 2026 모바일 반응형 UX (Priority: P2)
 
-소비자는 **ChatA(올리뷰 컨시어지)**를 통해 카카오톡/모바일에서 썸존 퀵 칩바와 바텀시트로 빠르고 친절한 쇼핑 큐레이션을 제공받고, 화장품 MD 및 데이터 전문가는 **ChatB(올리뷰 애널리스트)**를 통해 모바일 바텀 드로어 및 데스크탑 2열 대시보드에서 동적 브랜드/감성 필터와 Document Top-P 파라미터를 정밀 제어하며 BGE-Reranker 점수 분포 및 파이프라인 관측 데이터를 심층 분석할 수 있어야 한다.
+소비자는 **ChatA(올리뷰 컨시어지)**를 통해 카카오톡/모바일에서 썸존 퀵 칩바와 바텀시트로 빠르고 친절한 쇼핑 큐레이션을 제공받고, 화장품 MD 및 데이터 전문가는 **ChatB(올리뷰 애널리스트)**를 통해 모바일 바텀 드로어 및 데스크탑 2열 대시보드에서 동적 브랜드/감성 필터와 Document Score Threshold 파라미터를 정밀 제어하며 BGE-Reranker 점수 분포 및 파이프라인 관측 데이터를 심층 분석할 수 있어야 한다.
 
 **Why this priority**: 공통의 강력한 RAG 코어를 활용하면서도, 일반 소비자와 전문 분석가라는 명확히 다른 타겟 고객에게 스마트폰 최적화 UX를 제공하기 위함이다.
 
@@ -137,13 +137,13 @@
 
 **Acceptance Scenarios**:
 1. **Given** ChatA를 이용하는 모바일 고객은, **When** 질문을 입력하거나 썸존 칩을 탭하면, **Then** 가상 키보드에 가려지지 않는 `100dvh` 화면에서 친절한 뷰티 팁과 클릭 가능한 올리브영 링크 카드를 수신해야 한다.
-2. **Given** ChatB를 이용하는 데이터 분석가는, **When** 모바일 바텀 드로어에서 Top-P 임계치를 조정하여 분석을 요청하면, **Then** 4단계 파이프라인 타임라인과 BGE-Reranker 점수 분포 막대 그래프 보고서를 수신해야 한다.
+2. **Given** ChatB를 이용하는 데이터 분석가는, **When** 모바일 바텀 드로어에서 Document Score Threshold를 조정하여 분석을 요청하면, **Then** 4단계 파이프라인 타임라인과 BGE-Reranker 점수 분포 막대 그래프 보고서를 수신해야 한다.
 
 ---
 
 ### User Story 5 - 메인 포털 2x1 히어로 벤또 카드 및 전용 이력 페이지(changelog.html) (Priority: P2)
 
-통합 AI 서비스 포털(`gateway/html/index.html`)을 방문한 사용자는 **ChatA(올리뷰 컨시어지)와 ChatB(올리뷰 애널리스트)의 명확히 차별화된 성격과 역할을 카드를 통해 한눈에 파악**하고, 하단에 배치된 **2x1 와이드 히어로 벤또 카드**를 탭하여 **전용 이력 페이지(`gateway/html/changelog.html`)**로 이동해 서브시스템별 탭 필터(전체, ChatA, ChatB, Model Gateway, PILOS) 및 Beta 🏆 / Alpha 🌱 라이프사이클 뱃지가 적용된 7대 마일스톤 엔지니어링 카드를 투명하게 열람할 수 있어야 한다.
+통합 AI 서비스 포털(`gateway/html/index.html`)을 방문한 사용자는 **ChatA(올리뷰 컨시어지)와 ChatB(올리뷰 애널리스트)의 명확히 차별화된 성격과 역할을 카드를 통해 한눈에 파악**하고, 하단에 배치된 **2x1 와이드 히어로 벤또 카드**를 탭하여 **전용 이력 페이지(`gateway/html/changelog.html`)**로 이동해 서브시스템별 탭 필터(전체, ChatA, ChatB, Model Gateway, Nginx Gateway, Oliview Web, Core, PILOS) 및 Beta 🏆 / Alpha 🌱 라이프사이클 뱃지가 적용된 7대 마일스톤 엔지니어링 카드를 투명하게 열람할 수 있어야 한다.
 
 **Why this priority**: 포털은 간결하고 직관적인 서비스 진입을 유지하면서도, 엔지니어링 신뢰성을 대변하는 컴포넌트별 진화 이력을 전용 페이지에서 풍부하고 체계적으로 제공하기 위함이다.
 
@@ -152,7 +152,7 @@
 
 **Acceptance Scenarios**:
 1. **Given** 메인 포털 접속 시, **When** 서비스 그리드를 조회하면, **Then** ChatA와 ChatB가 'FastAPI 컨시어지' 및 'RAG 애널리스트'로 올바르게 소개되고 하단에 Liquid Glass 2x1 벤또 카드가 노출되어야 한다.
-2. **Given** 벤또 카드를 탭하여 `changelog.html`에 진입 시, **When** 상단 탭을 전환하면, **Then** 선택된 서브시스템(ChatA, ChatB, Model Gateway, PILOS)의 버전 및 변경 내역 카드만 실시간 필터링되어야 한다.
+2. **Given** 벤또 카드를 탭하여 `changelog.html`에 진입 시, **When** 상단 탭을 전환하면, **Then** 선택된 서브시스템(ChatA, ChatB, Model Gateway, Nginx Gateway, Oliview Web, Core, PILOS)의 버전 및 변경 내역 카드만 실시간 필터링되어야 한다.
 
 ---
 
@@ -162,7 +162,7 @@
 - $K=1$, $K=K_{max}$, 중복 리뷰, 빈 리뷰, 비정상 인용 번호(`[리뷰 0]`, 음수 표현, 매우 큰 정수), 손상된 인용 구문을 검증한다.
 - 금지 라벨과 인용 태그가 UTF-8 문자, 모델 토큰 또는 SSE 이벤트 경계에서 임의로 분할되어도 안전한 문자열만 방출한다.
 - 검색 리뷰에 시스템 지시 무시, 데이터 유출, 링크 실행 등을 요구하는 직접·간접 prompt injection이 포함되어도 데이터로만 취급한다.
-- 리뷰와 질의에 이름, 전화번호, 이메일, 주문번호, 인증정보가 포함되면 모델·로그·브라우저 출력 전에 정책에 따라 마스킹한다.
+- 리뷰와 질의에 이름, 전화번호, 이메일, 주문번호, 인증정보가 포함되면 모델·로그·브라우저 출력 전에 정책에 따라 마스킹한다. 직접 인용의 exact-match는 서버 내부의 비마스킹 원문으로 먼저 검증하되, 민감정보가 포함된 원문 substring은 외부로 전송하지 않고 동일 정책으로 생성한 `display_quote`만 표시하며 안전한 문맥 보존이 불가능하면 직접 인용을 생략하고 검증된 요약 또는 기권을 반환한다.
 - LLM/리뷰/브랜드 문자열에 HTML·스크립트·이벤트 핸들러가 포함되어도 실행되지 않고 텍스트 또는 허용목록 기반 sanitized markup으로만 렌더링한다.
 - SSE 재연결, 중복 이벤트, 잘못된 UTF-8, upstream timeout, DB 실패, 모델 오류에서 중복 답변이나 부분적으로 검증되지 않은 텍스트를 확정 응답으로 표시하지 않는다.
 - 768px~1023px tablet 구간은 단일 열 패널과 접을 수 있는 분석 제어 영역을 사용하며, 360·375·390·414·768·1024px에서 회귀 검증한다.
@@ -176,41 +176,41 @@
 #### [Core & Prompt Hardening & Token Interceptor]
 - **FR-001**: 시스템은 `bteam/oliview_core/prompts.py`를 단일 진실 공급원(SSOT)으로 신설하고, ChatA와 ChatB가 공통 뷰티 헌법 및 무환각 지침을 공유하도록 일원화해야 한다.
 - **FR-002**: 시스템은 LLM 시스템 프롬프트 및 사용자 프롬프트에서 가상 페르소나('사용자 A', '사용자 B', '고객 1', '익명의 구매자') 창작 금지 지침을 절대 규칙(Zero-Tolerance)으로 명시해야 한다.
-- **FR-003**: 시스템은 답변 구성 시 실제 구매자 리뷰 원문의 내용과 일치하지 않는 가상의 대화체 따옴표 인용구 날조를 금지하고, 실제 원문 요약 또는 원문과 정확히 일치하는 직접 발췌 형태로만 근거를 제시해야 한다. 직접 발췌가 원문과 일치하지 않으면 인용구를 제거하고 객관적 요약으로 대체해야 한다.
-- **FR-004**: 시스템은 `<context>`에 주입된 리뷰 개수 $K$를 기준으로, 생성된 텍스트 내의 인용 태그 인덱스 $N$이 $1 \le N \le K$를 만족하는지 검증하고 $N > K$ 또는 $N < 1$인 무효 인용 태그는 제거하거나 유효한 근거 없이 보정하지 않아야 한다.
+- **FR-003**: 시스템은 답변 구성 시 실제 구매자 리뷰 원문의 내용과 일치하지 않는 가상의 대화체 따옴표 인용구 날조를 금지하고, 실제 원문 요약 또는 원문과 정확히 일치하는 직접 발췌 형태로만 근거를 제시해야 한다. 직접 발췌 비교는 서버 내부에서 원문과 후보 모두 Unicode NFC 및 개행(CRLF/CR→LF)만 정규화하고 공백·구두점·문자 호환성은 변경하지 않은 substring exact-match로 수행한다. 민감정보가 없는 경우에만 저장된 원문 substring을 `display_quote`로 표시하며, 민감정보가 있으면 exact-match 성공 후 동일 redaction policy를 적용한 `display_quote`와 `quote_redacted=true`만 전송한다. 안전한 redaction이 불가능하거나 불일치하면 직접 인용을 제거하고 검증된 객관적 요약으로 대체하며, 요약 근거도 검증할 수 없으면 기권해야 한다.
+- **FR-004**: 시스템은 `<context>`에 주입된 리뷰 개수 $K$를 기준으로, 생성된 텍스트 내의 인용 태그 인덱스 $N$이 $1 \le N \le K$를 만족하는지 검증해야 한다. $N > K$ 또는 $N < 1$인 무효 인용은 다른 번호로 보정하지 않고, 태그와 결속된 factual claim까지 제거한 뒤 남은 claim-evidence 관계를 재검증하며, 안전한 응답을 구성할 수 없으면 전체 응답을 기권해야 한다.
 - **FR-005**: 시스템은 리뷰의 원문 감성(부정·의구심·불만족)과 정반대되는 긍정 단정 주장(Polarity Inversion)을 방지하고, 부정적 피드백은 '아쉬운 점/주의사항' 섹션에 정확히 배치해야 한다.
 - **FR-006**: 시스템은 `synthesis_node.py`에서 UTF-8로 디코딩된 스트림 조각을 처리하는 `StreamingTokenInterceptor`를 사용하되, 모델 토큰 수가 아니라 등록된 금지 패턴의 최대 접두어 길이에 기반한 동적 carry buffer로 chunk 경계 우회를 차단하고, 완료 후 `GroundednessSanitizer`로 2차 전수 검증해야 한다.
 - **FR-007**: 시스템은 검색 임계값과 절벽 완화값을 환경 설정으로 주입하고 평가 코퍼스로 보정해야 한다. 초기 후보값은 2위 절대 점수 `0.60`, 절벽 차이 `0.25`이며 승인 전 운영 상수로 간주하지 않는다. $K=0$이면 모델 호출 없이 즉시 하드 기권 카드를 반환해야 한다.
 
 #### [ChatA: 올리뷰 컨시어지 (C-End & Mobile-First)]
 - **FR-008**: ChatA는 `PersonaType.CONCIERGE` 프롬프트 어댑터를 사용하여 일반 소비자를 위한 친절·공감 뷰티 쇼핑 큐레이션 답변을 생성해야 한다.
-- **FR-009**: ChatA UI는 카카오톡/스마트폰 접속에 대응하여 전체 레이아웃 `height: 100dvh`, `visualViewport` 기반 가상 키보드 방어, 입력창 상단 **하단 40% 썸존 스와이프 칩바**, 인용 터치 시 `max-height: 85svh` **리뷰 원문 바텀시트**, 우측 페이드 그라데이션 스크롤 인디케이터가 적용된 가로 스크롤 테이블 래퍼를 제공해야 한다.
+- **FR-009**: ChatA UI는 카카오톡/스마트폰 접속에 대응하여 전체 레이아웃 `height: 100dvh`, `visualViewport` 기반 가상 키보드 방어, 입력창 상단 **하단 40% 썸존 스와이프 칩바**, 인용 터치 시 `max-height: 85svh` **리뷰 원문 바텀시트**, 우측 페이드 그라데이션 스크롤 인디케이터가 적용된 가로 스크롤 테이블 래퍼를 제공해야 한다. 제품 링크 카드는 서버가 검증한 올리브영 HTTPS 허용 도메인 URL만 클릭 가능하게 렌더링하고 그 외 URL은 비활성 텍스트로 표시해야 한다.
 
 #### [ChatB: 올리뷰 애널리스트 (B-End / Pro & Adaptive Dashboard)]
 - **FR-010**: ChatB는 `PersonaType.ANALYST` 프롬프트 어댑터를 사용하여 전문적이고 객관적인 데이터 분석 리포트를 생성해야 하며, 레거시 `NO_THINK_SYSTEM_PROMPT`(IT 어시스턴트)를 전면 제거해야 한다.
 - **FR-011**: ChatB UI는 모바일(<768px)에서 '⚙️ 분석 파라미터' 바텀 드로어, tablet(768px~1023px)에서 단일 열과 접을 수 있는 분석 제어 영역, 데스크탑(≥1024px)에서 2열 고정 패널을 제공해야 한다.
 - **FR-012**: ChatB UI는 레거시 Top-K 입력을 Document Score Threshold(초기 후보 `0.85`), Score Cliff Delta(초기 후보 `0.25`), 최대 선별 리뷰 수 제어로 교체하고, API 필드명은 생성 샘플링 `top_p`와 충돌하지 않는 `document_score_threshold`를 사용하며 DB(`v_active_rag_catalog`)의 실시간 유효 브랜드를 동적 로드해야 한다.
-- **FR-013**: ChatB UI는 BGE-Reranker 점수 분포를 모바일/데스크탑 친화적 막대 그래프(Progress Bar) 및 채택/탈락 뱃지로 시각화해야 한다.
+- **FR-013**: ChatB UI는 검색·재정렬·근거 검증·답변 합성의 4단계 파이프라인 타임라인과 BGE-Reranker 점수 분포를 모바일/데스크탑 친화적 막대 그래프(Progress Bar) 및 채택/탈락 뱃지로 시각화해야 한다.
 
 #### [Main Portal & 전용 이력 페이지]
 - **FR-014**: 메인 포털(`gateway/html/index.html`)의 서비스 카드를 업데이트하여, ChatA(올리뷰 컨시어지)와 ChatB(올리뷰 애널리스트)의 차별화된 2-Track 성격을 명확히 반영해야 한다.
-- **FR-015**: 메인 포털 홈에 Liquid Glass 스타일의 **`📜 AISERVICE Engineering Evolution` 2x1 히어로 벤또 카드**를 신설하여, 핵심 릴리즈 요약과 함께 전용 이력 페이지 링크를 제공해야 한다.
-- **FR-016**: 전용 이력 페이지(`gateway/html/changelog.html`)를 구축하여, 상단 서브시스템 탭 필터(`all`, `chat_a`, `chat_b`, `model_gateway`, `core`, `pilos`) 및 Beta 🏆 / Alpha 🌱 라이프사이클 뱃지가 명시된 7대 마일스톤 카드를 렌더링해야 한다.
+- **FR-015**: 메인 포털 홈에 Liquid Glass 스타일의 **`📜 AISERVICE Engineering Evolution` 2x1 히어로 벤또 카드**를 신설하여, 핵심 릴리즈 요약과 함께 canonical URL `/changelog`의 전용 이력 페이지 링크를 제공해야 한다.
+- **FR-016**: 전용 이력 페이지(`gateway/html/changelog.html`)를 구축하여, 상단 서브시스템 탭 필터(`all`, `chat_a`, `chat_b`, `model_gateway`, `nginx_gateway`, `oliview_web`, `core`, `pilos`) 및 Beta 🏆 / Alpha 🌱 라이프사이클 뱃지가 명시된 7대 마일스톤 카드를 렌더링해야 한다. `all`은 UI 필터 상태이며 마일스톤 저장 값이 아니다.
 - **FR-017**: 메인 포털 및 전용 이력 페이지의 인터랙티브 요소에 최소 터치 타겟 $48\text{px}$, 논리적 DOM 순서, 키보드 조작, 가시적이고 가려지지 않는 focus, dialog 의미 구조, 동적 상태의 접근 가능한 알림을 적용해야 한다.
 
 #### [Security, Privacy, API & Operations]
 - **FR-018**: 검색 리뷰와 사용자 입력을 비신뢰 데이터로 구분하고, 시스템 지시와 명확히 격리하며 직접·간접 prompt injection 및 다국어·난독화 공격에 대한 입력·출력 검증과 adversarial 테스트를 수행해야 한다.
-- **FR-019**: 사용자 질의, 실제 리뷰, 로그 및 외부 모델 전송 데이터에서 정책상 민감정보와 인증정보를 탐지·마스킹하고 원문이 로그에 남지 않음을 검증해야 한다.
+- **FR-019**: 사용자 질의, 실제 리뷰, 로그 및 외부 모델 전송 데이터에서 정책상 민감정보와 인증정보를 탐지·마스킹하고 원문이 로그에 남지 않음을 검증해야 한다. 직접 인용은 FR-003의 서버 내부 exact-match 후 redacted `display_quote` 전송 규칙을 따라야 한다.
 - **FR-020**: LLM·리뷰·브랜드·changelog의 비신뢰 문자열은 안전한 DOM sink 또는 허용목록 기반 sanitizer를 통해 렌더링하고, inline script/event handler 실행을 금지해야 한다.
-- **FR-021**: Chat API는 query/input token, output token, timeout, concurrency, rate limit, 인증, 표준 오류 응답 및 SSE 이벤트 계약을 명시하고 강제해야 한다.
+- **FR-021**: Chat API는 `Authorization: Bearer` 인증을 강제하고, validator와 credential은 환경 설정으로 주입하며 누락·오류 credential은 fail-closed `401`로 처리해야 한다. rate key는 인증된 principal과 service 조합으로 계산하고, query/input token, output token, timeout, per-principal rate limit, service-wide concurrency 한계는 모두 양의 유한값으로 설정 SSOT에서 주입해야 한다. 초과·timeout·인증 실패는 표준 오류 응답 및 SSE 이벤트 계약으로 일관되게 반환해야 한다.
 - **FR-022**: 서비스 간 호출, latency, 오류, 모델 호출 여부, 기권 및 guardrail 결과를 correlation ID가 포함된 구조화 로그로 기록하되 민감 원문은 기록하지 않아야 한다.
-- **FR-023**: 포트·내부 URL·healthcheck·외부 vLLM 연동은 `bteam/oliview_core/config.py`의 환경변수 기반 SSOT만 사용하고, 외부 연동은 기본 비활성화하며 셀프 루프백과 포트 충돌을 차단해야 한다.
+- **FR-023**: 포트·내부 URL·healthcheck·운영 모드·외부 vLLM 연동·검색 후보값·API token/rate/concurrency/timeout 한계·DEMO/PRODUCTION SLA 임계치는 `bteam/oliview_core/config.py`의 환경변수 기반 SSOT만 사용해야 한다. 외부 연동은 기본 비활성화하고, 필수 설정 누락은 fail-closed 처리하며, 셀프 루프백과 포트 충돌을 차단해야 한다.
 
 ---
 
 ### Key Entities
 
-- **ContextReviewRegistry**: 해당 질의에 대해 Document Top-P를 통과하여 `<context>`에 주입된 실제 유효 리뷰 목록 ($K$건) 및 유효 인용 태그 인덱스 매핑 테이블.
+- **ContextReviewRegistry**: 해당 질의에 대해 Document Score Threshold를 통과하여 `<context>`에 주입된 실제 유효 리뷰 목록 ($K$건) 및 유효 인용 태그 인덱스 매핑 테이블.
 - **StreamingTokenInterceptor**: 호환성을 위해 기존 이름을 유지하지만 UTF-8로 디코딩된 SSE 텍스트 chunk를 입력으로 받고, 금지 패턴의 최대 접두어 길이에 기반한 동적 carry buffer로 경계 분할을 방어하는 실시간 필터.
 - **PromptPersonaAdapter**: 요청 파라미터(`persona`)에 따라 `CONCIERGE`(ChatA)와 `ANALYST`(ChatB)의 어조 및 리포트 서식을 동적 전환하는 프롬프트 어댑터.
 - **GroundednessSanitizerResult**: 가상 사용자 라벨 소거, 초과 인용 태그 정제, 사실 정합성 검증 결과를 담는 방어 객체.
@@ -223,16 +223,16 @@
 ### Measurable Outcomes
 
 - **SC-001**: 버전 고정 평가 코퍼스와 adversarial corpus에서 ChatA 및 ChatB 최종 답변의 가상 인물 라벨 및 원문 불일치 직접 인용 노출 건수 **0건**.
-- **SC-002**: 스트리밍 도중 가상 인물 라벨이 찰나에 노출되는 시각적 깜빡임 발생률 **0.0%**.
+- **SC-002**: 모든 문자/SSE 경계 분할 fixture를 Playwright 브라우저에서 반복 재생할 때, 응답 컨테이너의 `MutationObserver` 기록과 최종 DOM에 가상 인물 라벨 또는 검증 전 partial text가 삽입된 횟수 **0건**.
 - **SC-003**: 실제 리뷰 개수 $K$건 환경에서 $N > K$ 또는 $N < 1$인 무효 인용 태그(`[리뷰 2]` ~ `[리뷰 6]`, `[리뷰 0]` 등) 발생률 **0.0%**.
-- **SC-004**: 긍정·부정·혼합 극성 평가셋에서 명백한 극성 반전 오류 **0건**이며, claim-evidence 정밀도와 context utilization을 평가 보고서에 기록한다.
-- **SC-005**: ChatB 스트리밍 시 IT 어시스턴트 프롬프트 누출 0건, $K=0$ 제로 서치 모델 호출 0회 및 Document Top-P 파라미터 제어 정상 연동 **100%**.
-- **SC-006**: 스마트폰 및 카카오톡 인앱 브라우저 화면 폭(360px~414px)에서 `100dvh` 가림 없는 레이아웃, `visualViewport` 키보드 방어 및 `85svh` 바텀시트, 썸존 칩바/바텀 드로어 정상 동작 확인.
-- **SC-007**: 메인 포털(`index.html`) 2x1 벤또 카드 렌더링 및 클릭 시 전용 `changelog.html` 이동 및 서브시스템 탭 필터링 정상 동작 **100%**.
-- **SC-008**: `bteam/oliview_core/tests/`, `bteam/Oliview_chatbot_a/tests/` 및 `bteam/Oliview_chatbot_b/tests/` 전체 회귀 테스트 통과율 **100% PASS**.
+- **SC-004**: 버전 고정 긍정·부정·혼합 극성 평가셋의 모든 반복에서 명백한 극성 반전 오류 **0건**, 근거가 필요한 factual claim의 claim-evidence precision **1.00**, 관련 근거가 존재하는 케이스의 context utilization **0.90 이상**을 달성해야 한다.
+- **SC-005**: ChatB 스트리밍 시 IT 어시스턴트 프롬프트 누출 0건, $K=0$ 제로 서치 모델 호출 0회 및 Document Score Threshold 파라미터 제어 정상 연동 **100%**.
+- **SC-006**: 360·375·390·414px 모바일 및 768·1024px 경계 viewport의 자동 브라우저 테스트와 승인된 실제 카카오톡 인앱 브라우저 점검에서 `100dvh` 가림 없는 레이아웃, `visualViewport` 키보드 방어, `85svh` 바텀시트, 썸존 칩바/바텀 드로어 및 링크 카드의 기대 케이스가 **100% 통과**해야 한다.
+- **SC-007**: 메인 포털(`index.html`) 2x1 벤또 카드 렌더링, canonical URL `/changelog` 이동, `changelog.html` 정적 자산 제공 및 서브시스템 탭 필터링 기대 케이스가 **100% 통과**해야 한다.
+- **SC-008**: `bteam/oliview_core/tests/`, `bteam/Oliview_chatbot_a/tests/`, `bteam/Oliview_chatbot_b/tests/` 및 `gateway/tests/` 전체 회귀 테스트 통과율 **100% PASS**이고 feature touchpoint의 Ruff와 Mypy가 exit code 0이어야 한다.
 - **SC-009**: prompt injection, PII, XSS, 비정상 입력 크기, SSE 경계 분할로 구성된 고정 보안 코퍼스의 차단 기대 케이스가 모두 통과하고 원문 비밀정보가 응답·로그에 노출되지 않아야 한다.
 - **SC-010**: 모든 ChatA/ChatB 요청에서 correlation ID, service, latency, model invocation, abstention, guardrail 결과가 구조화 로그로 남고 금지 필드·민감 원문 노출 건수는 0건이어야 한다.
-- **SC-011**: 하드웨어 benchmark는 모델 해시·양자화·context pool·slot·prompt/output 길이·GPU·driver·서버 버전을 고정해 재현할 수 있어야 하며, DEMO 모드의 제로 서치 3초 및 일반 RAG 20초 상한을 충족해야 한다. 더 엄격한 TTFT/처리량 목표는 실측 baseline 승인 후 적용한다.
+- **SC-011**: 하드웨어 benchmark는 모델 해시·양자화·context pool·slot·prompt/output 길이·GPU·driver·서버 버전·cache/cluster topology를 고정해 재현할 수 있어야 한다. DEMO 단일 노드 후보는 제로 서치 3초 및 일반 RAG 20초 상한을 충족해야 한다. PRODUCTION 승인은 분산 캐시와 2개 이상 model-serving worker의 GPU cluster topology에서 4-slot workload 기준 P95 TTFT 1.5초 이하, P95 전체 응답 8초 이하, aggregate throughput 25 tokens/s 이상, OOM 0건 및 worker 1개 장애 시 안전한 기권/재시도 정책을 충족한 경우에만 부여한다. 해당 topology를 검증할 수 없으면 결과를 `NOT VERIFIED`로 기록하고 단일 GPU를 PRODUCTION 승인으로 대체하지 않는다.
 
 ### Evaluation Protocol
 

@@ -945,11 +945,11 @@ class ProcessManager:
             if not is_aux:
                 if use_flash_attn:
                     cmd.extend(["--flash_attn", "True"])
-                if n_ctx >= 32768 or kv_type in ("q8_0", "q4_0", "fp8"):
-                    cmd.extend([
-                        "--type_k", str(type_kv_int),
-                        "--type_v", str(type_kv_int),
-                    ])
+                    if n_ctx >= 32768 or kv_type in ("q8_0", "q4_0", "fp8"):
+                        cmd.extend([
+                            "--type_k", str(type_kv_int),
+                            "--type_v", str(type_kv_int),
+                        ])
                 batch_sz = 256 if n_ctx >= 32768 else 512
                 cmd.extend(["--n_batch", str(batch_sz), "--n_ubatch", str(batch_sz)])
                 cmd.extend(["--interrupt_requests", "False"])

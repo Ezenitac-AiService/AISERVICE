@@ -85,14 +85,18 @@ def search_single_target(state: Dict[str, Any]) -> Dict[str, Any]:
                         auto_detect_filter=True,
                     )
 
-                    import urllib.parse
+                    from oliview_core.sanitizer import clean_product_name_for_search, build_oliveyoung_url
+
                     # 4. CandidateReview 구조로 변환 (제품명 컨텍스트 포함)
                     for idx, r in enumerate(raw_results):
-                        p_name = r.get("product_name") or target_name
+                        raw_p_name = r.get("product_name") or ""
+                        p_name = raw_p_name if raw_p_name and raw_p_name != "unknown" else target_name
                         b_name = r.get("brand") or r.get("brand_name") or brand_name or ""
                         c_name = r.get("category") or "화장품"
                         attr_name = r.get("attribute_name") or ""
                         r_text = r.get("review_text", r.get("clean_text", "")).strip()
+
+                        clean_p_name = clean_product_name_for_search(p_name, b_name)
 
                         # 제품명 프리픽스 추가 (열린 질의/추천 시 제품 식별력 보장)
                         if p_name and p_name != "unknown" and not r_text.startswith(f"[{p_name}]"):
@@ -100,7 +104,7 @@ def search_single_target(state: Dict[str, Any]) -> Dict[str, Any]:
                         else:
                             full_review_text = r_text
 
-                        p_url = f"https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query={urllib.parse.quote(p_name)}"
+                        p_url = build_oliveyoung_url(clean_p_name, b_name)
 
                         candidates.append(CandidateReview(
                             doc_id=str(r.get("review_id", idx)),
@@ -108,6 +112,7 @@ def search_single_target(state: Dict[str, Any]) -> Dict[str, Any]:
                             target_id=target_id,
                             target_name=p_name if p_name != "unknown" else target_name,
                             product_name=p_name,
+                            clean_product_name=clean_p_name,
                             brand_name=b_name,
                             category=c_name,
                             attribute_name=attr_name,

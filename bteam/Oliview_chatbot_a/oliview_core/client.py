@@ -42,6 +42,14 @@ class AiGatewayClient:
     def __init__(self, settings=None):
         self.settings = settings or get_settings()
 
+    @property
+    def timeout_llm(self) -> float:
+        return self.settings.timeout_llm_sec
+
+    @property
+    def inactivity_timeout_s(self) -> float:
+        return self.settings.inactivity_timeout_s
+
     # ─────────────────────────────────────────────────────────────────────────
     # 1. Embeddings (BGE-M3 on port 8090) with Redis Layer 2 Cache
     # ─────────────────────────────────────────────────────────────────────────
@@ -249,7 +257,7 @@ class AiGatewayClient:
         }
 
         inactivity_timeout = self.settings.inactivity_timeout_s
-        timeout_config = httpx.Timeout(timeout=inactivity_timeout, connect=30.0, read=inactivity_timeout)
+        timeout_config = httpx.Timeout(timeout=inactivity_timeout, connect=60.0, read=inactivity_timeout, write=60.0, pool=60.0)
 
         try:
             with httpx.Client(timeout=timeout_config) as client:

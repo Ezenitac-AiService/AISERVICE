@@ -349,22 +349,32 @@ class MultiTargetGraphOrchestrator:
                 "timestamp": time.time(),
             }
 
+        from oliview_core.sanitizer import (
+            clean_product_name_for_search,
+            build_oliveyoung_url,
+            clean_review_sentence,
+        )
+
         ref_reviews = []
         for target_id, reviews in state.get("reranked_contexts", {}).items():
             for idx, r in enumerate(reviews, start=1):
-                p_name = r.get("product_name") or r.get("target_name") or target_id
+                raw_p_name = r.get("product_name") or ""
+                p_name = raw_p_name if raw_p_name and raw_p_name != "unknown" else r.get("target_name", target_id)
                 b_name = r.get("brand_name") or (p_name.split()[0] if p_name else "")
                 c_name = r.get("category") or "화장품"
                 attr_name = r.get("attribute_name") or ""
-                r_text = r.get("review_text", "")
-                clean_t = r_text
-                if clean_t.startswith("[") and "]" in clean_t:
-                    clean_t = clean_t.split("]", 1)[1].strip()
-                p_url = r.get("product_url") or f"https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query={urllib.parse.quote(p_name)}"
+                
+                clean_p_name = r.get("clean_product_name") or clean_product_name_for_search(p_name, b_name)
+                clean_t = clean_review_sentence(r.get("review_text", ""))
+                p_url = r.get("product_url") or build_oliveyoung_url(clean_p_name, b_name)
+                rank_num = len(ref_reviews) + 1
+                tag_name = f"[{clean_p_name} 리뷰 {rank_num}]" if clean_p_name else f"[리뷰 {rank_num}]"
 
                 ref_reviews.append({
-                    "rank": len(ref_reviews) + 1,
+                    "rank": rank_num,
+                    "tag": tag_name,
                     "product_name": p_name,
+                    "clean_product_name": clean_p_name,
                     "brand_name": b_name,
                     "category": c_name,
                     "attribute_name": attr_name,
@@ -372,7 +382,6 @@ class MultiTargetGraphOrchestrator:
                     "separated_sentence": clean_t,
                     "clean_text": clean_t,
                     "rerank_score": round(r.get("rerank_score", 0.0), 4),
-                    "clean_product_name": p_name,
                     "product_url": p_url,
                     "oliveyoung_search_url": p_url,
                 })

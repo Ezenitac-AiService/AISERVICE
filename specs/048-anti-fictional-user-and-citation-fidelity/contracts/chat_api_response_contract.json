@@ -17,11 +17,17 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["review_index", "review_id", "quote"],
+        "required": ["review_index", "review_id", "display_quote", "quote_redacted"],
         "properties": {
           "review_index": { "type": "integer", "minimum": 1, "maximum": 20 },
           "review_id": { "type": "string", "minLength": 1, "maxLength": 128 },
-          "quote": { "type": "string", "minLength": 1, "maxLength": 2000 }
+          "display_quote": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "Exact source substring when safe, otherwise the server-side exact-matched substring after the shared redaction policy."
+          },
+          "quote_redacted": { "type": "boolean" }
         }
       }
     },
@@ -30,7 +36,10 @@
       "additionalProperties": false,
       "required": ["code", "message"],
       "properties": {
-        "code": { "type": "string", "maxLength": 80 },
+        "code": {
+          "type": "string",
+          "enum": ["UNAUTHORIZED", "FORBIDDEN", "RATE_LIMITED", "INVALID_REQUEST", "TIMEOUT", "UPSTREAM_ERROR", "INTERNAL_ERROR"]
+        },
         "message": { "type": "string", "maxLength": 500 }
       }
     }

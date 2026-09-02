@@ -10,10 +10,10 @@
 
 ### Decision 1: Prompt SSOT and two presentation personas
 
-- `bteam/oliview_core/prompts.py` is the sole prompt source.
+- `bteam/oliview_core/prompts.py` is the canonical prompt source.
 - `CONCIERGE` and `ANALYST` may change tone and layout, but not evidence, citation or security rules.
 - Retrieved reviews are marked as untrusted data and cannot override system instructions.
-- Per-service prompt copies are a temporary compatibility mechanism only; direct package use is preferred.
+- Per-service prompt copies are the runtime mechanism for this feature and must be hash-synchronized from the canonical source without mixing master/copy imports in one process. Direct shared-package migration is deferred to a separate feature.
 
 ### Decision 2: Boundary-safe streamed output validation
 
@@ -26,9 +26,9 @@ The WHATWG SSE format is UTF-8 and defines event framing independently from mode
 ### Decision 3: Citation fidelity and abstention
 
 - Valid citations satisfy `1 <= N <= K`.
-- Invalid citations are removed; they are never clamped or reassigned to another review.
-- Direct excerpts must match a normalized source-review substring under the documented Unicode/whitespace policy.
-- If no valid evidence remains, return an objective summary only or abstain.
+- Invalid citations and their bound factual claims are removed; citations are never clamped or reassigned to another review. Remaining claim-evidence relations are validated again.
+- Direct excerpts must match a server-side source-review substring after Unicode NFC and line-ending normalization (CRLF/CR→LF) only. Whitespace, punctuation and compatibility characters are not collapsed or rewritten. A safe source substring is exposed as `display_quote`; a PII-bearing substring is exact-matched first and then exposed only through the shared redaction policy with `quote_redacted=true`.
+- If a direct excerpt cannot be safely redacted or no valid evidence remains, return a verified non-quoted objective summary or abstain.
 - `K=0` bypasses prompt construction and model invocation.
 
 NIST AI RMF's Generative AI Profile treats confabulation and lifecycle measurement as risk-management concerns; deterministic label removal alone is not sufficient: <https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence>
@@ -45,9 +45,9 @@ The API uses `document_score_threshold`; it does not overload `top_p`, which is 
 
 - Direct and indirect prompt injection, including retrieved-review instructions, are tested.
 - System instructions, untrusted context and user input are explicitly delimited.
-- PII and credentials are redacted before model transmission, logging and browser rendering.
+- PII and credentials are redacted before model transmission, logging and browser rendering. Exact quote matching may use the protected server-side source, but only `display_quote` and `quote_redacted` cross the response boundary.
 - Generated and retrieved strings use safe DOM sinks by default; allowed Markdown is sanitized.
-- Query/output size, timeout, concurrency, rate limit and authentication are enforced in code and contracts.
+- Settings-injected Bearer validation fails closed. Query/output size, timeout, per-principal/service rate key, service concurrency and rate limit are enforced in code and contracts.
 
 Primary references:
 
@@ -75,7 +75,7 @@ References:
 - RTX 2080 and RTX 3060 meet that minimum; llama.cpp and Linux vLLM are compared under the same workload.
 - llama.cpp `-c` is a server context pool shared by slots. A 64K pool with four slots is not described as 64K per slot.
 - Continuous batching is currently enabled by default in llama.cpp; `--cont-batching` is redundant but may remain explicit. Flash attention defaults to `auto`; forcing `-fa on` requires hardware/build evidence.
-- VRAM, TTFT, full latency and throughput claims remain hypotheses until the reproducible benchmark completes.
+- VRAM, TTFT, full latency and throughput claims remain hypotheses until the reproducible benchmark completes. Single-node GTX/RTX results are DEMO/capacity evidence only. PRODUCTION approval additionally requires a distributed cache and at least two model-serving GPU workers, with routing/failover and one-worker-failure evidence, before applying the 4-slot P95 TTFT ≤1.5 seconds, P95 full response ≤8 seconds, aggregate throughput ≥25 tokens/s and zero OOM gates. Missing topology is reported as `NOT VERIFIED`.
 
 References:
 
@@ -104,6 +104,7 @@ Reference: JSON Schema Draft 2020-12 release notes: <https://json-schema.org/dra
 - A 64K context pool means every one of four slots receives 64K context.
 - GTX 1070, RTX 2080 and RTX 3060 should use the same backend solely by VRAM size.
 - `http://` public URLs are acceptable live-verification defaults.
+- A single-GPU benchmark can substitute for the constitution's distributed-cache/GPU-cluster PRODUCTION gate.
 
 ---
 
@@ -113,5 +114,6 @@ Reference: JSON Schema Draft 2020-12 release notes: <https://json-schema.org/dra
 2. Versioned normal, edge and adversarial evaluation corpus.
 3. Threshold calibration report with retrieval and generation metrics.
 4. PII/prompt-injection/XSS/resource-limit security report.
-5. Hardware benchmark with exact model, quantization, context, slot, driver and server versions.
-6. HTTPS mobile/browser/accessibility E2E matrix.
+5. DEMO single-node and PRODUCTION distributed-cache/GPU-cluster benchmark with exact model, quantization, context, slot, topology, driver and server versions.
+6. HTTPS Playwright mobile/browser/accessibility and DOM zero-flicker E2E matrix.
+7. Ruff/Mypy exit-code-zero evidence and independent ChatA/ChatB/Model Gateway/Nginx Gateway container build/up/health/test evidence.

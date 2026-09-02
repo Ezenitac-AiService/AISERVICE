@@ -12,7 +12,7 @@
       "version": { "type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+-(alpha|beta)$" },
       "subsystem": {
         "type": "string",
-        "enum": ["chat_a", "chat_b", "model_gateway", "core", "pilos"]
+        "enum": ["chat_a", "chat_b", "model_gateway", "nginx_gateway", "oliview_web", "core", "pilos"]
       },
       "stage": {
         "type": "string",

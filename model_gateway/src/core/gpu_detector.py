@@ -372,9 +372,9 @@ def detect_hardware_capabilities(
         hw_tier = HardwareTierEnum.BASELINE_8GB
         recommended_model = "qwen3.5-2b"
         recommended_batch = "qwen3.5-4b"
-        resident_std = 65536
-        resident_ultra = 131072
-        batch_ctx = 32768
+        resident_std = 16384
+        resident_ultra = 32768
+        batch_ctx = 16384
         min_tps = 50.0
 
     dynamic_ctx = calculate_3axis_dynamic_context(

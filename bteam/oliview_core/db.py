@@ -126,19 +126,19 @@ def fetch_active_catalog_records() -> List[Dict[str, Any]]:
     except Exception:
         pass
 
-    # 2. Fallback to direct JOIN query
+    # 2. Fallback to view aggregation
     fallback_query = """
     SELECT 
-        p.product_id,
-        p.product_name,
-        COALESCE(p.brand, p.brand_name, '') AS brand_name,
-        p.category,
-        COUNT(r.review_id) AS total_review_count,
-        COALESCE(AVG(r.rating), 5.0) AS avg_rating,
-        p.product_url
-    FROM products p
-    INNER JOIN reviews r ON p.product_id = r.product_id
-    GROUP BY p.product_id, p.product_name, brand_name, p.category
+        s.product_id,
+        s.product_name,
+        COALESCE(s.brand_name, '') AS brand_name,
+        COALESCE(s.analysis_category_name, '화장품') AS category,
+        COUNT(s.sentence_id) AS total_review_count,
+        5.0 AS avg_rating,
+        COALESCE(p.product_image_url, '') AS product_url
+    FROM vw_chroma_review_sentences s
+    LEFT JOIN products p ON s.product_id = p.product_id
+    GROUP BY s.product_id, s.product_name, s.brand_name, s.analysis_category_name, p.product_image_url
     HAVING total_review_count >= 1
     """
     try:
@@ -153,7 +153,7 @@ def fetch_active_catalog_records() -> List[Dict[str, Any]]:
 def fetch_aspect_summaries(category_keyword: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Fetches pre-aggregated aspect summaries for products.
-    Tries product_aspect_summaries first, falls back to aspect_sentiment_results or review_aspect_sentences.
+    Tries product_aspect_summaries first, falls back to vw_chroma_review_sentences aggregation.
     """
     try:
         with get_db_cursor() as cursor:
@@ -164,20 +164,19 @@ def fetch_aspect_summaries(category_keyword: Optional[str] = None) -> List[Dict[
     except Exception:
         pass
 
-    # Fallback to aspect_sentiment_results or direct aggregation
+    # Fallback to vw_chroma_review_sentences
     fallback_query = """
     SELECT 
-        p.product_id,
-        p.product_name,
-        COALESCE(p.brand, p.brand_name, '') AS brand_name,
-        p.category,
-        COUNT(r.review_id) AS total_review_count,
-        COALESCE(AVG(r.rating), 5.0) AS avg_rating,
-        '수분감' AS aspect_name,
+        s.product_id,
+        s.product_name,
+        COALESCE(s.brand_name, '') AS brand_name,
+        COALESCE(s.analysis_category_name, '화장품') AS category,
+        COUNT(s.sentence_id) AS total_review_count,
+        5.0 AS avg_rating,
+        s.attribute_name AS aspect_name,
         0.85 AS positive_ratio
-    FROM products p
-    INNER JOIN reviews r ON p.product_id = r.product_id
-    GROUP BY p.product_id, p.product_name, brand_name, p.category
+    FROM vw_chroma_review_sentences s
+    GROUP BY s.product_id, s.product_name, s.brand_name, s.analysis_category_name, s.attribute_name
     HAVING total_review_count >= 1
     """
     try:

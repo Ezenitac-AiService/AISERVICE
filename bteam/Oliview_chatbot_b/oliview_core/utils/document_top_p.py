@@ -37,20 +37,24 @@ class DocumentTopPCalculator:
         if not candidate_docs:
             return []
 
-        # 1. 점수 내림차순 정렬
-        sorted_docs = sorted(candidate_docs, key=lambda x: float(x.get("score", 0.0)), reverse=True)
+        # 1. 점수 내림차순 정렬 (score 또는 rerank_score 지원)
+        sorted_docs = sorted(
+            candidate_docs,
+            key=lambda x: float(x.get("score", x.get("rerank_score", 0.0))),
+            reverse=True,
+        )
 
         # 2. 1차 절대 품질 게이트 (Hard Gate: s_i >= min_score_gate)
         gated_docs = [
             d for d in sorted_docs
-            if float(d.get("score", 0.0)) >= self.config.min_score_gate
+            if float(d.get("score", d.get("rerank_score", 0.0))) >= self.config.min_score_gate
         ]
 
         if not gated_docs:
             logger.info(f"[{target_name}] All {len(sorted_docs)} docs fell below min_score_gate {self.config.min_score_gate}")
             return []
 
-        scores = [float(d.get("score", 0.0)) for d in gated_docs]
+        scores = [float(d.get("score", d.get("rerank_score", 0.0))) for d in gated_docs]
 
         # 3. 점수 절벽 (Score Cliff) 검사: 인접 문서 점수차가 0.25 이상 급락 시 조기 컷오프
         cutoff_index = len(scores)
@@ -90,22 +94,22 @@ class DocumentTopPCalculator:
 
         # 6. ReviewCitation 객체로 변환 및 인용 태그 부여
         citations: List[ReviewCitation] = []
-        display_target = short_target_name or target_name
 
         for rank_idx, doc in enumerate(selected_docs, start=1):
-            if short_target_name:
-                tag = f"[{short_target_name} 리뷰 {rank_idx}]"
+            doc_target = short_target_name or doc.get("clean_product_name")
+            if doc_target and doc_target != "unknown":
+                tag = f"[{doc_target} 리뷰 {rank_idx}]"
             else:
                 tag = f"[리뷰 {rank_idx}]"
 
             citations.append(ReviewCitation(
                 citation_tag=tag,
-                target_product_name=target_name,
+                target_product_name=doc_target or target_name,
                 review_id=str(doc.get("review_id", f"rev_{rank_idx}")),
                 rating=int(doc.get("rating", 5)),
                 product_option=str(doc.get("option", doc.get("product_option", "기본"))),
                 snippet=str(doc.get("text", doc.get("snippet", ""))),
-                rerank_score=float(doc.get("score", 0.0)),
+                rerank_score=float(doc.get("score", doc.get("rerank_score", 0.0))),
             ))
 
         return citations

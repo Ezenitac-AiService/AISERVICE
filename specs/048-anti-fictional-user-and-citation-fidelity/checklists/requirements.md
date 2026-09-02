@@ -22,29 +22,32 @@
 - [x] `K=0`, citation bounds and invalid-citation removal behavior are defined.
 - [x] Security requirements cover prompt injection, PII, XSS, resource limits and structured logging.
 - [x] API request, response, SSE and log contracts are separated.
-- [ ] Retrieval thresholds are validated — pending T040 calibration.
-- [ ] Hardware performance assumptions are validated — pending T041 benchmark.
+- [ ] Retrieval thresholds are validated — pending T043 calibration.
+- [ ] Hardware performance assumptions are validated — pending T046 benchmark.
 
 ## Testability and Evidence
 
 - [x] Evaluation strata and required metrics are specified.
 - [x] Stream-boundary testing is defined independently of tokenizer/SSE boundaries.
-- [x] Core, ChatA and ChatB test suites are all in the regression scope.
+- [x] Core, ChatA, ChatB and gateway test suites are all in the regression scope.
+- [x] Browser zero-flicker is defined through Playwright `MutationObserver` and final DOM evidence.
 - [x] Accessibility verification includes keyboard, focus, dialog, status and target size.
 - [ ] Contract tests have recorded Red/Green evidence — pending T002 and implementation.
-- [ ] Integrity/security corpus has passed — pending T039.
-- [ ] HTTPS live E2E and browser/device matrix have passed — pending T042.
-- [ ] `verification-report.md` exists with reproducible evidence — pending T043.
+- [ ] Integrity/security corpus has passed — pending T045.
+- [ ] HTTPS live E2E and browser/device matrix have passed — pending T047.
+- [ ] Ruff/Mypy quality gate has passed — pending T044.
+- [ ] Independent service container and network-isolation gates have passed — pending T047.
+- [ ] `verification-report.md` exists with reproducible evidence — pending T048.
 
 ## Constitution Readiness
 
 - [x] Korean documentation requirement is satisfied.
 - [x] Task order is contract-first and test-first.
-- [x] Invalid citation clamping has been removed from the plan and tasks.
+- [x] Invalid citation clamping and orphaned bound claims have been removed from the plan and tasks.
 - [x] Structured logging and sensitive-data masking have explicit requirements and tests.
 - [x] Infrastructure SSOT and external-vLLM opt-in are blocking tasks.
 - [x] Core synchronization has non-destructive safety gates.
-- [ ] Constitution implementation gates are complete — pending T001~T024.
+- [ ] Constitution implementation gates are complete — pending T001~T048, including T044 static analysis, T046 PRODUCTION topology decision and T047 service isolation.
 
 ## 2026 Research Traceability
 

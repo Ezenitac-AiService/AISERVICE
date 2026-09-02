@@ -1,19 +1,146 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ChatSseEventContract",
-  "description": "Application payload carried by a UTF-8 text/event-stream event",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["request_id", "sequence", "event", "data"],
-  "properties": {
-    "request_id": { "type": "string", "format": "uuid" },
-    "sequence": { "type": "integer", "minimum": 0 },
-    "event": { "type": "string", "enum": ["start", "delta", "citation", "abstention", "done", "error"] },
-    "data": {
-      "oneOf": [
-        { "type": "string", "maxLength": 20000 },
-        { "type": "object", "maxProperties": 20 }
-      ]
+  "description": "Discriminated application payload carried by a UTF-8 text/event-stream event. Sequence monotonicity and reconnect replay rules are verified by integration tests.",
+  "oneOf": [
+    { "$ref": "#/$defs/startEvent" },
+    { "$ref": "#/$defs/deltaEvent" },
+    { "$ref": "#/$defs/citationEvent" },
+    { "$ref": "#/$defs/abstentionEvent" },
+    { "$ref": "#/$defs/doneEvent" },
+    { "$ref": "#/$defs/errorEvent" }
+  ],
+  "$defs": {
+    "baseProperties": {
+      "request_id": { "type": "string", "format": "uuid" },
+      "event_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "sequence": { "type": "integer", "minimum": 0 }
+    },
+    "startEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "start" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["started_at"],
+          "properties": { "started_at": { "type": "string", "format": "date-time" } }
+        }
+      }
+    },
+    "deltaEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "delta" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text"],
+          "properties": { "text": { "type": "string", "maxLength": 20000 } }
+        }
+      }
+    },
+    "citationEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "citation" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["review_index", "review_id", "display_quote", "quote_redacted"],
+          "properties": {
+            "review_index": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "review_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "display_quote": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Exact source substring when safe, otherwise the server-side exact-matched substring after the shared redaction policy."
+            },
+            "quote_redacted": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "abstentionEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "abstention" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string", "enum": ["NO_EVIDENCE", "POLICY_BLOCKED", "GROUNDING_FAILED"] },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 }
+          }
+        }
+      }
+    },
+    "doneEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "done" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "k_bound", "model_invoked"],
+          "properties": {
+            "status": { "type": "string", "enum": ["answered", "abstained"] },
+            "k_bound": { "type": "integer", "minimum": 0, "maximum": 20 },
+            "model_invoked": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "errorEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "event_id", "sequence", "event", "data"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/baseProperties/request_id" },
+        "event_id": { "$ref": "#/$defs/baseProperties/event_id" },
+        "sequence": { "$ref": "#/$defs/baseProperties/sequence" },
+        "event": { "const": "error" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": ["UNAUTHORIZED", "FORBIDDEN", "RATE_LIMITED", "INVALID_REQUEST", "TIMEOUT", "UPSTREAM_ERROR", "INTERNAL_ERROR"]
+            },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+            "retryable": { "type": "boolean" }
+          }
+        }
+      }
     }
   }
 }

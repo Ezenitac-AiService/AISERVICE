@@ -301,9 +301,7 @@ class LlamaManager:
         if default_model_id is None:
             default_model_id = os.getenv("DEFAULT_MODEL", os.getenv("FAST_LLM_MODEL", "qwen3.5-2b"))
         current_model = self.config_manager.get_config().get("current_model")
-        target_n_ctx = int(self.config_manager.get_config().get("current_n_ctx", 65536))
-        if target_n_ctx < 65536 and "2b" in default_model_id.lower():
-            target_n_ctx = 65536
+        target_n_ctx = int(self.config_manager.get_config().get("current_n_ctx", 16384))
         if self.is_ready() and current_model == default_model_id:
             print(f"[LlamaManager] 기본 초고속 모델 '{default_model_id}'이 이미 VRAM 상주 서빙 중입니다 (n_ctx={target_n_ctx}).")
             return self.process_manager.state
@@ -316,7 +314,7 @@ class LlamaManager:
         self._last_active_time = time.time()
 
     async def check_idle_reclamation(self, idle_threshold_seconds: int = 60):
-        """FR-017 & Spec 036 T013: If batch model (4B) has been idle for >= 60s, automatically restore 2B 64K base model."""
+        """FR-017 & Spec 036 T013: If batch model (4B) has been idle for >= 60s, automatically restore 2B 16K base model."""
         if not hasattr(self, "_last_active_time"):
             self._last_active_time = time.time()
             return
@@ -325,8 +323,8 @@ class LlamaManager:
         if current_model and "4b" in current_model.lower():
             idle_seconds = time.time() - self._last_active_time
             if idle_seconds >= idle_threshold_seconds:
-                print(f"[LlamaManager] ⏱️ 4B 배치 모델 {idle_seconds:.1f}초 유휴 감지. 상시 기본 모델(qwen3.5-2b @ 64K)로 자동 복귀하여 VRAM을 회수합니다.")
-                self.config_manager.update_config(current_model="qwen3.5-2b", current_n_ctx=65536)
+                print(f"[LlamaManager] ⏱️ 4B 배치 모델 {idle_seconds:.1f}초 유휴 감지. 상시 기본 모델(qwen3.5-2b @ 16K)로 자동 복귀하여 VRAM을 회수합니다.")
+                self.config_manager.update_config(current_model="qwen3.5-2b", current_n_ctx=16384)
                 await self.ensure_default_model_resident("qwen3.5-2b")
 
     async def check_and_recover_crashes(self) -> None:
@@ -340,7 +338,7 @@ class LlamaManager:
         print("[LlamaManager] ⚠️ 메인 LLM(8089) 프로세스 부재 또는 크래시 감지 -> 자동 자가치유 재스폰 시작...")
         try:
             default_model = self.config_manager.get_default_model()
-            target_n_ctx = int(self.config_manager.get_config().get("current_n_ctx", 65536))
+            target_n_ctx = int(self.config_manager.get_config().get("current_n_ctx", 16384))
             await self.load_model_with_download(default_model, n_ctx=target_n_ctx)
         except Exception as e:
             print(f"[LlamaManager] ❌ 자동 복구 실패: {e}")

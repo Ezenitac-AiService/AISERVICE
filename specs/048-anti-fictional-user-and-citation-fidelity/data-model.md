@@ -25,18 +25,26 @@
   StreamingTokenInterceptor
    ├── carry: str (금지 패턴 최대 접두어 길이 기반 동적 suffix buffer)
    ├── registered_k: int
-   ├── process_token(token: str) -> Optional[str]
+   ├── process_chunk(chunk: str) -> Optional[str]
    └── flush() -> str
+
+  CitationView
+   ├── review_index: int (1 <= N <= K)
+   ├── review_id: str
+   ├── display_quote: str (안전한 원문 substring 또는 동일 정책으로 redaction한 표시 문자열)
+   └── quote_redacted: bool
 
   GroundednessSanitizerResult
    ├── sanitized_text: str
    ├── persona_removed_count: int
    ├── citations_removed_count: int
+   ├── claims_removed_count: int
+   ├── citations: List[CitationView]
    └── is_grounded: bool
 
   ChangelogMilestoneEntry
    ├── version: str (e.g., "v0.7.0-alpha", "v0.9.0-beta")
-   ├── subsystem: SubsystemType (CHAT_A | CHAT_B | MODEL_GATEWAY | CORE | PILOS)
+   ├── subsystem: SubsystemType (CHAT_A | CHAT_B | MODEL_GATEWAY | NGINX_GATEWAY | OLIVIEW_WEB | CORE | PILOS)
    ├── stage: StageType (BETA_TROPHY | ALPHA_SPROUT)
    ├── release_date: str (ISO YYYY-MM-DD)
   └── highlights: List[str]
@@ -57,7 +65,7 @@
 ## 2. Entity Specifications
 
 ### 1) `ContextReviewRegistry`
-- **책임**: Document Top-P를 통과하여 컨텍스트에 주입된 유효 리뷰 목록 및 인용 인덱스 상한($K$) 관리.
+- **책임**: Document Score Threshold를 통과하여 컨텍스트에 주입된 유효 리뷰 목록 및 인용 인덱스 상한($K$) 관리.
 - **Attributes**:
   - `reviews: List[Dict[str, Any]]`: 선별된 실존 리뷰 객체 리스트.
   - `k_bound: int`: 유효 리뷰 개수 (`0 <= K <= configured_max_selected_reviews <= 20`). 기본 최대값 후보는 6이며 설정으로 주입한다.
@@ -76,7 +84,7 @@
   - `finalize() -> str`: 잔여 버퍼 정제 후 최종 방출.
 
 ### 3) `PromptPersonaAdapter`
-- **책임**: 단일 SSOT 프롬프트 모듈(`bteam/oliview_core/prompts.py`)에서 2-Track 페르소나별 텍스트 서식 조합.
+- **책임**: 단일 SSOT 프롬프트 모듈(`bteam/oliview_core/prompts.py`)의 공통 integrity base prompt를 공유하고, 2-Track 페르소나별 어조와 텍스트 서식만 조합.
 - **Attributes**:
   - `PersonaType`: `Enum("PersonaType", ["CONCIERGE", "ANALYST"])`
 - **Functions**:
@@ -84,10 +92,10 @@
   - `build_rag_user_prompt(query: str, context: str, registry: ContextReviewRegistry) -> str`
 
 ### 4) `ChangelogMilestoneEntry`
-- **책임**: 메인 포털 `changelog.html`에 렌더링되는 서브시스템별 릴리즈 이력 데이터 구조.
+- **책임**: canonical URL `/changelog`에서 `gateway/html/changelog.html`로 렌더링되는 서브시스템별 릴리즈 이력 데이터 구조.
 - **Attributes**:
   - `version: str`: 버전 문자열 (예: `"v0.7.0-alpha"`, `"v0.9.0-beta"`).
-  - `subsystem: str`: `"chat_a"` | `"chat_b"` | `"model_gateway"` | `"core"` | `"pilos"`. `"all"`은 UI filter state이며 저장 엔티티 값이 아니다.
+  - `subsystem: str`: `"chat_a"` | `"chat_b"` | `"model_gateway"` | `"nginx_gateway"` | `"oliview_web"` | `"core"` | `"pilos"`. `"all"`은 UI filter state이며 저장 엔티티 값이 아니다.
   - `stage: str`: `"beta"` (Beta 🏆) | `"alpha"` (Alpha 🌱).
   - `date: str`: ISO 날짜 `"2026-09-02"`.
   - `title: str`: 릴리즈 타이틀.

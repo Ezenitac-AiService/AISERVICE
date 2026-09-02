@@ -137,6 +137,7 @@ class CandidateReview(TypedDict, total=False):
     target_id: str
     target_name: str
     product_name: Optional[str]
+    clean_product_name: Optional[str]
     brand_name: Optional[str]
     category: Optional[str]
     attribute_name: Optional[str]
@@ -153,6 +154,7 @@ class RerankedReview(TypedDict, total=False):
     target_id: str
     target_name: str
     product_name: Optional[str]
+    clean_product_name: Optional[str]
     brand_name: Optional[str]
     category: Optional[str]
     attribute_name: Optional[str]
@@ -160,6 +162,22 @@ class RerankedReview(TypedDict, total=False):
     rerank_score: float
     rank: int
     rating: Optional[float]
+
+
+class ReviewCitation(TypedDict, total=False):
+    """최종 레퍼런스 인용 및 UI 전달용 객체."""
+    rank: int
+    tag: str
+    product_name: str
+    clean_product_name: str
+    brand_name: str
+    category: str
+    attribute_name: str
+    review_score: float
+    clean_text: str
+    rerank_score: float
+    product_url: str
+    oliveyoung_search_url: str
 
 
 class RagGraphState(TypedDict, total=False):

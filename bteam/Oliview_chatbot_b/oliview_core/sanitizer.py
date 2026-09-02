@@ -35,13 +35,67 @@ BRAND_OY_URLS: Dict[str, str] = {
 }
 
 
+def clean_product_name_for_search(raw_name: str, brand_name: str = "") -> str:
+    """
+    올리브영 공식몰 검색 정확도 극대화를 위해 기획/증정/용량/색상 등 프로모션 노이즈를 정규식으로 제거하고
+    [브랜드명 + 핵심 상품명]을 추출합니다.
+    """
+    if not raw_name:
+        return (brand_name or "").strip()
+
+    text = raw_name
+    text = re.sub(r"\[.*?\]", " ", text)
+    text = re.sub(r"\(.*?\)", " ", text)
+
+    noise_patterns = [
+        r"\b\d+\+\d+\b",
+        r"\b\d+(ml|g|EA|매|입|개)\b",
+        r"\b\d+호\b",
+        r"기획세트|단독기획|스페셜기획|리필기획|증정기획",
+        r"본품|리필|더블기획|트리플기획|한정판",
+        r"대용량|미니|샘플|파우치증정",
+    ]
+    for pattern in noise_patterns:
+        text = re.sub(pattern, " ", text, flags=re.IGNORECASE)
+
+    text = re.sub(r"[^\w\s가-힣a-zA-Z0-9]", " ", text)
+    text = " ".join(text.split()).strip()
+
+    if brand_name and brand_name.strip():
+        b_clean = brand_name.strip()
+        if not text.startswith(b_clean):
+            text = f"{b_clean} {text}"
+
+    return text.strip() or ((brand_name or "").strip() if brand_name else (raw_name or "").strip())
+
+
 def build_oliveyoung_url(product_name: str, brand: Optional[str] = None) -> str:
-    """Builds search URL for Olive Young online mall."""
-    if not product_name and brand and brand in BRAND_OY_URLS:
+    """Builds search URL for Olive Young online mall with normalized query."""
+    clean_kw = clean_product_name_for_search(product_name, brand or "")
+    if not clean_kw and brand and brand in BRAND_OY_URLS:
         return BRAND_OY_URLS[brand]
-    clean_kw = re.sub(r"\[.*?\]|\(.*?\)", "", product_name or "").strip()
     encoded = urllib.parse.quote(clean_kw or product_name or "화장품")
     return f"https://www.oliveyoung.co.kr/store/search/getSearchMain.do?query={encoded}"
+
+
+def clean_review_sentence(text: str) -> str:
+    """
+    리뷰 본문에 포함된 카테고리 태그([스킨케어]), 기획세트명([1+1 기획]), 선행 닫는 괄호(']') 파편을 완벽히 정제합니다.
+    """
+    if not text:
+        return ""
+    cleaned = text.strip()
+    # 1. 선행 대괄호 태그 제거 (예: '[차앤박 앰플] 효과 좋아요' -> '효과 좋아요')
+    cleaned = re.sub(r"^\s*\[[^\]]*\]\s*", "", cleaned)
+    # 2. 짝이 맞지 않는 선행 닫는 괄호 파편 제거 (예: '기획 세트] 피부에...' -> '피부에...')
+    if "]" in cleaned and not cleaned.startswith("["):
+        prefix_part, sep, remainder = cleaned.partition("]")
+        if len(remainder.strip()) >= 5:
+            cleaned = remainder.strip()
+    cleaned = re.sub(r"^\s*\]\s*", "", cleaned)
+    # 3. 선행/후행 따옴표 및 공백 정리
+    cleaned = cleaned.strip("\"' \t\n\r")
+    return cleaned if len(cleaned) >= 5 else text.strip()
 
 
 def clean_review_noise(text: str) -> str:

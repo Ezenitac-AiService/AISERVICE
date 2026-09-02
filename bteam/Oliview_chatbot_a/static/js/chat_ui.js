@@ -92,31 +92,164 @@ function updateCategoryPanel(categoryName) {
 }
 
 /**
+ * GFM 테이블 파서 (Markdown Tables -> HTML Table)
+ */
+function parseMarkdownTables(text) {
+  const lines = text.split("\n");
+  const output = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
+    // 테이블 시작 후보 감지: '|'로 시작하고 끝나는 라인
+    if (line.startsWith("|") && line.endsWith("|") && i + 1 < lines.length) {
+      const nextRaw = lines[i + 1];
+      const nextLine = nextRaw.trim();
+
+      // 구분선 라인 확인: | :--- | :--- | 또는 |---|---|
+      const isSep = /^\|(?:\s*:?-{2,}:?\s*\|)+$/.test(nextLine);
+      if (isSep) {
+        const tableRows = [line, nextLine];
+        let j = i + 2;
+        while (j < lines.length) {
+          const rowLine = lines[j].trim();
+          if (rowLine.startsWith("|") && rowLine.endsWith("|")) {
+            tableRows.push(rowLine);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        // HTML 테이블 변환
+        const htmlTable = convertTableRowsToHtml(tableRows);
+        output.push(htmlTable);
+        i = j;
+        continue;
+      }
+    }
+
+    output.push(rawLine);
+    i++;
+  }
+
+  return output.join("\n");
+}
+
+function convertTableRowsToHtml(rows) {
+  if (rows.length < 2) return rows.join("\n");
+
+  const headerCells = splitTableRowCells(rows[0]);
+  const sepCells = splitTableRowCells(rows[1]);
+
+  const alignments = sepCells.map(c => {
+    const s = c.trim();
+    if (s.startsWith(":") && s.endsWith(":")) return "center";
+    if (s.endsWith(":")) return "right";
+    return "left";
+  });
+
+  let thead = "<thead><tr>";
+  headerCells.forEach((cell, idx) => {
+    const align = alignments[idx] || "left";
+    thead += `<th style="text-align:${align};">${cell.trim()}</th>`;
+  });
+  thead += "</tr></thead>";
+
+  let tbody = "<tbody>";
+  for (let r = 2; r < rows.length; r++) {
+    const dataCells = splitTableRowCells(rows[r]);
+    tbody += "<tr>";
+    headerCells.forEach((_, idx) => {
+      const cellText = (dataCells[idx] !== undefined ? dataCells[idx] : "").trim();
+      const align = alignments[idx] || "left";
+      tbody += `<td style="text-align:${align};">${cellText}</td>`;
+    });
+    tbody += "</tr>";
+  }
+  tbody += "</tbody>";
+
+  return `<div class="table-responsive"><table class="markdown-table">${thead}${tbody}</table></div>`;
+}
+
+function splitTableRowCells(row) {
+  let content = row.trim();
+  if (content.startsWith("|")) content = content.substring(1);
+  if (content.endsWith("|")) content = content.substring(0, content.length - 1);
+  return content.split("|");
+}
+
+/**
  * 마크다운 렌더링 & 인라인 [리뷰 N] 인용 뱃지 변환
  */
 function renderMarkdownWithCitations(rawMarkdown) {
   if (!rawMarkdown) return "";
 
-  let html = rawMarkdown;
+  // 1. 인용 부호 주변의 백틱 사전 제거: `[제품명 리뷰 1]` -> [제품명 리뷰 1]
+  let html = rawMarkdown.replace(/`(\[[^`\]\n]+?리뷰\s+\d+\])`/g, '$1');
 
-  // 헤딩 변환 (###, ##, #)
-  html = html.replace(/^### (.*$)/gim, '<h3 style="font-size:15px;margin:10px 0 4px 0;color:#1A2E1D;">$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2 style="font-size:16.5px;margin:12px 0 6px 0;color:#1A2E1D;">$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1 style="font-size:18px;margin:14px 0 8px 0;color:#1A2E1D;">$1</h1>');
+  // 2. GFM 마크다운 테이블 변환
+  html = parseMarkdownTables(html);
 
-  // 볼드체 (**text**)
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // 3. 수평선 변환 (---, ***, ___)
+  html = html.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '<hr class="markdown-hr">');
 
-  // 리스트 (- item, * item)
-  html = html.replace(/^\s*[-*]\s+(.*$)/gim, '<li style="margin-left:18px;margin-bottom:4px;">$1</li>');
+  // 4. 헤딩 변환 (###, ##, #)
+  html = html.replace(/^### (.*$)/gm, '<h3 class="markdown-h3">$1</h3>');
+  html = html.replace(/^## (.*$)/gm, '<h2 class="markdown-h2">$1</h2>');
+  html = html.replace(/^# (.*$)/gm, '<h1 class="markdown-h1">$1</h1>');
 
-  // 인라인 인용 태그 변환: [제품명 리뷰 N] 또는 [리뷰 N]
+  // 5. 코드 블록 및 인라인 코드
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="markdown-pre"><code>$1</code></pre>');
+  html = html.replace(/`([^`\n]+)`/g, '<code class="markdown-code">$1</code>');
+
+  // 6. 볼드체 (**text**) 및 이탤릭 (*text*)
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+
+  // 7. 리스트 변환 (순서 없는 리스트 및 순서 있는 리스트)
+  html = html.replace(/^\s*[-*+]\s+(.*$)/gm, '<li class="markdown-li">$1</li>');
+  html = html.replace(/^\s*(\d+)\.\s+(.*$)/gm, '<li class="markdown-li markdown-oli"><span class="oli-num">$1.</span> $2</li>');
+
+  // 8. 인라인 인용 태그 변환: [제품명 리뷰 N] 또는 [리뷰 N]
   html = html.replace(/\[([^\s\]]+(?:\s+[^\s\]]+)*\s+리뷰\s+\d+)\]/g, '<span class="citation-badge" data-citation="[$1]" title="참조 리뷰 보기">[$1]</span>');
   html = html.replace(/\[리뷰\s+(\d+)\]/g, '<span class="citation-badge" data-citation="[리뷰 $1]" title="참조 리뷰 보기">[리뷰 $1]</span>');
 
-  // 줄바꿈 변환
-  html = html.replace(/\n\n/g, '<br><br>');
-  html = html.replace(/(?<!<\/li>)\n/g, '<br>');
+  // 9. 줄바꿈 정제
+  const blockTags = ["div", "table", "thead", "tbody", "tr", "th", "td", "hr", "h1", "h2", "h3", "li", "pre", "code"];
+  const lines = html.split("\n");
+  const processed = [];
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const l = lines[idx];
+    const trimmed = l.trim();
+    if (!trimmed) {
+      const prev = idx > 0 ? lines[idx - 1].trim() : "";
+      const next = idx + 1 < lines.length ? lines[idx + 1].trim() : "";
+      const isPrevBlock = blockTags.some(tag => prev.endsWith(`</${tag}>`) || prev.startsWith(`<${tag}`));
+      const isNextBlock = blockTags.some(tag => next.startsWith(`<${tag}`));
+      if (!isPrevBlock && !isNextBlock && prev && next) {
+        processed.push("<br>");
+      }
+      continue;
+    }
+
+    const isBlock = blockTags.some(tag => trimmed.startsWith(`<${tag}`) || trimmed.endsWith(`</${tag}>`));
+    if (isBlock) {
+      processed.push(l);
+    } else {
+      processed.push(l + "<br>");
+    }
+  }
+
+  html = processed.join("\n");
+  html = html.replace(/(?:<br>\s*){3,}/g, '<br><br>');
+  html = html.replace(/<\/li><br>/g, '</li>');
+  html = html.replace(/<\/h[1-3]><br>/g, '</h$1>');
+  html = html.replace(/<\/div><br>/g, '</div>');
+  html = html.replace(/<hr class="markdown-hr"><br>/g, '<hr class="markdown-hr">');
 
   return html;
 }

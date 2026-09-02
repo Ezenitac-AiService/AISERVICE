@@ -253,11 +253,41 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
     response_text = re.sub(r"\[(\d+)\]", r"[리뷰 \1]", response_text)
     response_text = sanitize_negative_aspect_distortions(response_text)
 
+def is_valid_synthesis_response(response_text: Optional[str]) -> bool:
+    """
+    L5 응답 캐시 저장 전 유효성 검증 게이트 (OWASP LLM08 Cache Poisoning 방어).
+    에러 키워드, 타임아웃, 예외 트레이스백, 유출 감지 또는 미완결 답변을 엄격히 차단합니다.
+    """
+    if not response_text:
+        return False
+
+    cleaned = response_text.strip()
+    if len(cleaned) < 50:
+        return False
+
+    error_markers = [
+        "[답변 생성 오류:",
+        "timed out",
+        "Error:",
+        "Exception",
+        "Traceback (most recent call last):",
+        "504 Gateway Timeout",
+        "Connection closed unexpectedly",
+        "보안 검사에서 이상이 감지되었습니다",
+        "카나리아",
+    ]
+    for marker in error_markers:
+        if marker.lower() in cleaned.lower():
+            return False
+
+    return True
+
+
     if canary_leaked:
         response_text = (
             "죄송합니다. 답변 생성 중 보안 검사에서 이상이 감지되었습니다. 다시 질문해 주세요."
         )
-    elif settings.enable_l5_cache and response_text and len(doc_ids) > 0:
+    elif settings.enable_l5_cache and is_valid_synthesis_response(response_text) and len(doc_ids) > 0:
         active_model_name = client.discover_active_model()
         payload = {
             "response_text": response_text,
@@ -402,21 +432,22 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
             raw_text = "".join(full_tokens)
             sanitized_res = sanitizer.sanitize_markdown(raw_text)
             full_text = sanitized_res.cleaned_markdown
-            payload = {
-                "response_text": full_text,
-                "model_id": settings.fast_llm_model,
-                "prompt_version": "v1.0",
-                "tenant_id": tenant_id,
-                "doc_ids_hash": compute_doc_ids_hash(doc_ids),
-                "created_at": time.time(),
-                "estimated_tokens": len(full_tokens),
-            }
-            set_l5_response(
-                key=l5_key,
-                payload=payload,
-                ttl_base=settings.redis_ttl_llm_response,
-                jitter=settings.redis_ttl_llm_jitter,
-            )
+            if is_valid_synthesis_response(full_text):
+                payload = {
+                    "response_text": full_text,
+                    "model_id": settings.fast_llm_model,
+                    "prompt_version": "v1.0",
+                    "tenant_id": tenant_id,
+                    "doc_ids_hash": compute_doc_ids_hash(doc_ids),
+                    "created_at": time.time(),
+                    "estimated_tokens": len(full_tokens),
+                }
+                set_l5_response(
+                    key=l5_key,
+                    payload=payload,
+                    ttl_base=settings.redis_ttl_llm_response,
+                    jitter=settings.redis_ttl_llm_jitter,
+                )
     finally:
         if is_lock_owner:
             L5SingleFlightLock.release(l5_key)

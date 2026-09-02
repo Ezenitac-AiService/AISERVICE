@@ -97,10 +97,11 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
                         spec_header=None,
                     ))
             else:
-                # DB 매칭 후보가 없는 경우 단일 검색 풀로 폴백
+                # DB 매칭 후보가 없는 경우 단일 검색 풀로 폴백 (질문 문장이 상품명으로 오염되지 않도록 카테고리/속성명 결속)
+                discovery_label = norm_result.extracted_category or (norm_result.extracted_aspects[0] if norm_result.extracted_aspects else "추천_발굴")
                 target_entities.append(TargetEntity(
                     target_id="discovery_pool",
-                    target_name=query[:50],
+                    target_name=discovery_label,
                     brand_name=None,
                     product_name=None,
                     target_type=TargetType.ATTRIBUTE,

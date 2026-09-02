@@ -74,15 +74,16 @@ Write synchronization is permitted only after dry-run targets and hashes are rev
 
 - Generate `[리뷰 0]`, `[리뷰 999]`, malformed tags and a quote not present in the source review.
 - Expected:
-  - invalid citations are removed, not clamped;
-  - mismatched quote is removed or converted to a non-quoted objective summary;
+  - invalid citations and their bound factual claims are removed, not clamped, and remaining claim-evidence relations are revalidated;
+  - mismatched quote is removed or converted to a verified non-quoted objective summary;
+  - a PII-bearing exact-match source is exposed only as redacted `display_quote` with `quote_redacted=true`;
   - guardrail counts are logged without raw review text.
 
 ### Scenario 4: Stream boundary splitting
 
 - Split each forbidden label at every character boundary and representative SSE event boundary.
 - Include reconnect, duplicate sequence, finalize and invalid UTF-8 cases.
-- Expected: no unsafe prefix reaches the browser and no verified delta is duplicated.
+- Expected: Playwright `MutationObserver` and final DOM record no forbidden label or unverified partial text, and no verified delta is duplicated.
 
 ---
 
@@ -98,7 +99,7 @@ Expected: retrieved content remains data, output conforms to contracts, and inje
 
 Use synthetic names, email addresses, phone numbers, order IDs and credentials.
 
-Expected: policy-controlled fields are redacted before model transmission, logs and UI output. Never use real credentials in tests.
+Expected: policy-controlled fields are redacted before model transmission, logs and UI output. Server-side exact-match may inspect protected source text, but only `display_quote` and `quote_redacted` cross the API/SSE boundary. Never use real credentials in tests.
 
 ### XSS and unsafe URLs
 
@@ -108,7 +109,7 @@ Expected: no script executes; unsafe URLs are rejected; plain text or sanitized 
 
 ### Resource controls
 
-Test unauthenticated requests, oversized query/output requests, timeouts, excessive concurrency and rate limits.
+Test missing/invalid Settings-injected Bearer credentials, oversized query/output requests, timeouts, per-principal/service rate keys, excessive service concurrency, rate limits and required-setting omission.
 
 Expected: standard bounded error responses and SSE error events; no unbounded model work.
 
@@ -118,8 +119,8 @@ Expected: standard bounded error responses and SSE error events; no unbounded mo
 
 Validate 360, 375, 390, 414, 768 and 1024 CSS-pixel widths plus representative Kakao/WebKit devices.
 
-- ChatA: `100dvh`, `visualViewport`, `85svh`, chip bar and review dialog.
-- ChatB: mobile drawer, tablet collapsible controls, desktop two-column panel.
+- ChatA: `100dvh`, `visualViewport`, `85svh`, chip bar, review dialog and allowlisted Olive Young HTTPS link card.
+- ChatB: mobile drawer, tablet collapsible controls, desktop two-column panel and four-stage pipeline timeline.
 - Portal/changelog: 48px targets, keyboard operation, visible/non-obscured focus, logical DOM order and announced dynamic status.
 - Do not treat CSS declaration presence as proof; exercise the focused input with the virtual keyboard open.
 
@@ -129,7 +130,7 @@ Live paths are derived from `$env:BASE_URL`:
 ${BASE_URL}/bteam/chata
 ${BASE_URL}/bteam/chatb
 ${BASE_URL}/
-${BASE_URL}/changelog.html
+${BASE_URL}/changelog
 ```
 
 Also verify HTTP-to-HTTPS redirect, invalid authentication and SSE reconnect behavior.
@@ -140,19 +141,20 @@ Also verify HTTP-to-HTTPS redirect, invalid authentication and SSE reconnect beh
 
 - Run the versioned evaluation corpus before approving `document_score_threshold`, second-score and cliff values.
 - Record retrieval/claim precision and recall, context utilization and abstention rate.
-- For hardware, record model hash, quantization, context pool, slot count, per-slot effective context, prompt/output lengths, GPU, driver, server version, latency, throughput, VRAM and OOM events.
-- GTX 1070 is evaluated with llama.cpp. RTX 2080/3060 compare llama.cpp and Linux vLLM under the same workload.
+- For hardware, record model hash, quantization, context pool, slot count, per-slot effective context, prompt/output lengths, GPU, driver, server version, cache/cluster topology, routing/failover, latency, throughput, VRAM and OOM events.
+- GTX 1070 is evaluated with llama.cpp and RTX 2080/3060 compare llama.cpp and Linux vLLM as DEMO/capacity candidates. PRODUCTION requires a distributed cache and at least two model-serving GPU workers; if unavailable, record `NOT VERIFIED` rather than approving a single node.
 
 ---
 
 ## 7. Evidence Record
 
-T043 creates `verification-report.md` containing:
+T048 creates `verification-report.md` containing:
 
 - contract versions and validation results;
 - Red and Green test commands/results;
-- collected regression-test count;
+- collected regression-test count and Ruff/Mypy results;
 - integrity and security corpus results;
 - approved retrieval thresholds;
-- accessibility/browser matrix;
-- hardware benchmark and unresolved risks.
+- accessibility/browser/DOM zero-flicker matrix;
+- independent container build/up/health/test and network-isolation results;
+- DEMO single-node and PRODUCTION cluster benchmark or `NOT VERIFIED`, plus unresolved risks.

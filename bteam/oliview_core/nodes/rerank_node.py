@@ -80,6 +80,7 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
 
             entity = entity_map.get(target_id, {})
             target_name = entity.get("target_name", subset[0]["target_name"])
+            subset_by_id = {c.get("doc_id", ""): c for c in subset}
 
             candidate_dicts = [
                 {
@@ -88,6 +89,9 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                     "review_id": c.get("doc_id", ""),
                     "rating": c.get("rating", 5),
                     "option": c.get("option", "기본"),
+                    "product_name": c.get("product_name"),
+                    "clean_product_name": c.get("clean_product_name"),
+                    "brand_name": c.get("brand_name"),
                 }
                 for c in subset
             ]
@@ -101,13 +105,21 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
             # RerankedReview 변환
             selected_reviews: List[RerankedReview] = []
             for rank_idx, cit in enumerate(citations, start=1):
+                orig = subset_by_id.get(cit.review_id, {})
                 selected_reviews.append(RerankedReview(
                     doc_id=cit.review_id,
                     review_text=cit.snippet,
                     target_id=target_id,
-                    target_name=target_name,
+                    target_name=orig.get("target_name", target_name),
+                    product_name=orig.get("product_name"),
+                    clean_product_name=orig.get("clean_product_name"),
+                    brand_name=orig.get("brand_name"),
+                    category=orig.get("category"),
+                    attribute_name=orig.get("attribute_name"),
+                    product_url=orig.get("product_url"),
                     rerank_score=cit.rerank_score,
                     rank=rank_idx,
+                    rating=orig.get("rating", 5.0),
                 ))
 
             # 최소 1건 보장: 만약 Top-P에서 0건으로 모두 탈락했으나 원본 후보가 있었다면 최고점 1건 보존
@@ -117,9 +129,16 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                     doc_id=best["doc_id"],
                     review_text=best["review_text"],
                     target_id=target_id,
-                    target_name=target_name,
+                    target_name=best.get("target_name", target_name),
+                    product_name=best.get("product_name"),
+                    clean_product_name=best.get("clean_product_name"),
+                    brand_name=best.get("brand_name"),
+                    category=best.get("category"),
+                    attribute_name=best.get("attribute_name"),
+                    product_url=best.get("product_url"),
                     rerank_score=best.get("rerank_score", 0.0),
                     rank=1,
+                    rating=best.get("rating", 5.0),
                 ))
 
             reranked_contexts[target_id] = selected_reviews
