@@ -34,4 +34,3 @@ dev = [
 pythonpath = [".", "..", "oliview_core"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-
