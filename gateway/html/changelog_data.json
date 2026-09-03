@@ -127,7 +127,7 @@
     "spec_ref": "Spec 048",
     "title": "Model Gateway: 4슬롯 Continuous Batching & 32K 컨텍스트 서빙",
     "highlights": [
-      "GTX 1070 DEMO 모드: llama.cpp 단일 노드 안정화 서빙",
+      "RTX 3060 DEMO 모드: llama.cpp 단일 노드 안정화 서빙",
       "동적 헬스체크: 8081(LLM), 8090(Embedding), 8091(Reranker) 자동 복구 및 상태 모니터링",
       "연속 배치 슬롯 4개, 32K 컨텍스트 풀 및 OOM 방어 가드레일 완성"
     ]
@@ -206,9 +206,9 @@
     "stage": "beta",
     "date": "2026-08-17",
     "spec_ref": "Spec 002",
-    "title": "Nginx Gateway: 공인 DuckDNS HTTPS & 80/8080 듀얼 게이트웨이",
+    "title": "Nginx Gateway: 독립 인프라 단일 진입점 개통",
     "highlights": [
-      "Traefik Ingress 연동 Let's Encrypt 자동 갱신 및 공인 도메인(ezenitac.duckdns.org) 단일 진입점 개통"
+      "외부 게이트웨이 및 역방향 프록시 연동 단일 진입점 개통"
     ]
   },
   {
