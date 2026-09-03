@@ -27,6 +27,35 @@ def calculate_sha256(file_path: Path | str, chunk_size: int = 65536) -> str:
     return sha256_hash.hexdigest()
 
 
+def calculate_recursive_sha256(directory: Path | str) -> tuple[int, int, str]:
+    """디렉터리의 정렬된 상대 경로·파일 hash로 결정론적 증거를 만든다.
+
+    반환값은 `(size_bytes, file_count, sha256)`이며, 파일 내용뿐 아니라 상대
+    경로도 digest에 포함해 파일 교체·이름 변경을 모두 검출한다.
+    """
+    root = Path(directory)
+    if not root.is_dir():
+        raise NotADirectoryError(f"Directory not found for hashing: {root}")
+    digest = hashlib.sha256()
+    size_bytes = 0
+    file_count = 0
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        file_digest = calculate_sha256(path).encode("ascii")
+        digest.update(relative + b"\0" + file_digest + b"\0")
+        size_bytes += path.stat().st_size
+        file_count += 1
+    return size_bytes, file_count, digest.hexdigest()
+
+
+def calculate_path_evidence(path: Path | str) -> tuple[int, int, str]:
+    """파일 또는 디렉터리에 동일한 `(size, count, hash)` 인터페이스를 적용한다."""
+    target = Path(path)
+    if target.is_file():
+        return target.stat().st_size, 1, calculate_sha256(target)
+    return calculate_recursive_sha256(target)
+
+
 def generate_checksums_file(
     files: list[tuple[Path | str, str]],
     output_checksums_path: Path | str,
@@ -264,7 +293,7 @@ FORBIDDEN_SECRET_PATTERNS = [
     re.compile(r"[a-fA-F0-9]{32,}"),  # Long tokens/hashes (FRP tokens, API keys)
     re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*['\"]?([^'\"\s]+)['\"]?"),
     re.compile(r"-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----[\s\S]*?-----END[ A-Z0-9_-]+PRIVATE KEY-----"),
-    re.compile(r"GP123!"),
+    re.compile(r"TEST_PASSWORD!"),
     re.compile(r"pilos_password"),
 ]
 
@@ -287,9 +316,8 @@ def redact_sensitive_text(text: str) -> str:
         r"\1\2[REDACTED]\4",
         redacted,
     )
-    # Redact specific known testing passwords/tokens
-    redacted = redacted.replace("348a9b698d47c11b5a559616edc22d905b95c4fab59391bb", "[REDACTED]")
-    redacted = redacted.replace("GP123!", "[REDACTED]")
+    # Redact the deterministic test password as well as generic assignments.
+    redacted = redacted.replace("TEST_PASSWORD!", "[REDACTED]")
 
     # Redact remaining standalone 32+ hex tokens
     for match in set(re.findall(r"\b[a-fA-F0-9]{32,}\b", redacted)):

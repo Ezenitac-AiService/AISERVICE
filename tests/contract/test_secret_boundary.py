@@ -65,8 +65,8 @@ def test_redaction_masks_sensitive_tokens():
     """Structured log and error utilities must redact secret tokens and keys."""
     from AISERVICE.migration_pack.scripts.manifest_utils import redact_sensitive_text
 
-    sample_text = "Connecting with token 348a9b698d47c11b5a559616edc22d905b95c4fab59391bb to db password GP123!"
+    sample_text = "Connecting with token deadbeefdeadbeefdeadbeefdeadbeefdeadbeef to db password TEST_PASSWORD!"
     redacted = redact_sensitive_text(sample_text)
-    assert "348a9b698d47c11b5a559616edc22d905b95c4fab59391bb" not in redacted
-    assert "GP123!" not in redacted
+    assert "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef" not in redacted
+    assert "TEST_PASSWORD!" not in redacted
     assert "[REDACTED]" in redacted

@@ -124,8 +124,8 @@ services:
       - --init-file=/docker-entrypoint-initdb.d/00_reset.sql
     environment:
       MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:?set BTEAM_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${BTEAM_DB_NAME:-cosmetic_db}
-      MYSQL_USER: ${BTEAM_DB_USER:-gp123}
+      MYSQL_DATABASE: ${BTEAM_DB_NAME:-oliview_project}
+      MYSQL_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
     volumes:
       - bteam_mysql_data:/var/lib/mysql
@@ -153,7 +153,7 @@ services:
     environment:
       DB_HOST: bteam_db
       DB_PORT: 3306
-      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       DB_NAME3: ${BTEAM_DB_NAME:-oliview_project}
@@ -205,7 +205,7 @@ services:
       PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
       DB_PORT: 3306
-      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
@@ -247,7 +247,7 @@ services:
       PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
       DB_PORT: 3306
-      DB_USER: ${BTEAM_DB_USER:-gp123}
+      DB_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://vllm-serv-gateway
@@ -287,7 +287,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${PILOS_DB_ROOT_PASSWORD:?set PILOS_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${PILOS_DB_NAME:-pilos_v2}
-      MYSQL_USER: ${PILOS_DB_USER:-pilos_user}
+      MYSQL_USER: ${PILOS_DB_USER:?set PILOS_DB_USER}
       MYSQL_PASSWORD: ${PILOS_DB_PASSWORD:?set PILOS_DB_PASSWORD}
       TZ: Asia/Seoul
     volumes:
@@ -315,7 +315,7 @@ services:
     environment:
       DB_HOST: pilos-db
       DB_PORT: 3306
-      DB_USER: ${PILOS_DB_USER:-pilos_user}
+      DB_USER: ${PILOS_DB_USER:?set PILOS_DB_USER}
       DB_PASSWORD: ${PILOS_DB_PASSWORD:?set PILOS_DB_PASSWORD}
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
       LLM_PROVIDER: openai
@@ -409,9 +409,9 @@ services:
   # 10. 최소 검증 프로브 컨테이너 (One-shot Probe - aiservice-probe)
   # ============================================================================
   aiservice-probe:
-    image: curlimages/curl:latest
+    image: python:3.12-slim
     container_name: aiservice-probe
     profiles: ["probe"]
     networks:
       - aiservice-network
-    entrypoint: ["sh"]
+    entrypoint: ["python3"]

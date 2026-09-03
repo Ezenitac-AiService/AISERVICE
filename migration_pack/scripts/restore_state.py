@@ -43,7 +43,8 @@ class RestoreState(str, Enum):
 # Allowed state transitions mapping
 VALID_TRANSITIONS: dict[RestoreState, set[RestoreState]] = {
     RestoreState.CREATED: {RestoreState.PREFLIGHT_PASSED, RestoreState.ABORTED},
-    RestoreState.PREFLIGHT_PASSED: {RestoreState.STAGING_RESTORED, RestoreState.ABORTED},
+    RestoreState.PREFLIGHT_PASSED: {RestoreState.STAGING_IN_PROGRESS, RestoreState.STAGING_RESTORED, RestoreState.ABORTED},
+    RestoreState.STAGING_IN_PROGRESS: {RestoreState.STAGING_RESTORED, RestoreState.STAGING_DISCARDED, RestoreState.ABORTED},
     RestoreState.STAGING_RESTORED: {RestoreState.STAGING_VALIDATED, RestoreState.STAGING_DISCARDED, RestoreState.ABORTED},
     RestoreState.STAGING_VALIDATED: {RestoreState.PROMOTED, RestoreState.STAGING_DISCARDED, RestoreState.ABORTED},
     RestoreState.PROMOTED: {RestoreState.VERIFIED, RestoreState.ROLLED_BACK, RestoreState.TUNNEL_DEGRADED},
@@ -138,9 +139,29 @@ class MigrationStateMachine:
 
 
 def rollback_staging_environment(staging_volumes: list[str]) -> dict[str, Any]:
-    """Discard staging volumes and record rolled back state within 15 seconds."""
+    """Remove only explicitly named staging volumes through Docker.
+
+    This compatibility entry point is intentionally fail-closed: it no longer
+    claims rollback success without executing the requested volume cleanup.
+    Live volume names are rejected by convention and every Docker result is
+    reflected in the returned status.
+    """
+    import subprocess
+    started = datetime.now(timezone.utc)
+    removed: list[str] = []
+    errors: list[str] = []
+    for volume in staging_volumes:
+        if not volume.startswith("staging_"):
+            errors.append("invalid_staging_volume")
+            continue
+        result = subprocess.run(["docker", "volume", "rm", volume], capture_output=True, text=True, check=False)
+        if result.returncode == 0:
+            removed.append(volume)
+        else:
+            errors.append("docker_volume_remove_failed")
     return {
-        "status": "ROLLED_BACK",
-        "discarded_volumes": staging_volumes,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "status": "ROLLED_BACK" if not errors else "ROLLBACK_FAILED",
+        "removed_volumes": removed,
+        "error_count": len(errors),
+        "completed_at": started.isoformat(),
     }

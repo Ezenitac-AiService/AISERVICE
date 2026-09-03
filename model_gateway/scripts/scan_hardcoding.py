@@ -27,7 +27,8 @@ FORBIDDEN_PATTERNS = [
 ]
 
 IGNORED_DIRS = {
-    '.git', '.specify', 'venv', '__pycache__', '.pytest_cache', 'build', 'dist', 'specs', 'brain'
+    '.git', '.specify', 'venv', '.venv', '.uv-cache', '__pycache__', '.pytest_cache',
+    'build', 'dist', 'specs', 'brain'
 }
 
 def scan_file(file_path: Path) -> List[Tuple[int, str, str]]:

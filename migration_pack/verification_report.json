@@ -1,40 +1,44 @@
 {
   "schema_version": "1.0.0",
-  "checked_at": "2026-09-03T08:34:21.356775+00:00",
+  "checked_at": "2026-09-03T16:26:08.610038+00:00",
   "mode": "DEMO",
-  "status": "PASS",
+  "status": "FAIL",
   "total_checks": 9,
-  "passed_checks": 9,
-  "failed_checks": 0,
+  "passed_checks": 0,
+  "failed_checks": 9,
   "checks": [
     {
       "id": "portal",
       "category": "PUBLIC_WEB",
       "target": "http://gateway:80/",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356788+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5,
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.149924+00:00",
+      "latency_ms": 25.36,
+      "error_code": "ERR_PROBE_CONNECT",
       "subchecks": [
         {
           "id": "portal_root",
-          "status": "PASS",
-          "status_code": 200
+          "status": "FAIL",
+          "status_code": 503,
+          "error_code": "ERR_PROBE_CONNECT"
         },
         {
           "id": "portal_changelog",
-          "status": "PASS",
-          "status_code": 200
+          "status": "FAIL",
+          "status_code": 503,
+          "error_code": "ERR_PROBE_CONNECT"
         },
         {
           "id": "portal_changelog_data",
-          "status": "PASS",
-          "status_code": 200
+          "status": "FAIL",
+          "status_code": 503,
+          "error_code": "ERR_PROBE_CONNECT"
         },
         {
           "id": "portal_static_assets",
-          "status": "PASS",
-          "status_code": 200
+          "status": "FAIL",
+          "status_code": 503,
+          "error_code": "ERR_PROBE_CONNECT"
         }
       ]
     },
@@ -42,110 +46,109 @@
       "id": "ateam_pilos",
       "category": "PUBLIC_WEB",
       "target": "http://gateway:80/ateam/pilos/",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356799+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175302+00:00",
+      "latency_ms": 0.14,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "bteam_oliview",
       "category": "PUBLIC_WEB",
       "target": "http://gateway:80/bteam/oliview/",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356803+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175447+00:00",
+      "latency_ms": 0.15,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "bteam_chata",
       "category": "PUBLIC_WEB",
       "target": "http://gateway:80/bteam/chata/",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356809+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175598+00:00",
+      "latency_ms": 0.12,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "bteam_chatb",
       "category": "PUBLIC_WEB",
       "target": "http://gateway:80/bteam/chatb/",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356812+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175723+00:00",
+      "latency_ms": 0.13,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "model_gateway_llm",
       "category": "MODEL_GATEWAY",
       "target": "http://vllm-serv-gateway:8081/health",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356815+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175852+00:00",
+      "latency_ms": 0.12,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "model_gateway_embedding",
       "category": "MODEL_GATEWAY",
       "target": "http://vllm-serv-gateway:8090/v1/models",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356817+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.175973+00:00",
+      "latency_ms": 0.12,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "model_gateway_rerank",
       "category": "MODEL_GATEWAY",
       "target": "http://vllm-serv-gateway:8091/v1/models",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356819+00:00",
-      "status_code_or_ping": 200,
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.176100+00:00",
+      "latency_ms": 0.09,
+      "error_code": "ERR_PROBE_CONNECT"
     },
     {
       "id": "redis",
       "category": "REDIS",
       "target": "redis:6379",
-      "status": "PASS",
-      "checked_at": "2026-09-03T08:34:21.356821+00:00",
-      "status_code_or_ping": "+PONG",
-      "latency_ms": 4.5
+      "status": "FAIL",
+      "checked_at": "2026-09-03T16:25:52.176198+00:00",
+      "latency_ms": 0.04,
+      "error_code": "ERR_PROBE_CONNECT"
     }
   ],
   "hardware": {
     "profile_id": "dev-rtx3060",
-    "cpu_model": "Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz",
+    "cpu_model": "unknown",
     "avx2": true,
-    "gpu_model": "NVIDIA GeForce RTX 3060 12GB",
-    "vram_mb": 12288,
-    "compute_capability": "8.6",
+    "gpu_model": "unavailable",
+    "vram_mb": 0,
+    "compute_capability": "unknown",
     "backend": "llama.cpp-cuda",
-    "gpu_acceleration_verified": true,
-    "safe_slots": 4
+    "gpu_acceleration_verified": false
   },
   "gpu_evidence": {
     "source": "nvml+llama_runtime",
-    "device": "NVIDIA GeForce RTX 3060 12GB",
-    "build_fingerprint": "sm_86_cuda_12.4",
-    "sample_set_id": "sample_set_v1_dev_rtx3060",
-    "all_requests_verified": true,
+    "device": "unavailable",
+    "build_fingerprint": "unavailable",
+    "sample_set_id": "unverified_runtime",
+    "all_requests_verified": false,
     "samples": [
       {
         "workload": "chat_llm",
-        "request_count": 20,
-        "evidence_count": 20,
-        "coverage_percent": 100.0
+        "request_count": 0,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
       },
       {
         "workload": "embedding",
-        "request_count": 20,
-        "evidence_count": 20,
-        "coverage_percent": 100.0
+        "request_count": 0,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
       },
       {
         "workload": "rerank",
-        "request_count": 20,
-        "evidence_count": 20,
-        "coverage_percent": 100.0
+        "request_count": 0,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
       }
     ]
   },
@@ -160,72 +163,72 @@
     "assets": [
       {
         "asset_id": "qwen3.5-4b",
-        "path": "model_gateway/models/qwen3.5-4b.gguf",
+        "path": "model_gateway/models/qwen3.5-4b/Qwen3.5-4B-Q4_K_M.gguf",
         "hash_scope": "file",
-        "size_bytes": 4500000000,
+        "size_bytes": 2740937888,
         "file_count": 1,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        "observed_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
       },
       {
         "asset_id": "qwen3.5-2b",
-        "path": "model_gateway/models/qwen3.5-2b.gguf",
+        "path": "model_gateway/models/qwen3.5-2b/Qwen3.5-2B-Q4_K_M.gguf",
         "hash_scope": "file",
-        "size_bytes": 2600000000,
+        "size_bytes": 1280835840,
         "file_count": 1,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
+        "observed_sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
       },
       {
         "asset_id": "bge-m3",
-        "path": "model_gateway/models/bge-m3",
-        "hash_scope": "recursive_directory",
-        "size_bytes": 1200000000,
-        "file_count": 10,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "path": "model_gateway/models/bge-m3/bge-m3-q8_0.gguf",
+        "hash_scope": "file",
+        "size_bytes": 634553760,
+        "file_count": 1,
+        "expected_sha256": "aa473d51f451a22f0fcf39ba3330c14bed38a385712b1113440f69df4047a173",
+        "observed_sha256": "aa473d51f451a22f0fcf39ba3330c14bed38a385712b1113440f69df4047a173",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
       },
       {
         "asset_id": "bge-reranker-v2-m3",
-        "path": "model_gateway/models/bge-reranker-v2-m3",
-        "hash_scope": "recursive_directory",
-        "size_bytes": 1200000000,
-        "file_count": 8,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "path": "model_gateway/models/bge-reranker-v2-m3/bge-reranker-v2-m3-q8_0.gguf",
+        "hash_scope": "file",
+        "size_bytes": 635676416,
+        "file_count": 1,
+        "expected_sha256": "a1c7499841b5f9f5d9ab2c74629293740dbdbe217ded4f0baa64f233ec34c5e4",
+        "observed_sha256": "a1c7499841b5f9f5d9ab2c74629293740dbdbe217ded4f0baa64f233ec34c5e4",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
       },
       {
         "asset_id": "pilos-rag-chroma",
-        "path": "ateam/pilos-sentiment-index/artifacts/chroma_db",
+        "path": "ateam/pilos-sentiment-index/artifacts/rag_chroma/",
         "hash_scope": "recursive_directory",
-        "size_bytes": 50000000,
+        "size_bytes": 915620,
         "file_count": 5,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "expected_sha256": "07736aa73610044181ff1331e59b9f3922896f5a8e0e62187d8069eed117d9a4",
+        "observed_sha256": "07736aa73610044181ff1331e59b9f3922896f5a8e0e62187d8069eed117d9a4",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
       },
       {
         "asset_id": "chata-chroma-bm25",
-        "path": "bteam/Oliview_chatbot_a/data",
+        "path": "bteam/Oliview_chatbot_a/chroma_db_oliview/",
         "hash_scope": "recursive_directory",
-        "size_bytes": 75000000,
-        "file_count": 6,
-        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_bytes": 352425667,
+        "file_count": 7,
+        "expected_sha256": "570cc6d6b5c8968fc90cff79bf96f46b053e15c4085be70772222597aaacea8d",
+        "observed_sha256": "570cc6d6b5c8968fc90cff79bf96f46b053e15c4085be70772222597aaacea8d",
         "hash_match": true,
         "application_open": true,
         "status": "PASS"
@@ -236,7 +239,7 @@
     "scenario_results": [
       {
         "scenario_id": "zero_search",
-        "response_status": "abstained",
+        "response_status": "failed",
         "model_invoked": false,
         "factual_claim_count": 0,
         "cited_claim_count": 0,
@@ -247,7 +250,7 @@
       },
       {
         "scenario_id": "evidence_insufficient",
-        "response_status": "abstained",
+        "response_status": "failed",
         "model_invoked": false,
         "factual_claim_count": 0,
         "cited_claim_count": 0,
@@ -257,33 +260,8 @@
         "citations": []
       },
       {
-        "scenario_id": "valid_evidence",
-        "response_status": "answered",
-        "model_invoked": true,
-        "factual_claim_count": 2,
-        "cited_claim_count": 2,
-        "unsupported_claim_count": 0,
-        "citation_coverage_percent": 100.0,
-        "claim_ids": [
-          "claim_01",
-          "claim_02"
-        ],
-        "citations": [
-          {
-            "claim_id": "claim_01",
-            "document_id": "doc_01",
-            "result_index": 0
-          },
-          {
-            "claim_id": "claim_02",
-            "document_id": "doc_02",
-            "result_index": 1
-          }
-        ]
-      },
-      {
         "scenario_id": "invalid_citation",
-        "response_status": "blocked",
+        "response_status": "failed",
         "model_invoked": false,
         "factual_claim_count": 0,
         "cited_claim_count": 0,
@@ -294,7 +272,18 @@
       },
       {
         "scenario_id": "prompt_injection",
-        "response_status": "blocked",
+        "response_status": "failed",
+        "model_invoked": false,
+        "factual_claim_count": 0,
+        "cited_claim_count": 0,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": null,
+        "claim_ids": [],
+        "citations": []
+      },
+      {
+        "scenario_id": "valid_evidence",
+        "response_status": "failed",
         "model_invoked": false,
         "factual_claim_count": 0,
         "cited_claim_count": 0,
@@ -304,10 +293,10 @@
         "citations": []
       }
     ],
-    "factual_claim_count": 2,
-    "cited_claim_count": 2,
+    "factual_claim_count": 0,
+    "cited_claim_count": 0,
     "unsupported_claim_count": 0,
-    "citation_coverage_percent": 100.0,
+    "citation_coverage_percent": null,
     "raw_content_logged": false
   },
   "data_integrity": {
@@ -316,7 +305,7 @@
       "pilos_v2",
       "oliview_project"
     ],
-    "rollback_tested": true,
-    "rollback_duration_seconds": 12.4
-  }
+    "rollback_tested": false
+  },
+  "degraded_reason": "실제 probe 또는 필수 evidence가 아직 수용 기준을 충족하지 않음"
 }

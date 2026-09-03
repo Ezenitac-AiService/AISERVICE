@@ -211,8 +211,8 @@ class HybridRetriever:
         db_config = {
             "host": os.getenv("DB_HOST", "bteam_db"),
             "port": int(os.getenv("DB_PORT", 3306)),
-            "user": os.getenv("BTEAM_DB_USER", os.getenv("DB_USER", "gp123")),
-            "password": os.getenv("BTEAM_DB_PASSWORD", os.getenv("DB_PASSWORD", "GP123!")),
+            "user": os.getenv("BTEAM_DB_USER") or os.getenv("DB_USER") or "",
+            "password": os.getenv("BTEAM_DB_PASSWORD") or os.getenv("DB_PASSWORD") or "",
             "database": os.getenv("BTEAM_DB_NAME", os.getenv("DB_NAME", "oliview_project")),
             "charset": "utf8mb4",
             "cursorclass": pymysql.cursors.DictCursor,

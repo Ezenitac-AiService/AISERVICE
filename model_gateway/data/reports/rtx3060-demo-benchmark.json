@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-09-03T16:27:20.306472+00:00",
+  "sample_set_id": "sample_set_v1_dev_rtx3060_qwen3.5-4b",
+  "mode": "DEMO",
+  "base_url": "http://127.0.0.1:9",
+  "warm_up_excluded": 0,
+  "request_parameters": {
+    "model": "qwen3.5-4b",
+    "concurrency": 1,
+    "max_tokens": 256
+  },
+  "gpu_evidence": {
+    "source": "nvml+llama_runtime",
+    "device": "unverified",
+    "build_fingerprint": "unverified",
+    "sample_set_id": "sample_set_v1_dev_rtx3060_qwen3.5-4b",
+    "samples": [
+      {
+        "workload": "chat_llm",
+        "request_count": 20,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
+      },
+      {
+        "workload": "embedding",
+        "request_count": 20,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
+      },
+      {
+        "workload": "rerank",
+        "request_count": 20,
+        "evidence_count": 0,
+        "coverage_percent": 0.0
+      }
+    ],
+    "all_requests_verified": false,
+    "runtime_profile_verified": false,
+    "vram_snapshot": {
+      "available": false,
+      "reason": "nvidia-smi_failed"
+    }
+  },
+  "workloads": {
+    "chat_llm": {
+      "request_count": 20,
+      "completed_count": 0,
+      "evidence_count": 0,
+      "coverage_percent": 0.0,
+      "ttfb_p99_seconds": null,
+      "e2e_p99_seconds": null,
+      "all_within_10s": false
+    },
+    "embedding": {
+      "request_count": 20,
+      "completed_count": 0,
+      "evidence_count": 0,
+      "coverage_percent": 0.0,
+      "ttfb_p99_seconds": null,
+      "e2e_p99_seconds": null,
+      "all_within_10s": false
+    },
+    "rerank": {
+      "request_count": 20,
+      "completed_count": 0,
+      "evidence_count": 0,
+      "coverage_percent": 0.0,
+      "ttfb_p99_seconds": null,
+      "e2e_p99_seconds": null,
+      "all_within_10s": false
+    }
+  },
+  "cold_start": {
+    "measured": false,
+    "reason": "warm benchmark excludes cold start"
+  },
+  "overall": {
+    "all_gpu_requests_verified": false,
+    "chat_e2e_100_percent_under_10s": false,
+    "passed": false
+  },
+  "raw_prompts_logged": false,
+  "samples_logged": false
+}

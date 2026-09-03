@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import ipaddress
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -24,7 +25,25 @@ DEFAULT_GATEWAY_ENV = {
     "CHATBOT_A_UPSTREAM": "http://oliview_chatbot_a:8501",
     "CHATBOT_B_UPSTREAM": "http://oliview_chatbot_b:8002",
     "PILOS_WEB_UPSTREAM": "http://pilos_web:5000",
+    "TRUSTED_PROXY_CIDRS": "127.0.0.1/32,172.16.0.0/12",
+    "TRUSTED_CLIENT_IP_HEADER": "X-Forwarded-For",
 }
+
+
+def _trusted_proxy_directives(cidrs: str) -> str:
+    directives = []
+    for raw_cidr in cidrs.split(","):
+        cidr = raw_cidr.strip()
+        if not cidr:
+            continue
+        try:
+            network = ipaddress.ip_network(cidr, strict=False)
+        except ValueError as exc:
+            raise ValueError("invalid TRUSTED_PROXY_CIDRS") from exc
+        directives.append(f"    set_real_ip_from {network};")
+    if not directives:
+        raise ValueError("TRUSTED_PROXY_CIDRS must not be empty")
+    return "\n".join(directives)
 
 
 def render_nginx_conf(env_dict: dict[str, str] | None = None) -> str:
@@ -35,6 +54,11 @@ def render_nginx_conf(env_dict: dict[str, str] | None = None) -> str:
     merged_env.update(dict(os.environ))
     if env_dict:
         merged_env.update(env_dict)
+
+    header = str(merged_env.get("TRUSTED_CLIENT_IP_HEADER", ""))
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", header):
+        raise ValueError("invalid TRUSTED_CLIENT_IP_HEADER")
+    merged_env["TRUSTED_PROXY_DIRECTIVES"] = _trusted_proxy_directives(str(merged_env["TRUSTED_PROXY_CIDRS"]))
 
     template_content = TEMPLATE_PATH.read_text(encoding="utf-8")
 

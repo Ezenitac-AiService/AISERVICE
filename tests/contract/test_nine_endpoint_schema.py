@@ -40,3 +40,5 @@ def test_verify_migration_uses_nine_endpoints(aiservice_root: Path):
     content = verify_script.read_text(encoding="utf-8")
     for check_id in EXACT_NINE_CHECK_IDS:
         assert check_id in content, f"Missing check ID {check_id} in verify_migration.py"
+    for subcheck_id in ("portal_root", "portal_changelog", "portal_changelog_data", "portal_static_assets"):
+        assert subcheck_id in content

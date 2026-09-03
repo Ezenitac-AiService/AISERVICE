@@ -57,10 +57,12 @@ http {
     limit_req_status 429;
     limit_conn_status 429;
 
-    # Trusted Proxy & Real Client IP Detection
-    set_real_ip_from 127.0.0.1/32;
-    set_real_ip_from 172.16.0.0/12;
-    real_ip_header X-Forwarded-For;
+    # Trusted Proxy & Real Client IP Detection. TRUSTED_PROXY_CIDRS is
+    # expanded by scripts/render_gateway_config.py; arbitrary client headers
+    # are never trusted without a configured proxy source.
+    # TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS}
+${TRUSTED_PROXY_DIRECTIVES}
+    real_ip_header ${TRUSTED_CLIENT_IP_HEADER};
     real_ip_recursive on;
 
     # Gzip Compression
