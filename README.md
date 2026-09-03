@@ -1,6 +1,6 @@
 # AISERVICE: 통합 AI 서비스 단일 진입 게이트웨이 및 분산 플랫폼
 
-> **A-Team(주식 수급 감정지수 분석 Pilos)**과 **B-Team(화장품 리뷰 감정분석 Oliview & AI 챗봇)**을 공인 HTTPS 단일 도메인(`https://ezenitac.duckdns.org`, Let's Encrypt 자동 발급) 및 사설 격리 네트워크로 통합한 엔터프라이즈 AI 서비스 플랫폼입니다.
+> **A-Team(주식 수급 감정지수 분석 Pilos)**과 **B-Team(화장품 리뷰 감정분석 Oliview & AI 챗봇)**을 단일 진입 게이트웨이 및 사설 격리 네트워크로 통합한 엔터프라이즈 AI 서비스 플랫폼입니다.
 
 ---
 
@@ -10,14 +10,12 @@
 flowchart TD
     Client(["🌐 외부 클라이언트 (Web / Mobile)"])
 
-    subgraph Internet_Ingress ["인그레스 & 보안 계층 (Traefik Ingress)"]
-        TraefikHTTP["Traefik (HTTP 80)<br/>➔ 301 HTTPS 강제 리다이렉트"]
-        TraefikHTTPS["Traefik (HTTPS 443)<br/>Let's Encrypt SSL/TLS 자동 갱신"]
-        K8sIngress["gateway-svc (K8s Ingress, Port 8080)"]
+    subgraph Internet_Ingress ["인그레스 & 보안 계층 (외부 게이트웨이)"]
+        ExternalGW["외부 게이트웨이 (FRP/SSH Tunnel Proxy)<br/>TLS 종료 및 서브패스 라우팅"]
     end
 
     subgraph Router_Layer ["통합 라우팅 포털 (Nginx 1.25)"]
-        NginxGateway["aiservice-gateway (Port 80)<br/>- / ➔ 통합 포털 랜딩<br/>- /bteam/* ➔ B-Team 프록시<br/>- /ateam/* ➔ A-Team 프록시"]
+        NginxGateway["aiservice-gateway (Port 3000, 8001~8004)<br/>- / ➔ 통합 포털 랜딩<br/>- /bteam/* ➔ B-Team 프록시<br/>- /ateam/* ➔ A-Team 프록시"]
     end
 
     subgraph Private_Network ["내부 사설 네트워크 (aiservice-network 격리)"]
@@ -37,18 +35,15 @@ flowchart TD
 
         subgraph Model_Gateway_Group ["⚡ 공용 추론 인프라 (GPU Serving)"]
             ModelGateway["vllm-serv-gateway (8081)<br/>FastAPI + llama.cpp"]
-            ResidentLLM["qwen3.5-2b (8089)<br/>16K Context 상주 서빙"]
+            ResidentLLM["qwen3.5-4b / qwen3.5-2b<br/>16K Context GPU 상주 서빙"]
             Embedding["bge-m3 (8090)<br/>밀집 벡터 임베딩"]
             Reranker["bge-reranker-v2-m3 (8091)<br/>교차 인코더 재정렬"]
             RedisCache[("aiservice-redis (6379)<br/>L2/L3 캐싱 & 세션")]
         end
     end
 
-    Client -->|HTTP 80| TraefikHTTP
-    Client -->|HTTPS 443| TraefikHTTPS
-    TraefikHTTP --> TraefikHTTPS
-    TraefikHTTPS --> K8sIngress
-    K8sIngress --> NginxGateway
+    Client --> ExternalGW
+    ExternalGW --> NginxGateway
 
     NginxGateway -->|/bteam/oliview| OliviewFE
     NginxGateway -->|/bteam/chata| ChatbotA
@@ -69,7 +64,7 @@ flowchart TD
     classDef ateam fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
     classDef gateway fill:#ede7f6,stroke:#512da8,stroke-width:2px;
 
-    class TraefikHTTP,TraefikHTTPS,K8sIngress ingress;
+    class ExternalGW ingress;
     class NginxGateway router;
     class OliviewFE,OliviewBE,ChatbotA,ChatbotB,BTeamDB bteam;
     class PilosWeb,PilosWorker,PilosDB ateam;
@@ -80,14 +75,14 @@ flowchart TD
 
 ## 🌐 단일 진입 URL 라우팅 맵
 
-| 서비스 명칭 | 공인 접속 URL | 백엔드 기술 스택 | 주요 기능 및 역할 |
-|---|---|---|---|
-| **통합 포털 랜딩** | `https://ezenitac.duckdns.org/` | Nginx Static Portal | 4대 AI 서비스 바로가기 대시보드 |
-| **B-Team Oliview** | `https://ezenitac.duckdns.org/bteam/oliview` | React 18 + Flask | 화장품 리뷰 감정 분석 & 속성별 비교 통계 |
-| **B-Team 올리챗** | `https://ezenitac.duckdns.org/bteam/chata` | Streamlit + BGE-M3 | 초보자 맞춤 대화형 뷰티 가이드 AI |
-| **B-Team 올원챗** | `https://ezenitac.duckdns.org/bteam/chatb` | FastAPI + 하이브리드 RAG | 실시간 SSE 스트리밍 뷰티 솔루션 챗봇 |
-| **A-Team Pilos** | `https://ezenitac.duckdns.org/ateam/pilos` | Flask + Chart.js | 종목토론방 수급 감정지수 시각화 & 리포트 |
-| **A-Team Worker** | *(Internal Daemon)* | Python Background Daemon | 7단계 수집·분석·LLM 리포트 10분 주기 실행 |
+| 서비스 명칭 | 로컬 포트 | 공인/게이트웨이 접속 경로 | 백엔드 기술 스택 | 주요 기능 및 역할 |
+|---|---|---|---|---|
+| **통합 포털 랜딩** | `3000` | `https://<domain>/` | Nginx Static Portal | 4대 AI 서비스 바로가기 대시보드 |
+| **B-Team Oliview** | `8002` | `https://<domain>/bteam/oliview/` | React 18 + Flask | 화장품 리뷰 감정 분석 & 속성별 비교 통계 |
+| **B-Team 올리챗** | `8003` | `https://<domain>/bteam/chata/` | Streamlit + BGE-M3 | 초보자 맞춤 대화형 뷰티 가이드 AI |
+| **B-Team 올원챗** | `8004` | `https://<domain>/bteam/chatb/` | FastAPI + 하이브리드 RAG | 실시간 SSE 스트리밍 뷰티 솔루션 챗봇 |
+| **A-Team Pilos** | `8001` | `https://<domain>/ateam/pilos/` | Flask + Chart.js | 종목토론방 수급 감정지수 시각화 & 리포트 |
+| **A-Team Worker** | *(Internal)* | *(Internal Daemon)* | Python Background Daemon | 7단계 수집·분석·LLM 리포트 주기 실행 |
 
 ---
 
