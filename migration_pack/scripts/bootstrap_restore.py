@@ -167,7 +167,7 @@ def wait_for_redis(container: str = "aiservice-redis", max_retries: int = 60) ->
 
 
 def wait_for_model_gateway(
-    url: str = "http://127.0.0.1:8081/health", max_retries: int = 60
+    url: str = "http://vllm-serv-gateway:8081/health", max_retries: int = 60
 ) -> bool:
     for _ in range(max_retries):
         try:

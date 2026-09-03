@@ -1,0 +1,22 @@
+# ==============================================================================
+# Migration Pack .gitignore
+# ==============================================================================
+
+# Runtime Secrets
+.env
+.env.*
+!.env.migration.template
+secrets/
+*.key
+*.pem
+
+# Staging Volumes & Temporary Backups
+staging/
+staging_volumes/
+*.tmp
+*.bak
+*.orig
+
+# Temporary Reports & Verification Artifacts
+temp_reports/
+*.log

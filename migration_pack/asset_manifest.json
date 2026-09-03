@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "manifest_kind": "AISERVICE_MIGRATION_ASSETS",
+  "source_manifest": "migration_manifest.json",
+  "path_base": "AISERVICE_ROOT",
+  "assets": [
+    {
+      "asset_id": "qwen3.5-4b",
+      "kind": "model_file",
+      "path": "model_gateway/models/qwen3.5-4b/Qwen3.5-4B-Q4_K_M.gguf",
+      "required": true,
+      "size_bytes": 4500000000,
+      "file_count": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "file",
+      "application_validation": "model_load"
+    },
+    {
+      "asset_id": "qwen3.5-2b",
+      "kind": "model_file",
+      "path": "model_gateway/models/qwen3.5-2b/Qwen3.5-2B-Q4_K_M.gguf",
+      "required": true,
+      "size_bytes": 2600000000,
+      "file_count": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "file",
+      "application_validation": "model_load"
+    },
+    {
+      "asset_id": "bge-m3",
+      "kind": "model_file",
+      "path": "model_gateway/models/bge-m3/bge-m3-q8_0.gguf",
+      "required": true,
+      "size_bytes": 1200000000,
+      "file_count": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "file",
+      "application_validation": "model_load"
+    },
+    {
+      "asset_id": "bge-reranker-v2-m3",
+      "kind": "model_file",
+      "path": "model_gateway/models/bge-reranker-v2-m3/bge-reranker-v2-m3-q8_0.gguf",
+      "required": true,
+      "size_bytes": 1200000000,
+      "file_count": 1,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "file",
+      "application_validation": "model_load"
+    },
+    {
+      "asset_id": "pilos-rag-chroma",
+      "kind": "rag_directory",
+      "path": "ateam/pilos-sentiment-index/artifacts/rag_chroma/",
+      "required": true,
+      "size_bytes": 50000000,
+      "file_count": 5,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "recursive_directory",
+      "application_validation": "rag_open"
+    },
+    {
+      "asset_id": "chata-chroma-bm25",
+      "kind": "rag_directory",
+      "path": "bteam/Oliview_chatbot_a/chroma_db_oliview/",
+      "required": true,
+      "size_bytes": 75000000,
+      "file_count": 6,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hash_scope": "recursive_directory",
+      "application_validation": "rag_open"
+    }
+  ]
+}

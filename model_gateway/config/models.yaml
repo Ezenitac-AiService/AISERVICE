@@ -1,0 +1,39 @@
+# ==============================================================================
+# AISERVICE Model Gateway Model Declarations (SSOT)
+# ==============================================================================
+hardware_profile: dev-rtx3060
+vram_safety_limit_mb: 10240
+max_gpu_concurrent_slots: 4
+
+models:
+  qwen3.5-4b:
+    role: synthesis_llm
+    alias: [synthesis, default]
+    filename: qwen3.5-4b.gguf
+    n_ctx: 16384
+    vram_mb: 4500
+    n_gpu_layers: 99
+
+  qwen3.5-2b:
+    role: fast_llm
+    alias: [fast]
+    filename: qwen3.5-2b.gguf
+    n_ctx: 16384
+    vram_mb: 2600
+    n_gpu_layers: 99
+
+  bge-m3:
+    role: embedding
+    alias: [embedding]
+    filename: bge-m3
+    n_ctx: 8192
+    vram_mb: 1200
+    n_gpu_layers: 99
+
+  bge-reranker-v2-m3:
+    role: rerank
+    alias: [rerank]
+    filename: bge-reranker-v2-m3
+    n_ctx: 8192
+    vram_mb: 1200
+    n_gpu_layers: 99

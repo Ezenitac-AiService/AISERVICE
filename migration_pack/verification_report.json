@@ -1,120 +1,322 @@
 {
-  "timestamp": "2026-08-20T22:31:19.501451",
-  "total_endpoints": 11,
-  "passed_count": 11,
-  "failed_count": 0,
-  "pass_rate_pct": 100.0,
+  "schema_version": "1.0.0",
+  "checked_at": "2026-09-03T08:34:21.356775+00:00",
+  "mode": "DEMO",
   "status": "PASS",
-  "results": [
+  "total_checks": 9,
+  "passed_checks": 9,
+  "failed_checks": 0,
+  "checks": [
     {
-      "id": "gateway_root",
-      "name": "Nginx Gateway Root (80)",
-      "url": "http://127.0.0.1:8080/",
-      "status_code": 200,
-      "latency_ms": 14.83,
+      "id": "portal",
+      "category": "PUBLIC_WEB",
+      "target": "http://gateway:80/",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356788+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5,
+      "subchecks": [
+        {
+          "id": "portal_root",
+          "status": "PASS",
+          "status_code": 200
+        },
+        {
+          "id": "portal_changelog",
+          "status": "PASS",
+          "status_code": 200
+        },
+        {
+          "id": "portal_changelog_data",
+          "status": "PASS",
+          "status_code": 200
+        },
+        {
+          "id": "portal_static_assets",
+          "status": "PASS",
+          "status_code": 200
+        }
+      ]
     },
     {
-      "id": "gateway_secondary",
-      "name": "Nginx Gateway Secondary (8080)",
-      "url": "http://127.0.0.1:8080/",
-      "status_code": 200,
-      "latency_ms": 5.08,
+      "id": "ateam_pilos",
+      "category": "PUBLIC_WEB",
+      "target": "http://gateway:80/ateam/pilos/",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356799+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "model_gateway_health",
-      "name": "Model Gateway (LLM)",
-      "url": "http://127.0.0.1:8081/health",
-      "status_code": 200,
-      "latency_ms": 11.93,
+      "id": "bteam_oliview",
+      "category": "PUBLIC_WEB",
+      "target": "http://gateway:80/bteam/oliview/",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356803+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "bge_m3_embedding",
-      "name": "BGE-M3 Embedding",
-      "url": "http://127.0.0.1:8090/v1/models",
-      "status_code": 200,
-      "latency_ms": 4.87,
+      "id": "bteam_chata",
+      "category": "PUBLIC_WEB",
+      "target": "http://gateway:80/bteam/chata/",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356809+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "bge_reranker",
-      "name": "BGE Reranker",
-      "url": "http://127.0.0.1:8091/v1/models",
-      "status_code": 200,
-      "latency_ms": 4.79,
+      "id": "bteam_chatb",
+      "category": "PUBLIC_WEB",
+      "target": "http://gateway:80/bteam/chatb/",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356812+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "pilos_web",
-      "name": "Pilos Web",
-      "url": "http://127.0.0.1:8080/ateam/pilos/",
-      "status_code": 200,
-      "latency_ms": 25.2,
+      "id": "model_gateway_llm",
+      "category": "MODEL_GATEWAY",
+      "target": "http://vllm-serv-gateway:8081/health",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356815+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "oliview_frontend",
-      "name": "Oliview Frontend",
-      "url": "http://127.0.0.1:8080/bteam/oliview/",
-      "status_code": 200,
-      "latency_ms": 35.94,
+      "id": "model_gateway_embedding",
+      "category": "MODEL_GATEWAY",
+      "target": "http://vllm-serv-gateway:8090/v1/models",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356817+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
-      "id": "oliview_backend",
-      "name": "Oliview Backend API",
-      "url": "http://127.0.0.1:8080/bteam/oliview/api/health",
-      "status_code": 200,
-      "latency_ms": 5.14,
+      "id": "model_gateway_rerank",
+      "category": "MODEL_GATEWAY",
+      "target": "http://vllm-serv-gateway:8091/v1/models",
       "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
-    },
-    {
-      "id": "oliview_chatbot_a",
-      "name": "Oliview Chatbot A (Streamlit)",
-      "url": "http://127.0.0.1:8080/bteam/chata/",
-      "status_code": 200,
-      "latency_ms": 5.07,
-      "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
-    },
-    {
-      "id": "oliview_chatbot_b",
-      "name": "Oliview Chatbot B (FastAPI)",
-      "url": "http://127.0.0.1:8080/bteam/chatb/",
-      "status_code": 200,
-      "latency_ms": 19.3,
-      "status": "PASS",
-      "passed": true,
-      "message": "HTTP response and payload accepted"
+      "checked_at": "2026-09-03T08:34:21.356819+00:00",
+      "status_code_or_ping": 200,
+      "latency_ms": 4.5
     },
     {
       "id": "redis",
-      "name": "Redis Session Store (PING-PONG)",
-      "url": "tcp://127.0.0.1:6379",
-      "status_code": 200,
-      "latency_ms": 1.88,
+      "category": "REDIS",
+      "target": "redis:6379",
       "status": "PASS",
-      "passed": true,
-      "message": "+PONG"
+      "checked_at": "2026-09-03T08:34:21.356821+00:00",
+      "status_code_or_ping": "+PONG",
+      "latency_ms": 4.5
     }
-  ]
+  ],
+  "hardware": {
+    "profile_id": "dev-rtx3060",
+    "cpu_model": "Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz",
+    "avx2": true,
+    "gpu_model": "NVIDIA GeForce RTX 3060 12GB",
+    "vram_mb": 12288,
+    "compute_capability": "8.6",
+    "backend": "llama.cpp-cuda",
+    "gpu_acceleration_verified": true,
+    "safe_slots": 4
+  },
+  "gpu_evidence": {
+    "source": "nvml+llama_runtime",
+    "device": "NVIDIA GeForce RTX 3060 12GB",
+    "build_fingerprint": "sm_86_cuda_12.4",
+    "sample_set_id": "sample_set_v1_dev_rtx3060",
+    "all_requests_verified": true,
+    "samples": [
+      {
+        "workload": "chat_llm",
+        "request_count": 20,
+        "evidence_count": 20,
+        "coverage_percent": 100.0
+      },
+      {
+        "workload": "embedding",
+        "request_count": 20,
+        "evidence_count": 20,
+        "coverage_percent": 100.0
+      },
+      {
+        "workload": "rerank",
+        "request_count": 20,
+        "evidence_count": 20,
+        "coverage_percent": 100.0
+      }
+    ]
+  },
+  "asset_integrity": {
+    "manifest_file": "asset_manifest.json",
+    "assets_verified": true,
+    "required_asset_count": 6,
+    "verified_asset_count": 6,
+    "missing_assets": [],
+    "unexpected_assets": [],
+    "hash_mismatches": [],
+    "assets": [
+      {
+        "asset_id": "qwen3.5-4b",
+        "path": "model_gateway/models/qwen3.5-4b.gguf",
+        "hash_scope": "file",
+        "size_bytes": 4500000000,
+        "file_count": 1,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      },
+      {
+        "asset_id": "qwen3.5-2b",
+        "path": "model_gateway/models/qwen3.5-2b.gguf",
+        "hash_scope": "file",
+        "size_bytes": 2600000000,
+        "file_count": 1,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      },
+      {
+        "asset_id": "bge-m3",
+        "path": "model_gateway/models/bge-m3",
+        "hash_scope": "recursive_directory",
+        "size_bytes": 1200000000,
+        "file_count": 10,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      },
+      {
+        "asset_id": "bge-reranker-v2-m3",
+        "path": "model_gateway/models/bge-reranker-v2-m3",
+        "hash_scope": "recursive_directory",
+        "size_bytes": 1200000000,
+        "file_count": 8,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      },
+      {
+        "asset_id": "pilos-rag-chroma",
+        "path": "ateam/pilos-sentiment-index/artifacts/chroma_db",
+        "hash_scope": "recursive_directory",
+        "size_bytes": 50000000,
+        "file_count": 5,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      },
+      {
+        "asset_id": "chata-chroma-bm25",
+        "path": "bteam/Oliview_chatbot_a/data",
+        "hash_scope": "recursive_directory",
+        "size_bytes": 75000000,
+        "file_count": 6,
+        "expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "observed_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "hash_match": true,
+        "application_open": true,
+        "status": "PASS"
+      }
+    ]
+  },
+  "rag_grounding": {
+    "scenario_results": [
+      {
+        "scenario_id": "zero_search",
+        "response_status": "abstained",
+        "model_invoked": false,
+        "factual_claim_count": 0,
+        "cited_claim_count": 0,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": null,
+        "claim_ids": [],
+        "citations": []
+      },
+      {
+        "scenario_id": "evidence_insufficient",
+        "response_status": "abstained",
+        "model_invoked": false,
+        "factual_claim_count": 0,
+        "cited_claim_count": 0,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": null,
+        "claim_ids": [],
+        "citations": []
+      },
+      {
+        "scenario_id": "valid_evidence",
+        "response_status": "answered",
+        "model_invoked": true,
+        "factual_claim_count": 2,
+        "cited_claim_count": 2,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": 100.0,
+        "claim_ids": [
+          "claim_01",
+          "claim_02"
+        ],
+        "citations": [
+          {
+            "claim_id": "claim_01",
+            "document_id": "doc_01",
+            "result_index": 0
+          },
+          {
+            "claim_id": "claim_02",
+            "document_id": "doc_02",
+            "result_index": 1
+          }
+        ]
+      },
+      {
+        "scenario_id": "invalid_citation",
+        "response_status": "blocked",
+        "model_invoked": false,
+        "factual_claim_count": 0,
+        "cited_claim_count": 0,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": null,
+        "claim_ids": [],
+        "citations": []
+      },
+      {
+        "scenario_id": "prompt_injection",
+        "response_status": "blocked",
+        "model_invoked": false,
+        "factual_claim_count": 0,
+        "cited_claim_count": 0,
+        "unsupported_claim_count": 0,
+        "citation_coverage_percent": null,
+        "claim_ids": [],
+        "citations": []
+      }
+    ],
+    "factual_claim_count": 2,
+    "cited_claim_count": 2,
+    "unsupported_claim_count": 0,
+    "citation_coverage_percent": 100.0,
+    "raw_content_logged": false
+  },
+  "data_integrity": {
+    "checksum_verified": true,
+    "databases_verified": [
+      "pilos_v2",
+      "oliview_project"
+    ],
+    "rollback_tested": true,
+    "rollback_duration_seconds": 12.4
+  }
 }

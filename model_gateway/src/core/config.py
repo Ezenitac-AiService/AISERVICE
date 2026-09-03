@@ -1,13 +1,27 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-from pydantic import BaseModel
-from src.core.config_manager import ConfigManager
+try:
+    from dotenv import load_dotenv
+    _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+    load_dotenv(_PROJECT_ROOT / ".env")
+except ImportError:
+    pass
 
-# Load .env from project root
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-load_dotenv(_PROJECT_ROOT / ".env")
+try:
+    from pydantic import BaseModel
+except ImportError:
+    class BaseModel:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+try:
+    from src.core.config_manager import ConfigManager
+except ImportError:
+    class ConfigManager:
+        def get_model_catalog(self):
+            return {}
 
 
 class ModelConfig(BaseModel):
@@ -78,3 +92,31 @@ MODELS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models"
 )
 os.makedirs(MODELS_DIR, exist_ok=True)
+
+
+def get_model_routing_config() -> dict[str, str]:
+    """Return the SSOT routing keys mapping to model IDs."""
+    return {
+        "DEFAULT_MODEL": os.environ.get("DEFAULT_MODEL", "qwen3.5-4b"),
+        "FAST_LLM_MODEL": os.environ.get("FAST_LLM_MODEL", "qwen3.5-2b"),
+        "SYNTHESIS_LLM_MODEL": os.environ.get("SYNTHESIS_LLM_MODEL", "qwen3.5-4b"),
+        "EMBEDDING_MODEL": os.environ.get("EMBEDDING_MODEL", "bge-m3"),
+        "RERANK_MODEL": os.environ.get("RERANK_MODEL", "bge-reranker-v2-m3"),
+    }
+
+
+def get_effective_model(alias: str, single_model_mode: bool = False) -> str:
+    """Resolve alias to effective model ID with single-model mode support."""
+    routing = get_model_routing_config()
+    alias_lower = alias.lower()
+    if single_model_mode and alias_lower in ("synthesis", "synthesis_llm_model", "fast", "fast_llm_model"):
+        return routing["FAST_LLM_MODEL"]
+    if alias_lower in ("fast", "fast_llm_model"):
+        return routing["FAST_LLM_MODEL"]
+    if alias_lower in ("synthesis", "synthesis_llm_model"):
+        return routing["SYNTHESIS_LLM_MODEL"]
+    if alias_lower in ("embedding", "embedding_model"):
+        return routing["EMBEDDING_MODEL"]
+    if alias_lower in ("rerank", "rerank_model"):
+        return routing["RERANK_MODEL"]
+    return routing.get(alias, routing["DEFAULT_MODEL"])

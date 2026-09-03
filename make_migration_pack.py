@@ -203,8 +203,8 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="GPU 설치·JIT·GPU Compose 경로를 생략하고 CPU-only 모드로 패키징",
     )
     parser.add_argument("--target-os", default="ubuntu", help="타겟 OS 프로파일")
-    parser.add_argument("--target-cpu", default="i7-930", help="타겟 CPU 프로파일")
-    parser.add_argument("--target-gpu", default="gtx1070", help="타겟 GPU 프로파일")
+    parser.add_argument("--target-cpu", default="i7-4770", help="타겟 CPU 프로파일")
+    parser.add_argument("--target-gpu", default="rtx3060", help="타겟 GPU 프로파일")
     parser.add_argument("--dry-run", action="store_true", help="사전검사만 수행")
     parser.add_argument(
         "--force", "-f", action="store_true", help="기존 산출물 덮어쓰기 및 무인 실행"
@@ -696,22 +696,22 @@ def step_3_build_dist_bundle(
 
 def _target_hardware(target_cpu: str, target_gpu: str) -> dict[str, Any]:
     gpu_label = (
-        "NVIDIA GeForce GTX 1070 8GB (Pascal sm_61)"
-        if target_gpu.lower() in {"gtx1070", "sm_61", "61"}
+        "NVIDIA GeForce RTX 3060 12GB (Ampere sm_86)"
+        if target_gpu.lower() in {"rtx3060", "sm_86", "86"}
         else target_gpu
     )
     cpu_label = (
-        "Intel Core i7-930 (SSE4.2, Non-AVX)"
-        if target_cpu.lower() == "i7-930"
+        "Intel Core i7-4770 (AVX2, FMA)"
+        if target_cpu.lower() in {"i7-4770", "haswell"}
         else target_cpu
     )
     return {
         "cpu": cpu_label,
         "gpu": gpu_label,
-        "ram_mb": 24576,
-        "vram_mb": 8192 if gpu_label != "none" else 0,
-        "llama_cpp_flags": "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=61 -march=native -DGGML_AVX=OFF -DGGML_AVX2=OFF",
-        "vram_safety_limit_mb": 5000,
+        "ram_mb": 16384,
+        "vram_mb": 12288 if gpu_label != "none" else 0,
+        "llama_cpp_flags": "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=86 -march=native -DGGML_AVX2=ON",
+        "vram_safety_limit_mb": 10240,
     }
 
 
@@ -795,8 +795,8 @@ def step_4_generate_manifest(
     bundle_dir: Path,
     databases: list[dict[str, Any]],
     volumes: list[dict[str, Any]],
-    target_cpu: str = "i7-930",
-    target_gpu: str = "gtx1070",
+    target_cpu: str = "i7-4770",
+    target_gpu: str = "rtx3060",
     *,
     environment: Mapping[str, str] | None = None,
     models: list[dict[str, Any]] | None = None,

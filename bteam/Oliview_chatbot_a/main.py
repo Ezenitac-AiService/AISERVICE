@@ -41,6 +41,7 @@ app = FastAPI(
     title="Oliview ChatA Concierge Service",
     description="Olive Young Beauty Review Concierge Agent with SSE Streaming (Spec 048)",
     version="2.0.0",
+    root_path=os.environ.get("FASTAPI_ROOT_PATH", "/bteam/chata"),
 )
 
 # CORS configuration

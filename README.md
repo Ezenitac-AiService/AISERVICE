@@ -116,10 +116,29 @@ docker exec -it pilos-worker python -m pilos.jobs.run_service_pipeline
 
 ---
 
+## 🐧 네이티브 Ubuntu 24.04 LTS 마이그레이션 환경 (dev-rtx3060)
+
+- **타겟 하드웨어**: Intel Core i7-4770 (AVX2), 16GB RAM, NVIDIA GeForce RTX 3060 12GB (Compute Capability 8.6, sm_86)
+- **운영 모드**: `APP_RUN_MODE=DEMO` (PoC/DEMO 수용 기준)
+- **터널 진입점 연동**: 로컬 게이트웨이 포트 5개(`3000`, `8001~8004`)가 `dist_client_a` 역방향 터널을 통해 공인 게이트웨이에 연결됨
+- **상세 수용 검증 가이드**: [specs/001-aiservice-platform-migration/quickstart.md](../specs/001-aiservice-platform-migration/quickstart.md)
+
+### 테스트 실행 명령
+```bash
+# 계약 및 런타임 테스트 실행
+pytest tests/contract -v
+pytest tests/integration -v
+pytest model_gateway/tests/contract -v
+```
+
+---
+
 ## 📚 상세 기술문서 목차 (Documentation)
 
 각 서브 도메인별 심층 구현 아키텍처 및 상세 사양은 아래의 전용 문서에서 확인하실 수 있습니다:
 
+0. 🎯 **[001 마이그레이션 수용 가이드](../specs/001-aiservice-platform-migration/quickstart.md)**
+   - Ubuntu 24.04 LTS 네이티브 복원, 9개 핵심 헬스체크 및 롤백 검증 절차
 1. 🏛️ **[통합 시스템 및 인프라 아키텍처 상세](docs/architecture.md)**
    - K8s Ingress, Traefik HTTPS 암호화, Nginx 라우터 및 사설 도커 브리지 네트워크 격리 구조
 2. ⚡ **[Model Gateway & GPU 추론 서빙 상세](docs/model_gateway.md)**

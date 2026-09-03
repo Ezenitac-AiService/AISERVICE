@@ -1,22 +1,104 @@
 {
-  "manifest_version": "2.0.0",
-  "created_at": "2026-08-30T20:18:00+09:00",
+  "manifest_version": "1.1.0",
+  "migration_mode": "DEMO_PLATFORM_TRANSFER",
   "source_environment": {
     "os": "Windows",
-    "platform": "Windows/WSL2",
-    "hostname": "source-host"
+    "platform": "Windows/WSL2"
   },
-  "databases": {
-    "pilos_v2": {
+  "target_hardware_profile": {
+    "profile_id": "dev-rtx3060",
+    "cpu_model": "Intel(R) Core(TM) i7-4770 CPU @ 3.40GHz",
+    "supports_avx2": true,
+    "gpu_name": "NVIDIA GeForce RTX 3060 12GB",
+    "vram_mb": 12288,
+    "compute_capability": "8.6",
+    "backend": "llama.cpp-cuda",
+    "vram_safety_limit_mb": 10240,
+    "max_gpu_concurrent_slots": 4
+  },
+  "databases": [
+    {
+      "name": "pilos_v2",
       "dump_file": "database/pilos_v2.sql.gz",
-      "compressed_size_bytes": 504569163,
-      "sha256": "50ddf67ea31aad03d7f8a1b293af0a234f91a2f6a8b36a5a0880668179cacbed"
+      "size_bytes": 504569163,
+      "sha256": "50ddf67ea31aad03d7f8a1b293af0a234f91a2f6a8b36a5a0880668179cacbed",
+      "row_counts": {
+        "reviews": 125000,
+        "sentiment_records": 125000
+      },
+      "live_volume": "aiservice_db_data",
+      "staging_volume": "staging_pilos_v2"
     },
     {
       "name": "oliview_project",
       "dump_file": "database/oliview_project.sql.gz",
-      "compressed_size_bytes": 537276691,
-      "sha256": "3ab81f98900b6cbf72ac909a242f5101b6033a9f5ade87aef07224451b1bce8d"
+      "size_bytes": 537276691,
+      "sha256": "3ab81f98900b6cbf72ac909a242f5101b6033a9f5ade87aef07224451b1bce8d",
+      "row_counts": {
+        "products": 5400,
+        "users": 1200
+      },
+      "live_volume": "aiservice_db_data",
+      "staging_volume": "staging_oliview_project"
+    }
+  ],
+  "secrets": {
+    "source": "external_protected_path",
+    "plaintext_excluded": true,
+    "mode": "0600",
+    "fields": [
+      "DB_PASSWORD",
+      "JWT_SECRET",
+      "REDIS_PASSWORD",
+      "HF_TOKEN"
+    ]
+  },
+  "ddns": {
+    "enabled": false,
+    "runtime_dependency": false,
+    "cron_entries": 0
+  },
+  "services": [
+    "gateway",
+    "model-gateway",
+    "ateam-pilos",
+    "bteam-oliview",
+    "bteam-chata",
+    "bteam-chatb",
+    "redis",
+    "mysql"
+  ],
+  "asset_manifest_file": "asset_manifest.json",
+  "tunnel_policy": {
+    "frp_primary": {
+      "enabled": true,
+      "remote_ports": [18000, 18001, 18002, 18003, 18004]
+    },
+    "ssh_standby": {
+      "default_enabled": false,
+      "enabled": false,
+      "default_service_state": "installed_disabled",
+      "enabled_service_state": "enabled_running",
+      "explicit_enablement_required": true,
+      "enablement_flag": "ENABLE_SSH_STANDBY_TUNNEL",
+      "remote_ports": [28000, 28001, 28002, 28003, 28004],
+      "endpoint_source": "external_gateway_config"
+    },
+    "external_gateway": {
+      "config_ref": "docs/external-gateway.md",
+      "owner": "external_gateway_operator",
+      "owned_responsibilities": [
+        "public_dns",
+        "tls",
+        "path_mapping",
+        "probe",
+        "failover",
+        "failback"
+      ],
+      "owns_public_mapping": true,
+      "probe_interval_seconds": 3,
+      "failover_failed_probes": 1,
+      "failback_successful_probes": 3
     }
   }
 }

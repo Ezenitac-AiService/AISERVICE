@@ -8,7 +8,6 @@ services:
     command: ["bash", "-c", "python3 -m src.api.server < /dev/null"]
     init: true
     restart: unless-stopped
-    privileged: true
     stdin_open: true
     tty: true
     volumes:
@@ -17,12 +16,15 @@ services:
       - ./data:/app/data
       - ./src:/app/src
       - ./scripts:/app/scripts
-      - /usr/lib/wsl:/usr/lib/wsl:ro
-    devices:
-      - /dev/dxg:/dev/dxg
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     environment:
       - PYTHONPATH=/app:/app/.venv/lib/python3.12/site-packages
-      - LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/lib/wsl/drivers:/usr/local/lib:/usr/lib/x86_64-linux-gnu
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PYTHONUNBUFFERED=1

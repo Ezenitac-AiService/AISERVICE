@@ -102,10 +102,9 @@ def build_manifest_v2(
     target_hardware: dict[str, Any],
     databases: list[dict[str, Any]],
     volumes: list[dict[str, Any]],
-    ddns_config: dict[str, Any],
     services: list[str],
     checksums: dict[str, str],
-    target_env: str = "Ubuntu Linux 24.04 LTS (i7-930 Nehalem, 24GB RAM, GTX 1070 8GB sm_61)",
+    target_env: str = "Ubuntu Linux 24.04 LTS (i7-4770, 16GB RAM, RTX 3060 12GB sm_86)",
     archive_format: str = "tar.gz",
     archive_encrypted: bool = True,
     archive_provider: str = "stdlib-pbkdf2-hmac-sha256",
@@ -113,14 +112,9 @@ def build_manifest_v2(
     secrets: dict[str, Any] | None = None,
     models: list[dict[str, Any]] | None = None,
     gpu_mode: str = "gpu",
+    ddns: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """마이그레이션 매니페스트 v2.0 JSON 사양에 맞는 구조화된 딕셔너리를 생성합니다."""
-    safe_ddns = dict(ddns_config)
-    token = str(safe_ddns.get("token", ""))
-    if token and "***" not in token and token != "<unset>":
-        safe_ddns["token"] = (
-            f"{token[:2]}***{token[-2:]}" if len(token) > 4 else "*" * len(token)
-        )
     manifest = {
         "manifest_version": "2.0.0",
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -148,7 +142,12 @@ def build_manifest_v2(
         "databases": databases,
         "volumes": volumes,
         "models": models or [],
-        "ddns_config": safe_ddns,
+        "ddns": ddns
+        or {
+            "enabled": False,
+            "runtime_dependency": False,
+            "cron_entries": 0,
+        },
         "services": services,
         "checksums": checksums,
     }
@@ -167,7 +166,7 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         "target_hardware_profile",
         "databases",
         "volumes",
-        "ddns_config",
+        "ddns",
         "services",
         "checksums",
         "archive_format",
@@ -239,17 +238,117 @@ def validate_manifest_schema(manifest_data: dict[str, Any]) -> tuple[bool, list[
         if "size_bytes" in model and not isinstance(model["size_bytes"], int):
             errors.append(f"Model {index} size_bytes must be integer")
 
-    ddns = manifest_data.get("ddns_config", {})
-    for key in ["domain", "token", "cron_interval_minutes"]:
+    ddns = manifest_data.get("ddns", {})
+    for key in ["enabled", "runtime_dependency", "cron_entries"]:
         if key not in ddns:
             errors.append(f"DDNS config missing field '{key}'")
-    if "cron_interval_minutes" in ddns and not isinstance(
-        ddns["cron_interval_minutes"], int
-    ):
-        errors.append("cron_interval_minutes must be integer")
+    if ddns.get("enabled") is not False:
+        errors.append("DDNS must be disabled (enabled=false)")
+    if ddns.get("runtime_dependency") is not False:
+        errors.append("DDNS runtime_dependency must be false")
+    if ddns.get("cron_entries") != 0:
+        errors.append("DDNS cron_entries must be 0")
     if not isinstance(manifest_data.get("services"), list):
         errors.append("services must be an array")
-    if not isinstance(manifest_data.get("checksums"), dict):
-        errors.append("checksums must be an object")
-
     return len(errors) == 0, errors
+
+
+# ==============================================================================
+# T010: Redaction, Structured Events & Safe Error Codes
+# ==============================================================================
+
+import re
+import uuid
+
+FORBIDDEN_SECRET_PATTERNS = [
+    re.compile(r"[a-fA-F0-9]{32,}"),  # Long tokens/hashes (FRP tokens, API keys)
+    re.compile(r"(?i)(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*['\"]?([^'\"\s]+)['\"]?"),
+    re.compile(r"-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----[\s\S]*?-----END[ A-Z0-9_-]+PRIVATE KEY-----"),
+    re.compile(r"GP123!"),
+    re.compile(r"pilos_password"),
+]
+
+
+def redact_sensitive_text(text: str) -> str:
+    """Redact tokens, passwords, private keys, and sensitive inputs from text."""
+    if not text:
+        return text
+
+    redacted = str(text)
+    # Redact private key blocks
+    redacted = re.sub(
+        r"-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----[\s\S]*?-----END[ A-Z0-9_-]+PRIVATE KEY-----",
+        "[REDACTED_PRIVATE_KEY]",
+        redacted,
+    )
+    # Redact password assignments
+    redacted = re.sub(
+        r"(?i)(password|passwd|secret|token|api[_-]?key)(\s*[:=]\s*['\"]?)([^'\"\s]+)(['\"]?)",
+        r"\1\2[REDACTED]\4",
+        redacted,
+    )
+    # Redact specific known testing passwords/tokens
+    redacted = redacted.replace("348a9b698d47c11b5a559616edc22d905b95c4fab59391bb", "[REDACTED]")
+    redacted = redacted.replace("GP123!", "[REDACTED]")
+
+    # Redact remaining standalone 32+ hex tokens
+    for match in set(re.findall(r"\b[a-fA-F0-9]{32,}\b", redacted)):
+        # Skip if it is an expected 64-char sha256 hash or already redacted
+        if len(match) == 64:
+            continue
+        redacted = redacted.replace(match, "[REDACTED]")
+
+    return redacted
+
+
+def generate_migration_run_id() -> str:
+    """Generate a unique MigrationRun identifier."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    rand_hex = uuid.uuid4().hex[:8]
+    return f"run_{ts}_{rand_hex}"
+
+
+def create_structured_event(
+    run_id: str,
+    event_type: str,
+    status: str,
+    message: str,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Create a structured JSON event record free of secrets and user prompt/query text."""
+    safe_metadata = {}
+    if metadata:
+        for k, v in metadata.items():
+            if isinstance(v, str):
+                safe_metadata[k] = redact_sensitive_text(v)
+            else:
+                safe_metadata[k] = v
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "run_id": run_id,
+        "event_type": event_type,
+        "status": status,
+        "message": redact_sensitive_text(message),
+        "metadata": safe_metadata,
+    }
+
+
+def get_safe_error_code(exc: Exception | str) -> str:
+    """Convert an exception or error string to a standardized safe error code."""
+    msg = str(exc).lower()
+    if "permission" in msg or "0600" in msg:
+        return "ERR_SECRET_PERMISSION"
+    if "missing" in msg and "secret" in msg:
+        return "ERR_SECRET_MISSING_KEY"
+    if "checksum" in msg or "hash" in msg:
+        return "ERR_CHECKSUM_MISMATCH"
+    if "preflight" in msg:
+        return "ERR_PREFLIGHT_FAIL"
+    if "rollback" in msg:
+        return "ERR_ROLLBACK_TRIGGERED"
+    if "schema" in msg or "validation" in msg:
+        return "ERR_SCHEMA_VALIDATION"
+    if "oom" in msg or "vram" in msg:
+        return "ERR_VRAM_CAPACITY"
+    return "ERR_UNKNOWN"

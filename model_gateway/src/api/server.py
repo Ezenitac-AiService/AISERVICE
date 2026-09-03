@@ -16,6 +16,10 @@ from src.api.routes.inference_api import router as inference_router
 from src.api.routes.dashboard_api import router as dashboard_router
 from src.api.routes.admin_api import router as admin_router
 from src.api.routes.health_api import router as health_router
+try:
+    from src.api.routes_v1 import router as v1_router
+except ImportError:
+    v1_router = None
 from src.api.middleware.subnet_filter import SubnetFilterMiddleware
 from src.api.middleware.client_access_logger import ClientAccessLogMiddleware
 from src.api.middleware.api_key_auth import APIKeyAuthMiddleware
@@ -109,6 +113,8 @@ def create_app() -> FastAPI:
     app.include_router(inference_router)
     app.include_router(dashboard_router)
     app.include_router(health_router)
+    if v1_router is not None:
+        app.include_router(v1_router)
 
 
 

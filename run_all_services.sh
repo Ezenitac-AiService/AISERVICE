@@ -18,26 +18,22 @@ fi
 ACTION="${1:-up}"
 
 if [ "$ACTION" = "up" ]; then
-    echo "[START] Starting all 10 containers in unified aiservice-network..."
+    echo "[START] Starting containers in unified aiservice-network..."
     docker compose up -d
-    echo "[K8S] Applying Kubernetes Ingress & gateway-svc..."
-    kubectl apply -f ddns/ingress-ezenitac.yaml >/dev/null 2>&1 || true
     echo ""
     echo "======================================================================"
-    echo " [SUCCESS] All 10 services are running!"
+    echo " [SUCCESS] AISERVICE containers are running!"
     echo "======================================================================"
-    echo " - Public HTTPS Portal:    https://ezenitac.duckdns.org/"
-    echo " - Local Portal Landing:   http://localhost:8080/ (or http://localhost:80/)"
-    echo " - B-Team Oliview:         https://ezenitac.duckdns.org/bteam/oliview"
-    echo " - B-Team OllyChat (A):    https://ezenitac.duckdns.org/bteam/chata"
-    echo " - B-Team OlwonChat (B):   https://ezenitac.duckdns.org/bteam/chatb"
-    echo " - A-Team Pilos Dashboard: https://ezenitac.duckdns.org/ateam/pilos"
+    echo " - Portal Landing:         http://localhost:3000/"
+    echo " - B-Team Oliview:         http://localhost:8002/ (or /bteam/oliview/)"
+    echo " - B-Team OllyChat (A):    http://localhost:8003/ (or /bteam/chata/)"
+    echo " - B-Team OlwonChat (B):   http://localhost:8004/ (or /bteam/chatb/)"
+    echo " - A-Team Pilos Dashboard: http://localhost:8001/ (or /ateam/pilos/)"
     echo " - A-Team Pipeline Worker: Background Scheduled Daemon (pilos-worker)"
     echo "======================================================================"
 elif [ "$ACTION" = "build" ]; then
-    echo "[BUILD] Rebuilding and starting all 10 containers..."
+    echo "[BUILD] Rebuilding and starting containers..."
     docker compose up -d --build
-    kubectl apply -f ddns/ingress-ezenitac.yaml >/dev/null 2>&1 || true
 elif [ "$ACTION" = "down" ]; then
     echo "[STOP] Stopping and removing all containers..."
     docker compose down
@@ -45,7 +41,6 @@ elif [ "$ACTION" = "logs" ]; then
     docker compose logs -f
 elif [ "$ACTION" = "status" ]; then
     docker compose ps
-    kubectl get ingress,svc -n default || true
 elif [ "$ACTION" = "trigger-worker" ]; then
     echo "[TRIGGER] Running A-Team Pipeline manually inside pilos-worker..."
     docker exec -it pilos-worker python -m pilos.jobs.run_service_pipeline
