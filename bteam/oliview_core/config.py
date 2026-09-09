@@ -118,6 +118,59 @@ class ModelDiscoveryCache:
 _discovery_cache = ModelDiscoveryCache()
 
 
+def compute_context_harness_profile(n_ctx: int = 16384) -> ContextHarnessProfile:
+    """
+    3-Tier Agentic Context Harness Profile 계산기 (Spec 035).
+    게이트웨이 유효 컨텍스트 윈도우 크기에 따라 토큰 예산과 선별 리뷰 수를 동적 산정합니다.
+    """
+    if n_ctx >= 65536:
+        # Tier 3: Ultra (64K~128K+)
+        return ContextHarnessProfile(
+            total_n_ctx=n_ctx,
+            tier_name="ULTRA",
+            max_input_tokens=48000,
+            max_output_tokens=8192,
+            max_compare_output_tokens=8192,
+            tokens_per_target=15000,
+            reranked_per_target=20,
+            candidates_per_target=30,
+            max_history_turns=50,
+            raw_history_turns=10,
+            summary_history_turns=40,
+        )
+    elif n_ctx >= 32768:
+        # Tier 2: 32K Standard (32,768 tokens)
+        return ContextHarnessProfile(
+            total_n_ctx=n_ctx,
+            tier_name="32K_STANDARD",
+            max_input_tokens=22000,
+            max_output_tokens=4096,
+            max_compare_output_tokens=4096,
+            tokens_per_target=7000,
+            reranked_per_target=12,
+            candidates_per_target=20,
+            max_history_turns=30,
+            raw_history_turns=5,
+            summary_history_turns=25,
+        )
+    else:
+        # Tier 1: 16K Baseline (16,384 tokens)
+        return ContextHarnessProfile(
+            total_n_ctx=max(16384, n_ctx),
+            tier_name="16K_BASELINE",
+            max_input_tokens=10000,
+            max_output_tokens=2048,
+            max_compare_output_tokens=3072,
+            tokens_per_target=3500,
+            reranked_per_target=6,
+            candidates_per_target=15,
+            max_history_turns=15,
+            raw_history_turns=5,
+            summary_history_turns=10,
+        )
+
+
+
 class Settings(BaseModel):
     """Legacy Settings compatibility wrapper."""
     app_run_mode: AppRunMode = Field(default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO")))
