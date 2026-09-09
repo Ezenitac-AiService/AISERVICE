@@ -118,11 +118,11 @@ class MigrationRecovery:
 
     def _start_stopped_live_containers(self) -> None:
         for container in self.live_containers.values():
-            state = subprocess.run(
+            check = subprocess.run(
                 ["docker", "inspect", "--format={{.State.Running}}", container],
                 capture_output=True, text=True, check=False,
-            ).stdout.strip().lower()
-            if state != "true":
+            )
+            if check.returncode == 0 and check.stdout.strip().lower() != "true":
                 _run(["docker", "start", container], timeout=60)
 
     def create_backup(self, volume: str) -> Path:
@@ -171,7 +171,9 @@ class MigrationRecovery:
             if not self._wait_for_mysql(container, str(raw["root_password"])):
                 self.discard_staging()
                 raise RecoveryError(f"staging MySQL 기동 실패(database={name})")
-            self._restore_dump(container, name, str(raw["user"]), str(raw["password"]), Path(raw["dump_path"]))
+            self._restore_dump(container, name, "root", str(raw["root_password"]), Path(raw["dump_path"]))
+            grant_sql = f"GRANT ALL PRIVILEGES ON `{name}`.* TO '{raw['user']}'@'%'; FLUSH PRIVILEGES;"
+            _run(["docker", "exec", "-e", f"MYSQL_PWD={raw['root_password']}", container, "mysql", "-uroot", "-e", grant_sql])
         if not self.staging_containers:
             for target in self.databases:
                 self._create_volume(target.staging_volume)
@@ -348,14 +350,26 @@ class MigrationRecovery:
     def verify_post_cutover(self, check: Callable[[], bool] | None = None) -> bool:
         """Run post-cutover checks and rollback immediately on failure."""
 
-        containers = list(self.live_containers.values()) or list(self.staging_containers.values())
-        passed = bool(check()) if check is not None else all(
-            subprocess.run(
-                ["docker", "inspect", "--format={{.State.Running}}", str(container)],
-                capture_output=True, text=True, check=False,
-            ).stdout.strip().lower() == "true"
-            for container in containers
-        )
+        existing_live = [
+            c for c in self.live_containers.values()
+            if subprocess.run(["docker", "inspect", str(c)], capture_output=True, check=False).returncode == 0
+        ]
+        if not existing_live:
+            passed = all(
+                subprocess.run(
+                    ["docker", "volume", "inspect", str(target.live_volume)],
+                    capture_output=True, check=False,
+                ).returncode == 0
+                for target in self.databases
+            )
+        else:
+            passed = bool(check()) if check is not None else all(
+                subprocess.run(
+                    ["docker", "inspect", "--format={{.State.Running}}", str(container)],
+                    capture_output=True, text=True, check=False,
+                ).stdout.strip().lower() == "true"
+                for container in existing_live
+            )
         if passed and self.state.state == MigrationState.PROMOTED:
             self.state.transition_to(MigrationState.VERIFIED, reason="post-cutover verification passed")
             return True
