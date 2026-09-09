@@ -181,8 +181,16 @@ class MigrationRecovery:
             self.state.transition_to(MigrationState.STAGING_RESTORED, reason="run-scoped staging volumes created")
 
     @staticmethod
-    def _wait_for_mysql(container: str, root_password: str, retries: int = 60) -> bool:
+    def _wait_for_mysql(container: str, root_password: str, retries: int = 90) -> bool:
         for _ in range(retries):
+            logs = subprocess.run(
+                ["docker", "logs", "--tail", "50", container],
+                capture_output=True, text=True, check=False,
+            ).stdout
+            # Official mysql:8.0 runs temporary server during init; wait until init is done
+            if "Starting temporary server" in logs and "MySQL init process done. Ready for start up." not in logs:
+                time.sleep(2)
+                continue
             result = subprocess.run(
                 ["docker", "exec", "-e", f"MYSQL_PWD={root_password}", container, "mysqladmin", "ping", "-h", "localhost", "-uroot"],
                 capture_output=True, text=True, check=False,
@@ -197,6 +205,8 @@ class MigrationRecovery:
         if not dump_path.is_file():
             raise RecoveryError(f"staging dump가 없습니다(database={database})")
         command = ["docker", "exec", "-i", "-e", f"MYSQL_PWD={password}", container, "mysql", f"-u{user}", "--default-character-set=utf8mb4", database]
+        err_msg = ""
+        process = None
         try:
             import gzip
             process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -205,10 +215,14 @@ class MigrationRecovery:
                 while chunk := stream.read(1024 * 1024):
                     process.stdin.write(chunk)
             process.stdin.close()
-            if process.wait() != 0:
-                raise RecoveryError(f"staging dump 복원 실패(database={database})")
+            ret = process.wait()
+            if ret != 0:
+                err_msg = process.stderr.read().decode(errors="replace") if process.stderr else ""
+                raise RecoveryError(f"staging dump 복원 실패(database={database}, exit={ret}): {err_msg[:200]}")
         except (OSError, BrokenPipeError) as exc:
-            raise RecoveryError(f"staging dump 스트리밍 실패(database={database})") from exc
+            if process and process.stderr:
+                err_msg = process.stderr.read().decode(errors="replace")
+            raise RecoveryError(f"staging dump 스트리밍 실패(database={database}): {err_msg[:200]}") from exc
 
     def _mysql_validation(self, target: DatabaseTarget) -> bool:
         container = self.staging_containers.get(target.name)
