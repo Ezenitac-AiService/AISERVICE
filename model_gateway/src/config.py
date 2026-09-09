@@ -18,10 +18,10 @@ def is_external_vllm_enabled() -> bool:
 
 
 def get_default_fallback_chain() -> list[str]:
-    """외장 vLLM 명시 활성화 시 vllm 포함, 기본은 llama.cpp-cuda -> llama.cpp-cpu-openblas."""
+    """외장 vLLM 명시 활성화 시 vllm 포함, 기본은 GPU-only llama.cpp-cuda (CPU fallback 금지 per FR-009/T088)."""
     if is_external_vllm_enabled():
-        return ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
-    return ["llama.cpp-cuda", "llama.cpp-cpu-openblas"]
+        return ["vllm", "llama.cpp-cuda"]
+    return ["llama.cpp-cuda"]
 
 
 DEFAULT_MODEL_VRAM_BUDGET_MB = {"llm": 2600, "embedding": 1200, "reranker": 1200}
@@ -35,16 +35,16 @@ RUNTIME_COMPATIBILITY_ERROR_MARKERS = (
     "oom",
 )
 def clamp_vram_safety_limit(value: Any) -> int:
-    """모든 입력 경로에서 VRAM safety limit을 0..5,000MB로 제한합니다."""
+    """RTX 3060 12GB 환경에서 VRAM safety limit을 최대 12,288MB, 기본 10,240MB로 설정합니다."""
     try:
         parsed = int(value)
     except (TypeError, ValueError):
-        parsed = 5000
-    return max(0, min(parsed, 5000))
+        parsed = 10240
+    return max(0, min(parsed, 12288))
 
 
 VRAM_SAFETY_LIMIT_MB = clamp_vram_safety_limit(
-    os.environ.get("VRAM_SAFETY_LIMIT_MB", "5000")
+    os.environ.get("VRAM_SAFETY_LIMIT_MB", "10240")
 )
 
 

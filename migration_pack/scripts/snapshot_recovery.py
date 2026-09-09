@@ -214,13 +214,46 @@ class MigrationRecovery:
         container = self.staging_containers.get(target.name)
         if not container:
             return False
-        command = ["docker", "exec"]
         root_password = self.staging_root_passwords.get(target.name, "")
-        if root_password:
-            command.extend(["-e", f"MYSQL_PWD={root_password}"])
-        command.extend([container, "mysqladmin", "ping", "-h", "localhost", "-uroot"])
-        result = _run(command, timeout=30)
-        return result.returncode == 0
+        env_args = ["-e", f"MYSQL_PWD={root_password}"] if root_password else []
+
+        # 1. Ping check
+        ping_cmd = ["docker", "exec", *env_args, container, "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+        result = _run(ping_cmd, timeout=30)
+        if result.returncode != 0:
+            return False
+
+        # 2. Schema and charset / encoding check (utf8mb4)
+        charset_sql = f"SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '{target.name}';"
+        charset_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", charset_sql]
+        charset_res = _run(charset_cmd, timeout=30)
+        if "utf8mb4" not in charset_res.stdout.strip():
+            return False
+
+        # 3. Table row counts & application readability check
+        for table, expected_min in target.row_counts.items():
+            count_sql = f"SELECT COUNT(*) FROM `{target.name}`.`{table}`;"
+            count_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", count_sql]
+            count_res = _run(count_cmd, timeout=30)
+            val = count_res.stdout.strip()
+            if not val.isdigit() or int(val) < expected_min:
+                return False
+
+            read_sql = f"SELECT 1 FROM `{target.name}`.`{table}` LIMIT 1;"
+            read_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", read_sql]
+            read_res = _run(read_cmd, timeout=30)
+            if read_res.returncode != 0:
+                return False
+
+        # 4. Index validation
+        idx_sql = f"SELECT COUNT(*) FROM information_schema.STATISTICS WHERE table_schema = '{target.name}';"
+        idx_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", idx_sql]
+        idx_res = _run(idx_cmd, timeout=30)
+        idx_val = idx_res.stdout.strip()
+        if not idx_val.isdigit() or int(idx_val) <= 0:
+            return False
+
+        return True
 
     def validate_staging(self, targets: Iterable[dict[str, str]] | None = None) -> None:
         """staging container readiness 및 manifest 대상 DB 존재를 확인한다."""
