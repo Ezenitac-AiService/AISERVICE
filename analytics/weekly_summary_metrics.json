@@ -1,0 +1,311 @@
+{
+  "analysis_metadata": {
+    "target_period": "2026-09-03 ~ 2026-09-09 (KST 7일간)",
+    "generated_at": "2026-09-09 20:36:38 KST",
+    "total_requests": 4236,
+    "unique_visitors_est": 1402,
+    "unique_ips": 2,
+    "total_sessions_est": 1803,
+    "avg_pv_per_session": 2.35,
+    "avg_session_duration_sec": 25.78
+  },
+  "daily_trends": [
+    {
+      "date": "2026-09-03",
+      "day_of_week": "목",
+      "hits": 1010,
+      "unique_ips": 2,
+      "estimated_uv": 419,
+      "share_pct": 23.8
+    },
+    {
+      "date": "2026-09-04",
+      "day_of_week": "금",
+      "hits": 374,
+      "unique_ips": 2,
+      "estimated_uv": 43,
+      "share_pct": 8.8
+    },
+    {
+      "date": "2026-09-05",
+      "day_of_week": "토",
+      "hits": 706,
+      "unique_ips": 2,
+      "estimated_uv": 392,
+      "share_pct": 16.7
+    },
+    {
+      "date": "2026-09-06",
+      "day_of_week": "일",
+      "hits": 109,
+      "unique_ips": 2,
+      "estimated_uv": 24,
+      "share_pct": 2.6
+    },
+    {
+      "date": "2026-09-07",
+      "day_of_week": "월",
+      "hits": 1051,
+      "unique_ips": 2,
+      "estimated_uv": 402,
+      "share_pct": 24.8
+    },
+    {
+      "date": "2026-09-08",
+      "day_of_week": "화",
+      "hits": 879,
+      "unique_ips": 2,
+      "estimated_uv": 371,
+      "share_pct": 20.8
+    },
+    {
+      "date": "2026-09-09",
+      "day_of_week": "수",
+      "hits": 107,
+      "unique_ips": 2,
+      "estimated_uv": 36,
+      "share_pct": 2.5
+    }
+  ],
+  "hourly_traffic": {
+    "0": 125,
+    "1": 827,
+    "2": 12,
+    "3": 280,
+    "4": 11,
+    "5": 21,
+    "6": 942,
+    "7": 17,
+    "8": 21,
+    "9": 15,
+    "10": 22,
+    "11": 64,
+    "12": 195,
+    "13": 64,
+    "14": 24,
+    "15": 55,
+    "16": 71,
+    "17": 758,
+    "18": 566,
+    "19": 41,
+    "20": 43,
+    "21": 25,
+    "22": 16,
+    "23": 21
+  },
+  "devices": {
+    "Desktop": 2071,
+    "Bot/Crawler": 1602,
+    "Mobile": 425,
+    "Unknown": 138
+  },
+  "os": {
+    "Other": 1650,
+    "Windows 10/11": 945,
+    "Linux": 570,
+    "macOS": 421,
+    "Unknown": 138,
+    "Windows (Other)": 87,
+    "iOS 18.4": 74,
+    "Android 15": 63,
+    "Android 12": 61,
+    "iOS 17.0": 57
+  },
+  "browsers": {
+    "Chrome": 1866,
+    "Other": 1617,
+    "Firefox": 299,
+    "Safari": 147,
+    "Unknown": 138,
+    "Edge": 122,
+    "API Tool (curl/python)": 47
+  },
+  "inapp_browsers": {},
+  "service_shares": {
+    "기타/직접 호출": 3334,
+    "통합 포털 랜딩 (/)": 374,
+    "공통 API": 159,
+    "A-Team Pilos 웹/API": 120,
+    "정적 메타 리소스": 106,
+    "B-Team 올리챗 A (Streamlit)": 65,
+    "B-Team Oliview 웹": 57,
+    "B-Team 올원챗 B (FastAPI RAG)": 21
+  },
+  "top_endpoints": {
+    "/": 257,
+    "/fetch": 148,
+    "": 117,
+    "/v1/messages": 92,
+    "/favicon.ico": 88,
+    "/v1/chat/completions": 82,
+    "/api/stocks": 64,
+    "/proxy": 64,
+    "/changelog_data.json": 49,
+    "/changelog": 47,
+    "/bteam/chata/": 22,
+    "/invoke_model": 20,
+    "/robots.txt": 15,
+    "/bteam/chatb/": 15,
+    "/@fs/proc/self/environ": 12,
+    "/read": 12,
+    "/download": 12,
+    "/api/fetch": 12,
+    "/api/preview": 12,
+    "/v1/models": 11,
+    "/.env": 11,
+    "/.git/config": 11,
+    "/bteam/oliview/": 10,
+    "/ateam/pilos/": 10,
+    "/debug/default/view": 10
+  },
+  "status_codes": {
+    "404": 3529,
+    "200": 487,
+    "400": 119,
+    "304": 66,
+    "301": 20,
+    "405": 12,
+    "101": 2,
+    "499": 1
+  },
+  "errors_404_top": {
+    "/fetch": 148,
+    "/v1/messages": 92,
+    "/favicon.ico": 88,
+    "/v1/chat/completions": 82,
+    "/proxy": 64,
+    "/invoke_model": 20,
+    "/changelog": 16,
+    "/robots.txt": 15,
+    "/@fs/proc/self/environ": 12,
+    "/read": 12
+  },
+  "errors_500_top": {},
+  "latency_stats": {
+    "avg": 0.2172,
+    "p50": 0.0,
+    "p90": 0.033,
+    "p95": 0.159,
+    "p99": 1.363,
+    "max": 181.091
+  },
+  "slow_endpoints_top": [
+    {
+      "uri": "/bteam/chata/api/v1/chat/stream",
+      "count": 6,
+      "avg_latency": 60.2622,
+      "p95_latency": 136.721,
+      "max_latency": 136.721
+    },
+    {
+      "uri": "/bteam/oliview/",
+      "count": 10,
+      "avg_latency": 35.3592,
+      "p95_latency": 181.091,
+      "max_latency": 181.091
+    },
+    {
+      "uri": "",
+      "count": 117,
+      "avg_latency": 1.069,
+      "p95_latency": 5.004,
+      "max_latency": 5.005
+    },
+    {
+      "uri": "/v1/messages",
+      "count": 92,
+      "avg_latency": 0.3524,
+      "p95_latency": 1.384,
+      "max_latency": 1.519
+    },
+    {
+      "uri": "/v1/chat/completions",
+      "count": 82,
+      "avg_latency": 0.3019,
+      "p95_latency": 0.647,
+      "max_latency": 0.69
+    },
+    {
+      "uri": "/invoke_model",
+      "count": 20,
+      "avg_latency": 0.1943,
+      "p95_latency": 0.826,
+      "max_latency": 0.826
+    },
+    {
+      "uri": "/api/stocks",
+      "count": 64,
+      "avg_latency": 0.0816,
+      "p95_latency": 0.289,
+      "max_latency": 0.413
+    },
+    {
+      "uri": "/bteam/chatb/",
+      "count": 15,
+      "avg_latency": 0.0665,
+      "p95_latency": 0.168,
+      "max_latency": 0.168
+    },
+    {
+      "uri": "/bteam/chata/static/js/app.js",
+      "count": 8,
+      "avg_latency": 0.0315,
+      "p95_latency": 0.084,
+      "max_latency": 0.084
+    },
+    {
+      "uri": "/ateam/pilos/",
+      "count": 10,
+      "avg_latency": 0.0265,
+      "p95_latency": 0.115,
+      "max_latency": 0.115
+    },
+    {
+      "uri": "/bteam/chata/",
+      "count": 22,
+      "avg_latency": 0.0257,
+      "p95_latency": 0.097,
+      "max_latency": 0.126
+    },
+    {
+      "uri": "/api/mcp",
+      "count": 6,
+      "avg_latency": 0.0212,
+      "p95_latency": 0.101,
+      "max_latency": 0.101
+    },
+    {
+      "uri": "/api/.env",
+      "count": 9,
+      "avg_latency": 0.0164,
+      "p95_latency": 0.053,
+      "max_latency": 0.053
+    },
+    {
+      "uri": "/bteam/chata/api/v1/chat/history/sess_1788359580499_axymhw",
+      "count": 9,
+      "avg_latency": 0.0064,
+      "p95_latency": 0.028,
+      "max_latency": 0.028
+    },
+    {
+      "uri": "/api/fetch",
+      "count": 12,
+      "avg_latency": 0.0043,
+      "p95_latency": 0.014,
+      "max_latency": 0.014
+    }
+  ],
+  "stock_popularity": {
+    "NAVER (035420)": 2,
+    "SK하이닉스 (000660)": 2,
+    "POSCO홀딩스 (005490)": 2,
+    "카카오 (035720)": 2,
+    "현대차 (005380)": 2,
+    "삼성전자 (005930)": 2,
+    "셀트리온 (068270)": 2,
+    "두산에너빌리티 (034020)": 2,
+    "에코프로비엠 (247540)": 2,
+    "LG에너지솔루션 (373220)": 2
+  }
+}

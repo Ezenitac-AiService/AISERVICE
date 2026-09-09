@@ -1,0 +1,137 @@
+{
+  "period": "2026-09-03 ~ 2026-09-09",
+  "comparison_period": "2026-08-27 ~ 2026-09-02",
+  "total_requests": 4236,
+  "prev_total_requests": 4193,
+  "real_requests": 1335,
+  "prev_real_requests": 2443,
+  "bot_requests": 2901,
+  "prev_bot_requests": 1750,
+  "real_sessions": {
+    "unique_users": 307,
+    "sessions": 441,
+    "avg_pv": 3.03,
+    "avg_duration": 50.07
+  },
+  "daily_stats": [
+    {
+      "date": "2026-09-03",
+      "dow": "목",
+      "total": 1010,
+      "real": 422,
+      "bot": 588,
+      "real_sessions": 92
+    },
+    {
+      "date": "2026-09-04",
+      "dow": "금",
+      "total": 374,
+      "real": 172,
+      "bot": 202,
+      "real_sessions": 50
+    },
+    {
+      "date": "2026-09-05",
+      "dow": "토",
+      "total": 706,
+      "real": 159,
+      "bot": 547,
+      "real_sessions": 94
+    },
+    {
+      "date": "2026-09-06",
+      "dow": "일",
+      "total": 109,
+      "real": 72,
+      "bot": 37,
+      "real_sessions": 26
+    },
+    {
+      "date": "2026-09-07",
+      "dow": "월",
+      "total": 1051,
+      "real": 279,
+      "bot": 772,
+      "real_sessions": 87
+    },
+    {
+      "date": "2026-09-08",
+      "dow": "화",
+      "total": 879,
+      "real": 168,
+      "bot": 711,
+      "real_sessions": 60
+    },
+    {
+      "date": "2026-09-09",
+      "dow": "수",
+      "total": 107,
+      "real": 63,
+      "bot": 44,
+      "real_sessions": 32
+    }
+  ],
+  "real_services": {
+    "기타 요청": 644,
+    "통합 포털 메인 (/)": 227,
+    "A-Team Pilos (주식 감정 분석)": 115,
+    "정적 메타": 95,
+    "시스템 변경로그 (/changelog)": 82,
+    "B-Team 올리챗 A (Streamlit RAG)": 61,
+    "B-Team Oliview (리뷰 분석 대시보드)": 54,
+    "공통 API": 40,
+    "B-Team 올원챗 B (FastAPI RAG)": 17
+  },
+  "all_services": {
+    "기타 요청": 3238,
+    "통합 포털 메인 (/)": 374,
+    "공통 API": 159,
+    "A-Team Pilos (주식 감정 분석)": 120,
+    "정적 메타": 106,
+    "시스템 변경로그 (/changelog)": 96,
+    "B-Team 올리챗 A (Streamlit RAG)": 65,
+    "B-Team Oliview (리뷰 분석 대시보드)": 57,
+    "B-Team 올원챗 B (FastAPI RAG)": 21
+  },
+  "real_devices": {
+    "Desktop": 1217,
+    "Mobile": 83,
+    "Unknown": 35
+  },
+  "real_os": {
+    "Windows": 584,
+    "Other": 374,
+    "Linux": 155,
+    "macOS": 139,
+    "Android": 54,
+    "iOS": 29
+  },
+  "status_all": {
+    "404": 3529,
+    "200": 487,
+    "400": 119,
+    "304": 66,
+    "301": 20,
+    "405": 12,
+    "101": 2,
+    "499": 1
+  },
+  "status_real": {
+    "404": 807,
+    "200": 415,
+    "304": 66,
+    "400": 16,
+    "301": 16,
+    "405": 12,
+    "101": 2,
+    "499": 1
+  },
+  "latency_real": {
+    "avg": 0.5518,
+    "p50": 0.0,
+    "p90": 0.037,
+    "p95": 0.112,
+    "p99": 0.413,
+    "max": 181.091
+  }
+}

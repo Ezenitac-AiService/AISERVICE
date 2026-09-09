@@ -1,0 +1,65 @@
+{
+  "oliview_chatbot_a": [
+    {
+      "timestamp": "2026-09-02 11:48:29,603",
+      "query": "스킨케어에서 수분감 좋은 인기 앰플 추천해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 11:49:28,187",
+      "query": "스킨케어에서 수분감 좋은 인기 앰플 추천해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 11:57:46,785",
+      "query": "스킨케어에서 수분감 좋은 인기 앰플 추천해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 11:58:09,408",
+      "query": "여름철 기름기 잡고 모공 커버 잘되는 매트한 파운데이션",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 12:02:41,896",
+      "query": "브링그린 티트리 세럼 진정 효과와 사용감 어때?",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 12:08:59,532",
+      "query": "브링그린 티트리 세럼 진정 효과와 사용감 어때?",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 16:00:43,654",
+      "query": "스킨케어에서 수분감 좋은 인기 앰플 추천해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 16:01:07,186",
+      "query": "식물나라 토너 자극성과 기능/효과 분석해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-02 16:41:52,351",
+      "query": "자극 없이 순한 클렌징 제품 분석해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-03 02:53:29,883",
+      "query": "스킨케어에서 수분감 좋은 인기 앰플 추천해줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-04 04:28:20,570",
+      "query": "차앤박 프로폴리스 앰플 수분감과 흡수력 알려줘",
+      "logger": "oliview.fastapi"
+    },
+    {
+      "timestamp": "2026-09-07 04:10:37,615",
+      "query": "브링그린 티트리 세럼 진정 효과와 사용감 어때?",
+      "logger": "oliview.fastapi"
+    }
+  ],
+  "oliview_chatbot_b": []
+}
