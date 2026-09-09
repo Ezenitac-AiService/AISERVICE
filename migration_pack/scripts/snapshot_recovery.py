@@ -47,7 +47,11 @@ def _run(command: list[str], *, timeout: float = 900, env: dict[str, str] | None
     except (OSError, subprocess.SubprocessError) as exc:
         raise RecoveryError(f"Docker 작업을 실행할 수 없습니다(type={type(exc).__name__})") from exc
     if result.returncode != 0:
-        raise RecoveryError(f"Docker 작업 실패(code={result.returncode})")
+        err = (result.stderr or result.stdout or "").strip()
+        msg = f"Docker 작업 실패(code={result.returncode})"
+        if err:
+            msg += f": {err[:300]}"
+        raise RecoveryError(msg)
     return result
 
 
@@ -156,24 +160,41 @@ class MigrationRecovery:
             self.staging_containers[name] = container
             self.live_containers[name] = str(raw.get("container", name))
             self.staging_root_passwords[name] = str(raw["root_password"])
-            _run(
-                [
-                    "docker", "run", "-d", "--name", container,
-                    "--mount", f"type=volume,src={staging_volume},dst=/var/lib/mysql",
-                    "-e", f"MYSQL_DATABASE={name}",
-                    "-e", f"MYSQL_USER={raw['user']}",
-                    "-e", f"MYSQL_PASSWORD={raw['password']}",
-                    "-e", f"MYSQL_ROOT_PASSWORD={raw['root_password']}",
-                    "mysql:8.0",
-                ],
-                timeout=120,
+            existing = subprocess.run(
+                ["docker", "inspect", "--format={{.State.Running}}", container],
+                capture_output=True, text=True, check=False,
             )
-            if not self._wait_for_mysql(container, str(raw["root_password"])):
-                self.discard_staging()
-                raise RecoveryError(f"staging MySQL 기동 실패(database={name})")
-            self._restore_dump(container, name, "root", str(raw["root_password"]), Path(raw["dump_path"]))
-            grant_sql = f"GRANT ALL PRIVILEGES ON `{name}`.* TO '{raw['user']}'@'%'; FLUSH PRIVILEGES;"
-            _run(["docker", "exec", "-e", f"MYSQL_PWD={raw['root_password']}", container, "mysql", "-uroot", "-e", grant_sql])
+            container_ready = False
+            if existing.returncode == 0:
+                if existing.stdout.strip().lower() == "true" and self._wait_for_mysql(container, str(raw["root_password"]), retries=2):
+                    chk = subprocess.run(
+                        ["docker", "exec", "-e", f"MYSQL_PWD={raw['root_password']}", container, "mysql", "-uroot", "-s", "-N", "-e", f"SHOW TABLES IN `{name}`;"],
+                        capture_output=True, text=True, check=False,
+                    )
+                    if chk.returncode == 0 and chk.stdout.strip():
+                        container_ready = True
+                if not container_ready:
+                    subprocess.run(["docker", "rm", "-f", container], capture_output=True, check=False)
+
+            if not container_ready:
+                _run(
+                    [
+                        "docker", "run", "-d", "--name", container,
+                        "--mount", f"type=volume,src={staging_volume},dst=/var/lib/mysql",
+                        "-e", f"MYSQL_DATABASE={name}",
+                        "-e", f"MYSQL_USER={raw['user']}",
+                        "-e", f"MYSQL_PASSWORD={raw['password']}",
+                        "-e", f"MYSQL_ROOT_PASSWORD={raw['root_password']}",
+                        "mysql:8.0",
+                    ],
+                    timeout=120,
+                )
+                if not self._wait_for_mysql(container, str(raw["root_password"])):
+                    self.discard_staging()
+                    raise RecoveryError(f"staging MySQL 기동 실패(database={name})")
+                self._restore_dump(container, name, "root", str(raw["root_password"]), Path(raw["dump_path"]))
+                grant_sql = f"GRANT ALL PRIVILEGES ON `{name}`.* TO '{raw['user']}'@'%'; FLUSH PRIVILEGES;"
+                _run(["docker", "exec", "-e", f"MYSQL_PWD={raw['root_password']}", container, "mysql", "-uroot", "-e", grant_sql])
         if not self.staging_containers:
             for target in self.databases:
                 self._create_volume(target.staging_volume)
@@ -227,49 +248,52 @@ class MigrationRecovery:
             raise RecoveryError(f"staging dump 스트리밍 실패(database={database}): {err_msg[:200]}") from exc
 
     def _mysql_validation(self, target: DatabaseTarget) -> bool:
-        container = self.staging_containers.get(target.name)
-        if not container:
-            return False
-        root_password = self.staging_root_passwords.get(target.name, "")
-        env_args = ["-e", f"MYSQL_PWD={root_password}"] if root_password else []
+        try:
+            container = self.staging_containers.get(target.name)
+            if not container:
+                return False
+            root_password = self.staging_root_passwords.get(target.name, "")
+            env_args = ["-e", f"MYSQL_PWD={root_password}"] if root_password else []
 
-        # 1. Ping check
-        ping_cmd = ["docker", "exec", *env_args, container, "mysqladmin", "ping", "-h", "localhost", "-uroot"]
-        result = _run(ping_cmd, timeout=30)
-        if result.returncode != 0:
-            return False
-
-        # 2. Schema and charset / encoding check (utf8mb4)
-        charset_sql = f"SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '{target.name}';"
-        charset_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", charset_sql]
-        charset_res = _run(charset_cmd, timeout=30)
-        if "utf8mb4" not in charset_res.stdout.strip():
-            return False
-
-        # 3. Table row counts & application readability check
-        for table, expected_min in target.row_counts.items():
-            count_sql = f"SELECT COUNT(*) FROM `{target.name}`.`{table}`;"
-            count_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", count_sql]
-            count_res = _run(count_cmd, timeout=30)
-            val = count_res.stdout.strip()
-            if not val.isdigit() or int(val) < expected_min:
+            # 1. Ping check
+            ping_cmd = ["docker", "exec", *env_args, container, "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+            result = _run(ping_cmd, timeout=30)
+            if result.returncode != 0:
                 return False
 
-            read_sql = f"SELECT 1 FROM `{target.name}`.`{table}` LIMIT 1;"
-            read_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", read_sql]
-            read_res = _run(read_cmd, timeout=30)
-            if read_res.returncode != 0:
+            # 2. Schema and charset / encoding check (utf8mb4)
+            charset_sql = f"SELECT default_character_set_name FROM information_schema.SCHEMATA WHERE schema_name = '{target.name}';"
+            charset_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", charset_sql]
+            charset_res = _run(charset_cmd, timeout=30)
+            if "utf8mb4" not in charset_res.stdout.strip():
                 return False
 
-        # 4. Index validation
-        idx_sql = f"SELECT COUNT(*) FROM information_schema.STATISTICS WHERE table_schema = '{target.name}';"
-        idx_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", idx_sql]
-        idx_res = _run(idx_cmd, timeout=30)
-        idx_val = idx_res.stdout.strip()
-        if not idx_val.isdigit() or int(idx_val) <= 0:
-            return False
+            # 3. Table row counts & application readability check
+            for table, expected_min in target.row_counts.items():
+                count_sql = f"SELECT COUNT(*) FROM `{target.name}`.`{table}`;"
+                count_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", count_sql]
+                count_res = _run(count_cmd, timeout=30)
+                val = count_res.stdout.strip()
+                if not val.isdigit() or int(val) < expected_min:
+                    return False
 
-        return True
+                read_sql = f"SELECT 1 FROM `{target.name}`.`{table}` LIMIT 1;"
+                read_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", read_sql]
+                read_res = _run(read_cmd, timeout=30)
+                if read_res.returncode != 0:
+                    return False
+
+            # 4. Index validation
+            idx_sql = f"SELECT COUNT(*) FROM information_schema.STATISTICS WHERE table_schema = '{target.name}';"
+            idx_cmd = ["docker", "exec", *env_args, container, "mysql", "-uroot", "-s", "-N", "-e", idx_sql]
+            idx_res = _run(idx_cmd, timeout=30)
+            idx_val = idx_res.stdout.strip()
+            if not idx_val.isdigit() or int(idx_val) <= 0:
+                return False
+
+            return True
+        except (RecoveryError, OSError):
+            return False
 
     def validate_staging(self, targets: Iterable[dict[str, str]] | None = None) -> None:
         """staging container readiness 및 manifest 대상 DB 존재를 확인한다."""
@@ -305,7 +329,12 @@ class MigrationRecovery:
 
             # Detach database consumers before modifying their mounted volumes.
             for container in self.live_containers.values():
-                _run(["docker", "stop", "--time", "30", container], timeout=60)
+                check = subprocess.run(
+                    ["docker", "inspect", "--format={{.State.Running}}", container],
+                    capture_output=True, text=True, check=False,
+                )
+                if check.returncode == 0 and check.stdout.strip().lower() == "true":
+                    _run(["docker", "stop", "--time", "30", container], timeout=60)
 
             # Preserve named-volume identity so Compose references remain stable.
             # Backup-based rollback covers the unavoidable sequential update of

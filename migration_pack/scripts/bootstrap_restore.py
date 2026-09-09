@@ -403,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
         recovery.promote()
         if not recovery.verify_post_cutover():
             raise RestoreError("post-cutover 검증 실패로 rollback을 수행했습니다", 3)
+        recovery.discard_staging()
         _write_dry_run_report(args.report, "PROMOTED", run_id)
         return 0
     except RestoreError as exc:
