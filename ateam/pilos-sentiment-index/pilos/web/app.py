@@ -145,12 +145,30 @@ def error_response(status: str, message: str, http_status: int):
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+
+class WSGIPrefixStripMiddleware:
+    """WSGI middleware to strip subpath prefix (/ateam/pilos) while preserving SCRIPT_NAME."""
+
+    def __init__(self, wsgi_app, prefix="/ateam/pilos"):
+        self.wsgi_app = wsgi_app
+        self.prefix = prefix.rstrip("/")
+
+    def __call__(self, environ, start_response):
+        path_info = environ.get("PATH_INFO", "")
+        if path_info == self.prefix or path_info.startswith(self.prefix + "/"):
+            environ["SCRIPT_NAME"] = environ.get("SCRIPT_NAME", "") + self.prefix
+            new_path = path_info[len(self.prefix):]
+            environ["PATH_INFO"] = new_path if new_path.startswith("/") else "/" + new_path
+        return self.wsgi_app(environ, start_response)
+
+
 app = Flask(
     __name__,
     template_folder="templates",
     static_folder="static",
 )
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+app.wsgi_app = WSGIPrefixStripMiddleware(app.wsgi_app, prefix="/ateam/pilos")
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY")
 

@@ -74,19 +74,45 @@ SYNTHESIS_MODEL_NAME = get_synthesis_model()
 DB_CONFIG = {
     "host": os.getenv("DB_HOST", "bteam_db"),
     "port": int(os.getenv("DB_PORT", 3306)),
-    "user": os.getenv("DB_USER", "gp123"),
-    "password": os.getenv("DB_PASSWORD", "GP123!"),
+    "user": os.getenv("DB_USER", "bteam_user"),
+    "password": os.getenv("DB_PASSWORD", ""),
     "database": os.getenv("DB_NAME", os.getenv("DB_NAME3", "oliview_project")),
     "charset": "utf8mb4",
     "cursorclass": pymysql.cursors.DictCursor
 }
 
+class PureASGIPrefixStripMiddleware:
+    """Pure ASGI middleware that strips subpath prefix and dynamically injects root_path into ASGI scope."""
+
+    def __init__(self, app, prefix: str = "/bteam/chatb"):
+        self.app = app
+        self.prefix = "/" + prefix.strip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == self.prefix:
+                scope = dict(scope)
+                scope["path"] = "/"
+                scope["raw_path"] = b"/"
+                scope["root_path"] = self.prefix
+            elif path.startswith(self.prefix + "/"):
+                scope = dict(scope)
+                new_path = path[len(self.prefix):]
+                scope["path"] = new_path
+                scope["raw_path"] = new_path.encode("latin-1")
+                scope["root_path"] = self.prefix
+
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(
     title="Oliview Production RAG Engine API",
     description="하이브리드 리랭킹 검색 결과와 8081 생성 LLM을 결합한 완결형 검색 증강 생성 API",
     version="3.0.0",
-    root_path=os.getenv("FASTAPI_ROOT_PATH", "/bteam/chatb")
 )
+
+app.add_middleware(PureASGIPrefixStripMiddleware, prefix="/bteam/chatb")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1120,6 +1146,12 @@ async def cancel_queue_endpoint(request: Request):
             return resp.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"큐 취소 요청 실패: {e}")
+
+
+@app.get("/health", tags=["Health"])
+@app.get("/healthz", tags=["Health"])
+async def health_check():
+    return {"status": "ok", "app": "Oliview Production RAG Engine API", "service": "chat_b", "version": "3.0.0"}
 
 
 @app.get("/", tags=["UI"])

@@ -156,7 +156,7 @@ function renderEmptyState(container, message) {
 }
 
 async function fetchStockDetail(code) {
-  const response = await fetch(`/api/stocks/${encodeURIComponent(code)}`);
+  const response = await fetch(`api/stocks/${encodeURIComponent(code)}`);
   const body = await readJson(response);
   if (response.ok) return body;
   throw new Error(
@@ -168,7 +168,7 @@ async function fetchStockDetail(code) {
 async function fetchLlmReport(code, modelDate) {
   const query = new URLSearchParams({ model_date: modelDate });
   const response = await fetch(
-    `/api/stocks/${encodeURIComponent(code)}/llm-reports?${query}`,
+    `api/stocks/${encodeURIComponent(code)}/llm-reports?${query}`,
   );
   const body = await readJson(response);
   if (response.ok) return { state: body.status || "ready", report: body };

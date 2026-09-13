@@ -1,1 +1,0 @@
-"""Incremental ChromaDB indexing."""

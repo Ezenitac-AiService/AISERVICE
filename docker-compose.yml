@@ -11,56 +11,25 @@ volumes:
     name: ateam_db_data
   redis_data:
     name: aiservice_redis_data
-  green_mysql_data:
-    external: true
-    name: green_mysql_data
-  green_chroma_data:
-    external: true
-    name: green_chroma_data
 
 services:
-  # ============================================================================
-  # 0. 통합 Nginx 역방향 프록시 게이트웨이 (aiservice-gateway)
-  # ============================================================================
-  gateway:
-    build:
-      context: ./gateway
-      dockerfile: Dockerfile
-    image: aiservice-gateway:latest
-    container_name: aiservice-gateway
-    restart: unless-stopped
-    ports:
-      - "${GATEWAY_PORTAL_PORT:-3000}:80"
-      - "${GATEWAY_PILOS_PORT:-8001}:8001"
-      - "${GATEWAY_OLIVIEW_PORT:-8002}:8002"
-      - "${GATEWAY_CHATA_PORT:-8003}:8003"
-      - "${GATEWAY_CHATB_PORT:-8004}:8004"
-    volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./gateway/html:/usr/share/nginx/html:ro
-    networks:
-      - aiservice-network
-    depends_on:
-      - oliview_frontend
-      - oliview_backend
-      - oliview_chatbot_a
-      - oliview_chatbot_b
-      - pilos_web
 
   # ============================================================================
-  # 1. 공통 LLM/임베딩 서빙 게이트웨이 (vLLM - vllm-serv-gateway)
+  # 1. 공통 LLM/임베딩 서빙 게이트웨이 (llama.cpp-CUDA - model-gateway)
   # ============================================================================
-  vllm-serv:
+  model-gateway:
     build:
       context: ./model_gateway
       dockerfile: Dockerfile
-    image: vllm-serv:latest
-    container_name: vllm-serv-gateway
+    image: model-gateway:latest
+    container_name: model-gateway
     command: ["bash", "-c", "python3 -m src.api.server < /dev/null"]
     init: true
     restart: unless-stopped
     stdin_open: true
     tty: true
+    ports:
+      - "127.0.0.1:8081:8081"
     deploy:
       resources:
         reservations:
@@ -121,7 +90,6 @@ services:
       - --innodb_buffer_pool_size=1G
       - --innodb_log_file_size=256M
       - --innodb_flush_log_at_trx_commit=2
-      - --init-file=/docker-entrypoint-initdb.d/00_reset.sql
     environment:
       MYSQL_ROOT_PASSWORD: ${BTEAM_DB_ROOT_PASSWORD:?set BTEAM_DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${BTEAM_DB_NAME:-oliview_project}
@@ -129,8 +97,6 @@ services:
       MYSQL_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
     volumes:
       - bteam_mysql_data:/var/lib/mysql
-      - ./bteam/reset_pass.sql:/docker-entrypoint-initdb.d/00_reset.sql:ro
-      - ./bteam/oliview_project_backup_0813.sql:/docker-entrypoint-initdb.d/01_backup.sql:ro
     networks:
       - aiservice-network
     healthcheck:
@@ -179,6 +145,11 @@ services:
     image: oliview_frontend:latest
     container_name: oliview_frontend
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:5173"
+    environment:
+      VITE_BACKEND_URL: http://oliview_backend:5050
+      DOCKER_CONTAINER: "true"
     depends_on:
       - oliview_backend
     volumes:
@@ -188,7 +159,7 @@ services:
       - aiservice-network
 
   # ============================================================================
-  # 5. B-Team 올리챗 (Streamlit - oliview_chatbot_a)
+  # 5. B-Team 올리챗 (FastAPI - oliview_chatbot_a)
   # ============================================================================
   oliview_chatbot_a:
     build:
@@ -200,6 +171,8 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8003:8501"
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8501"]
     environment:
       PYTHONPATH: /app:/app/bteam:/bteam
@@ -208,7 +181,7 @@ services:
       DB_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
-      SERVER_HOST: http://vllm-serv-gateway
+      SERVER_HOST: http://model-gateway
       MAIN_PORT: 8081
       EMBED_PORT: 8090
       EMBEDDING_PORT: 8090
@@ -217,7 +190,6 @@ services:
       REDIS_PORT: 6379
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-2b}
-      FASTAPI_ROOT_PATH: /bteam/chata
       USE_LLM_METADATA_FILTER: "false"
     volumes:
       - ./bteam/Oliview_chatbot_a:/app
@@ -225,7 +197,7 @@ services:
     depends_on:
       bteam_db:
         condition: service_healthy
-      vllm-serv:
+      model-gateway:
         condition: service_started
     networks:
       - aiservice-network
@@ -243,6 +215,8 @@ services:
     stdin_open: true
     tty: true
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8004:8002"
     environment:
       PYTHONPATH: /app:/app/bteam:/bteam
       DB_HOST: bteam_db
@@ -250,21 +224,20 @@ services:
       DB_USER: ${BTEAM_DB_USER:?set BTEAM_DB_USER}
       DB_PASSWORD: ${BTEAM_DB_PASSWORD:?set BTEAM_DB_PASSWORD}
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
-      SERVER_HOST: http://vllm-serv-gateway
+      SERVER_HOST: http://model-gateway
       MAIN_PORT: 8081
       EMBED_PORT: 8090
       EMBEDDING_PORT: 8090
       RERANK_PORT: 8091
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-2b}
-      FASTAPI_ROOT_PATH: /bteam/chatb
     volumes:
       - ./bteam/Oliview_chatbot_b:/app
       - ./bteam/oliview_core:/app/oliview_core
     depends_on:
       bteam_db:
         condition: service_healthy
-      vllm-serv:
+      model-gateway:
         condition: service_started
     networks:
       - aiservice-network
@@ -292,7 +265,6 @@ services:
       TZ: Asia/Seoul
     volumes:
       - ateam_db_data:/var/lib/mysql
-      - ./ateam/pilos_v2.sql:/docker-entrypoint-initdb.d/01_pilos_v2.sql:ro
     networks:
       - aiservice-network
     healthcheck:
@@ -312,6 +284,8 @@ services:
     image: pilos-web:latest
     container_name: pilos-web
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:5000"
     environment:
       DB_HOST: pilos-db
       DB_PORT: 3306
@@ -320,11 +294,11 @@ services:
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
-      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
-      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      LLM_BASE_URL: http://model-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://model-gateway:8090/v1
       EMBEDDING_API_KEY: EMPTY
       EMBEDDING_MODEL: bge-m3
-      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_BASE_URL: http://model-gateway:8091/v1
       RERANK_API_KEY: EMPTY
       RERANK_MODEL: bge-reranker-v2-m3
       CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
@@ -350,7 +324,7 @@ services:
     depends_on:
       pilos_db:
         condition: service_healthy
-      vllm-serv:
+      model-gateway:
         condition: service_started
     networks:
       - aiservice-network
@@ -374,11 +348,11 @@ services:
       DB_NAME: ${PILOS_DB_NAME:-pilos_v2}
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
-      LLM_BASE_URL: http://vllm-serv-gateway:8081/v1
-      EMBEDDING_BASE_URL: http://vllm-serv-gateway:8090/v1
+      LLM_BASE_URL: http://model-gateway:8081/v1
+      EMBEDDING_BASE_URL: http://model-gateway:8090/v1
       EMBEDDING_API_KEY: EMPTY
       EMBEDDING_MODEL: bge-m3
-      RERANK_BASE_URL: http://vllm-serv-gateway:8091/v1
+      RERANK_BASE_URL: http://model-gateway:8091/v1
       RERANK_API_KEY: EMPTY
       RERANK_MODEL: bge-reranker-v2-m3
       CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
@@ -400,7 +374,7 @@ services:
     depends_on:
       pilos_db:
         condition: service_healthy
-      vllm-serv:
+      model-gateway:
         condition: service_started
     networks:
       - aiservice-network

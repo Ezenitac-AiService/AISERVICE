@@ -1,7 +1,7 @@
 {
-  "primary_server_host": "http://vllm-serv-gateway",
+  "primary_server_host": "http://model-gateway",
   "fallback_server_host": "http://127.0.0.1",
-  "server_host": "http://vllm-serv-gateway",
+  "server_host": "http://model-gateway",
   "main_port": 8081,
   "embedding_port": 8090,
   "rerank_port": 8091,

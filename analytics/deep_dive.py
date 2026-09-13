@@ -42,7 +42,12 @@ def analyze_chatbot_and_db():
                 stock_requests[m.group(1)] += 1
 
     # Extract db info
-    res_db = subprocess.run(['docker', 'exec', 'bteam_db', 'mysql', '-ugp123', '-pGP123!', 'oliview_project', '-e', 'SELECT brand_id, brand_name_ko FROM brands LIMIT 20;'], capture_output=True, text=True, encoding='utf-8', errors='ignore')
+    bteam_pass = os.getenv("BTEAM_DB_PASSWORD", "")
+    cmd_db = ['docker', 'exec', 'bteam_db', 'mysql', f"-u{os.getenv('BTEAM_DB_USER', 'gp123')}"]
+    if bteam_pass:
+        cmd_db.append(f"-p{bteam_pass}")
+    cmd_db.extend(['oliview_project', '-e', 'SELECT brand_id, brand_name_ko FROM brands LIMIT 20;'])
+    res_db = subprocess.run(cmd_db, capture_output=True, text=True, encoding='utf-8', errors='ignore')
     
     stock_names = {
         '005930': '삼성전자',

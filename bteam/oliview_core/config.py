@@ -33,10 +33,10 @@ class CoreSettings(BaseModel):
     CHATBOT_A_UPSTREAM: str = Field(default="http://oliview_chatbot_a:8501")
     CHATBOT_B_UPSTREAM: str = Field(default="http://oliview_chatbot_b:8002")
     PILOS_WEB_UPSTREAM: str = Field(default="http://pilos-web:5000")
-    LLM_BASE_URL: str = Field(default="http://vllm-serv-gateway:8081/v1")
-    EMBEDDING_BASE_URL: str = Field(default="http://vllm-serv-gateway:8090/v1")
-    RERANK_BASE_URL: str = Field(default="http://vllm-serv-gateway:8091/v1")
-    MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://vllm-serv-gateway:8081/health")
+    LLM_BASE_URL: str = Field(default="http://model-gateway:8081/v1")
+    EMBEDDING_BASE_URL: str = Field(default="http://model-gateway:8090/v1")
+    RERANK_BASE_URL: str = Field(default="http://model-gateway:8091/v1")
+    MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://model-gateway:8081/health")
     CHATA_HEALTH_URL: str = Field(default="http://oliview_chatbot_a:8501/health")
     CHATB_HEALTH_URL: str = Field(default="http://oliview_chatbot_b:8502/health")
     REDIS_ENDPOINT: str = Field(default="redis://redis:6379/0")
@@ -85,7 +85,7 @@ def _detect_default_server_host() -> str:
     if env_val:
         return env_val
     if _is_running_in_docker():
-        return "http://vllm-serv-gateway"
+        return "http://model-gateway"
     return "http://127.0.0.1"
 
 
@@ -180,8 +180,8 @@ class Settings(BaseModel):
     rerank_endpoint: str = Field(default_factory=lambda: os.getenv("RERANK_BASE_URL", f"{_detect_default_server_host()}:8003/v1"))
     db_host: str = Field(default_factory=_detect_default_db_host)
     db_port: int = Field(default=3306)
-    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "oliview"))
-    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", "oliview1234"))
+    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "bteam_user"))
+    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", ""))
     db_name: str = Field(default_factory=lambda: os.getenv("DB_NAME", "oliview_db"))
     redis_endpoint: str = Field(default_factory=lambda: os.getenv("REDIS_ENDPOINT", "redis://127.0.0.1:6379/0"))
 

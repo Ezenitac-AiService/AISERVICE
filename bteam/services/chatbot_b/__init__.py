@@ -1,1 +1,0 @@
-"""Green ChatB compatibility service."""

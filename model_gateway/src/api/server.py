@@ -82,9 +82,9 @@ from src.core.middleware.protocol_guard import ProtocolGuardMiddleware
 def create_app() -> FastAPI:
     """Create and configure FastAPI application instance with subnets middleware and routers."""
     app = FastAPI(
-        title="vllm_serv Qwen3.5 & Gemma4 GPU Serving API",
-        description="llama.cpp 기반 Qwen 3.5 & Gemma 4 GPU 서빙 API",
-        version="1.0.0",
+        title="Model Gateway GPU Serving API",
+        description="Model Gateway (llama.cpp-CUDA) RTX 3060 12GB GPU 서빙 API",
+        version="1.5.0",
         lifespan=lifespan
     )
 

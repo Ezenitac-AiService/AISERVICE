@@ -206,7 +206,7 @@ class ProcessManager:
             "qwen3.6-27b": 131072,
             "qwen3.6-35b-a3b": 131072
         }
-        self.vram_total = 24000
+        self.vram_total = self.vram_max_capacity_mb or (server_config.get("vram_limit_mb") if server_config else None) or 10240
         self.process: Optional[asyncio.subprocess.Process] = None
         self.state: ProcessState = ProcessState(status=ProcessStatusEnum.UNLOADED, port=self.port)
         self.vram_offload_status: Optional[VramOffloadStatus] = None

@@ -1,1 +1,0 @@
-"""Aspect sentiment classification adapters."""

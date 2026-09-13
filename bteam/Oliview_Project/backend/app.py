@@ -29,8 +29,8 @@ def get_db_connection():
     except Exception:
         host = os.getenv('DB_HOST') or os.getenv('host') or 'localhost'
         port = int(os.getenv('DB_PORT', 3306))
-        user = os.getenv('DB_USER') or os.getenv('ID') or 'GP'
-        password = os.getenv('DB_PASSWORD') or os.getenv('PW') or 'GP123!'
+        user = os.getenv('DB_USER') or os.getenv('ID') or 'bteam_user'
+        password = os.getenv('DB_PASSWORD') or os.getenv('PW') or ''
         database = os.getenv('DB_NAME') or os.getenv('DB_NAME3') or os.getenv('DBName') or 'oliview_project'
         return pymysql.connect(
             host=host,

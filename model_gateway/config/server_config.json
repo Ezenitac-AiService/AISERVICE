@@ -16,7 +16,7 @@
         "172.16.0.0/12"
     ],
     "firewall_auto_allow": true,
-    "vram_limit_mb": 6500,
+    "vram_limit_mb": 10240,
     "default_model": "qwen3.5-2b",
     "current_n_ctx": 16384,
     "vram_max_capacity_mb": null,
@@ -51,6 +51,6 @@
     "hardware_profiling": {
         "auto_detect": true,
         "enforce_all_gpu_on_no_avx": true,
-        "fallback_hardware_tier": "pascal_sm61"
+        "fallback_hardware_tier": "ampere_sm86"
     }
 }

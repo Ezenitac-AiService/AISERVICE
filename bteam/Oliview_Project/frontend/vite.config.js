@@ -2,7 +2,22 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'root-redirect',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url === '/' || req.url === '') {
+            res.writeHead(302, { Location: '/bteam/oliview/' });
+            res.end();
+            return;
+          }
+          next();
+        });
+      }
+    }
+  ],
   base: '/bteam/oliview/',
   server: {
     host: '0.0.0.0',
@@ -14,6 +29,11 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' || process.env.DOCKER_CONTAINER ? 'http://oliview_backend:5050' : 'http://localhost:5050'),
         changeOrigin: true,
+      },
+      '/bteam/oliview/api': {
+        target: process.env.VITE_BACKEND_URL || (process.env.NODE_ENV === 'production' || process.env.DOCKER_CONTAINER ? 'http://oliview_backend:5050' : 'http://localhost:5050'),
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/bteam\/oliview/, ''),
       }
     }
   }

@@ -1,7 +1,7 @@
 """HTTP BGE-M3 Embeddings Client for LangChain & ChromaDB.
 
 Replaces local HuggingFace weights dependency by remotely querying
-the Model Gateway (vllm-serv-gateway:8090 / v1/embeddings).
+the Model Gateway (model-gateway:8090 / v1/embeddings).
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class HttpBgeM3Embeddings(Embeddings):
         if timeout is None:
             timeout = float(os.getenv("EMBEDDING_TIMEOUT_SECONDS", "120.0"))
         if not base_url:
-            server_host = os.getenv("SERVER_HOST", "http://vllm-serv-gateway")
+            server_host = os.getenv("SERVER_HOST", "http://model-gateway")
             if not server_host.startswith("http://") and not server_host.startswith("https://"):
                 server_host = f"http://{server_host}"
             embedding_port = os.getenv("EMBEDDING_PORT", "8090")

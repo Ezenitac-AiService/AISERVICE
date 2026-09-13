@@ -737,7 +737,7 @@
   function ensureStocks() {
     if (state.stocks) return Promise.resolve(state.stocks);
     if (state.stocksPromise) return state.stocksPromise;
-    state.stocksPromise = fetch("/api/stocks")
+    state.stocksPromise = fetch("api/stocks")
       .then((response) => {
         if (!response.ok) throw new Error("종목 목록을 불러오지 못했습니다.");
         return response.json();
@@ -824,7 +824,7 @@
 
   async function getDetail(code) {
     if (state.detailCache.has(code)) return state.detailCache.get(code);
-    const response = await fetch(`/api/stocks/${encodeURIComponent(code)}`);
+    const response = await fetch(`api/stocks/${encodeURIComponent(code)}`);
     if (!response.ok) throw new Error("기준일을 불러오지 못했습니다.");
     const body = await response.json();
     state.detailCache.set(code, body);
@@ -1180,8 +1180,8 @@
 
   async function requestChat(payload, signal, onChunk) {
     const endpoint = IS_FIXED_STOCK_MODE
-      ? `/api/stocks/${encodeURIComponent(FIXED_STOCK_CODE)}/chat`
-      : "/api/chat";
+      ? `api/stocks/${encodeURIComponent(FIXED_STOCK_CODE)}/chat`
+      : "api/chat";
     const requestPayload = { ...payload, stream: true };
     const response = await fetch(endpoint, {
       method: "POST",

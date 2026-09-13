@@ -21,7 +21,7 @@ def _require_env():
         "host": os.getenv("DB_HOST", os.getenv("PILOS_DB_HOST", "pilos-db")),
         "port": os.getenv("DB_PORT", os.getenv("PILOS_DB_PORT", "3306")),
         "user": os.getenv("DB_USER", os.getenv("PILOS_DB_USER", "pilos_user")),
-        "password": os.getenv("DB_PASSWORD", os.getenv("PILOS_DB_PASSWORD", "pilos_password")),
+        "password": os.getenv("DB_PASSWORD", os.getenv("PILOS_DB_PASSWORD", "")),
         "name": os.getenv("DB_NAME", os.getenv("PILOS_DB_NAME", "pilos_v2")),
     }
     missing = [k for k in ("host", "user", "password", "name") if not cfg[k]]

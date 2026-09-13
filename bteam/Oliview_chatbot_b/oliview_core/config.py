@@ -33,10 +33,10 @@ class CoreSettings(BaseModel):
     CHATBOT_A_UPSTREAM: str = Field(default="http://oliview_chatbot_a:8501")
     CHATBOT_B_UPSTREAM: str = Field(default="http://oliview_chatbot_b:8002")
     PILOS_WEB_UPSTREAM: str = Field(default="http://pilos-web:5000")
-    LLM_BASE_URL: str = Field(default="http://vllm-serv-gateway:8081/v1")
-    EMBEDDING_BASE_URL: str = Field(default="http://vllm-serv-gateway:8090/v1")
-    RERANK_BASE_URL: str = Field(default="http://vllm-serv-gateway:8091/v1")
-    MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://vllm-serv-gateway:8081/health")
+    LLM_BASE_URL: str = Field(default="http://model-gateway:8081/v1")
+    EMBEDDING_BASE_URL: str = Field(default="http://model-gateway:8090/v1")
+    RERANK_BASE_URL: str = Field(default="http://model-gateway:8091/v1")
+    MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://model-gateway:8081/health")
     CHATA_HEALTH_URL: str = Field(default="http://oliview_chatbot_a:8501/health")
     CHATB_HEALTH_URL: str = Field(default="http://oliview_chatbot_b:8502/health")
     REDIS_ENDPOINT: str = Field(default="redis://redis:6379/0")
@@ -85,7 +85,7 @@ def _detect_default_server_host() -> str:
     if env_val:
         return env_val
     if _is_running_in_docker():
-        return "http://vllm-serv-gateway"
+        return "http://model-gateway"
     return "http://127.0.0.1"
 
 
@@ -118,6 +118,59 @@ class ModelDiscoveryCache:
 _discovery_cache = ModelDiscoveryCache()
 
 
+def compute_context_harness_profile(n_ctx: int = 16384) -> ContextHarnessProfile:
+    """
+    3-Tier Agentic Context Harness Profile 계산기 (Spec 035).
+    게이트웨이 유효 컨텍스트 윈도우 크기에 따라 토큰 예산과 선별 리뷰 수를 동적 산정합니다.
+    """
+    if n_ctx >= 65536:
+        # Tier 3: Ultra (64K~128K+)
+        return ContextHarnessProfile(
+            total_n_ctx=n_ctx,
+            tier_name="ULTRA",
+            max_input_tokens=48000,
+            max_output_tokens=8192,
+            max_compare_output_tokens=8192,
+            tokens_per_target=15000,
+            reranked_per_target=20,
+            candidates_per_target=30,
+            max_history_turns=50,
+            raw_history_turns=10,
+            summary_history_turns=40,
+        )
+    elif n_ctx >= 32768:
+        # Tier 2: 32K Standard (32,768 tokens)
+        return ContextHarnessProfile(
+            total_n_ctx=n_ctx,
+            tier_name="32K_STANDARD",
+            max_input_tokens=22000,
+            max_output_tokens=4096,
+            max_compare_output_tokens=4096,
+            tokens_per_target=7000,
+            reranked_per_target=12,
+            candidates_per_target=20,
+            max_history_turns=30,
+            raw_history_turns=5,
+            summary_history_turns=25,
+        )
+    else:
+        # Tier 1: 16K Baseline (16,384 tokens)
+        return ContextHarnessProfile(
+            total_n_ctx=max(16384, n_ctx),
+            tier_name="16K_BASELINE",
+            max_input_tokens=10000,
+            max_output_tokens=2048,
+            max_compare_output_tokens=3072,
+            tokens_per_target=3500,
+            reranked_per_target=6,
+            candidates_per_target=15,
+            max_history_turns=15,
+            raw_history_turns=5,
+            summary_history_turns=10,
+        )
+
+
+
 class Settings(BaseModel):
     """Legacy Settings compatibility wrapper."""
     app_run_mode: AppRunMode = Field(default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO")))
@@ -127,8 +180,8 @@ class Settings(BaseModel):
     rerank_endpoint: str = Field(default_factory=lambda: os.getenv("RERANK_BASE_URL", f"{_detect_default_server_host()}:8003/v1"))
     db_host: str = Field(default_factory=_detect_default_db_host)
     db_port: int = Field(default=3306)
-    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "oliview"))
-    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", "oliview1234"))
+    db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "bteam_user"))
+    db_password: str = Field(default_factory=lambda: os.getenv("DB_PASSWORD", ""))
     db_name: str = Field(default_factory=lambda: os.getenv("DB_NAME", "oliview_db"))
     redis_endpoint: str = Field(default_factory=lambda: os.getenv("REDIS_ENDPOINT", "redis://127.0.0.1:6379/0"))
 

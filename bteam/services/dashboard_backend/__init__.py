@@ -1,1 +1,0 @@
-"""Green Dashboard backend service."""

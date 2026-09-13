@@ -37,12 +37,39 @@ logger = get_logger("oliview.fastapi.chata")
 settings = get_settings()
 rate_limiter = RedisRateLimiter(settings.REDIS_ENDPOINT)
 
+class PureASGIPrefixStripMiddleware:
+    """Pure ASGI middleware that strips subpath prefix and dynamically injects root_path into ASGI scope."""
+
+    def __init__(self, app, prefix: str = "/bteam/chata"):
+        self.app = app
+        self.prefix = "/" + prefix.strip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") in ("http", "websocket"):
+            path = scope.get("path", "")
+            if path == self.prefix:
+                scope = dict(scope)
+                scope["path"] = "/"
+                scope["raw_path"] = b"/"
+                scope["root_path"] = self.prefix
+            elif path.startswith(self.prefix + "/"):
+                scope = dict(scope)
+                new_path = path[len(self.prefix):]
+                scope["path"] = new_path
+                scope["raw_path"] = new_path.encode("latin-1")
+                scope["root_path"] = self.prefix
+
+        await self.app(scope, receive, send)
+
+
 app = FastAPI(
     title="Oliview ChatA Concierge Service",
     description="Olive Young Beauty Review Concierge Agent with SSE Streaming (Spec 048)",
     version="2.0.0",
-    root_path=os.environ.get("FASTAPI_ROOT_PATH", "/bteam/chata"),
 )
+
+# Prefix strip middleware (Pure ASGI, zero-buffering for SSE streaming)
+app.add_middleware(PureASGIPrefixStripMiddleware, prefix="/bteam/chata")
 
 # CORS configuration
 app.add_middleware(

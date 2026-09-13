@@ -172,7 +172,7 @@ async function loadPipelineStatus() {
   pipelineStatusLoading = true;
 
   try {
-    const response = await fetch("/api/pipeline/status", { cache: "no-store" });
+    const response = await fetch("api/pipeline/status", { cache: "no-store" });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body) throw new Error("pipeline status fetch failed");
     renderPipelineStatus(body);
@@ -310,7 +310,7 @@ function renderSupplyShare(node, data) {
 /* ---------------- API ---------------- */
 
 async function fetchAllStocks() {
-  const res = await fetch("/api/stocks");
+  const res = await fetch("api/stocks");
   if (!res.ok) throw new Error("all stocks fetch failed");
   return res.json();
 }
@@ -324,9 +324,12 @@ async function fetchMainSignal(stock) {
     return { report_status: "not_found", signal_status: null };
   }
 
-  const params = new URLSearchParams({ model_date: stock.model_date });
+  const params = new URLSearchParams({
+    model_date: stock.model_date,
+    limit: "1",
+  });
   const res = await fetch(
-    `/api/stocks/${encodeURIComponent(stock.stock_code)}/llm-reports?${params}`,
+    `api/stocks/${encodeURIComponent(stock.stock_code)}/llm-reports?${params}`,
   );
   const body = await res.json().catch(() => ({}));
 
@@ -815,7 +818,7 @@ function renderMainScModel(direction, model) {
 }
 
 async function requestSingleCommentInference(text) {
-  const response = await fetch("/api/inference/single-comment", {
+  const response = await fetch("api/inference/single-comment", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ comment_text: text }),
