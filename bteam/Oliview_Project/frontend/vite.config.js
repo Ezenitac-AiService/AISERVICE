@@ -8,7 +8,7 @@ export default defineConfig({
       name: 'root-redirect',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          if (req.url === '/' || req.url === '') {
+          if (req.url === '/' || req.url === '' || req.url === '/bteam/oliview') {
             res.writeHead(302, { Location: '/bteam/oliview/' });
             res.end();
             return;
