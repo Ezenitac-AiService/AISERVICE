@@ -15,6 +15,46 @@ volumes:
 services:
 
   # ============================================================================
+  # 0. 통합 AI 포털 정적 웹서버 (Nginx Unprivileged - aiservice-portal)
+  # ============================================================================
+  aiservice-portal:
+    image: nginxinc/nginx-unprivileged:alpine
+    container_name: aiservice-portal
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    volumes:
+      - ../dist_node_a/portal_nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../dist_node_a/portal_static:/usr/share/nginx/html:ro
+    environment:
+      - NGINX_ENTRYPOINT_QUIET_LOGS=1
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m
+      - /var/run:size=4m
+      - /var/cache/nginx:size=8m
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ============================================================================
   # 1. 공통 LLM/임베딩 서빙 게이트웨이 (llama.cpp-CUDA - model-gateway)
   # ============================================================================
   model-gateway:
@@ -30,6 +70,10 @@ services:
     tty: true
     ports:
       - "127.0.0.1:8081:8081"
+    shm_size: '2gb'
+    depends_on:
+      redis:
+        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -54,6 +98,18 @@ services:
       - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-10240}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8081/health/readiness | grep -q 'ready' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
