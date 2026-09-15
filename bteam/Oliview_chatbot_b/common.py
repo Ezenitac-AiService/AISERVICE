@@ -301,6 +301,8 @@ def clean_think_tags(text: str, show_think: bool = False) -> str:
 def load_sample_config() -> dict:
     """환경변수 및 설정에서 로컬 게이트웨이 및 모델 토폴로지 설정을 로드합니다."""
     host = os.getenv("SERVER_HOST") or os.getenv("MODEL_GATEWAY_HOST") or "http://model-gateway"
+    if "vllm-serv-gateway" in host:
+        host = host.replace("vllm-serv-gateway", "model-gateway")
     if not host.startswith("http://") and not host.startswith("https://"):
         host = f"http://{host}"
 

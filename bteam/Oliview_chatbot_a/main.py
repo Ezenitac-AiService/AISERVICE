@@ -38,7 +38,7 @@ settings = get_settings()
 rate_limiter = RedisRateLimiter(settings.REDIS_ENDPOINT)
 
 class PureASGIPrefixStripMiddleware:
-    """Pure ASGI middleware that strips subpath prefix and dynamically injects root_path into ASGI scope."""
+    """Pure ASGI middleware that strips subpath prefix and preserves Starlette static route compatibility."""
 
     def __init__(self, app, prefix: str = "/bteam/chata"):
         self.app = app
@@ -51,13 +51,11 @@ class PureASGIPrefixStripMiddleware:
                 scope = dict(scope)
                 scope["path"] = "/"
                 scope["raw_path"] = b"/"
-                scope["root_path"] = self.prefix
             elif path.startswith(self.prefix + "/"):
                 scope = dict(scope)
                 new_path = path[len(self.prefix):]
                 scope["path"] = new_path
                 scope["raw_path"] = new_path.encode("latin-1")
-                scope["root_path"] = self.prefix
 
         await self.app(scope, receive, send)
 
@@ -86,7 +84,9 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 (STATIC_DIR / "css").mkdir(exist_ok=True)
 (STATIC_DIR / "js").mkdir(exist_ok=True)
 
+# Dual Normalization static mounts (Constitution Principle VIII)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/bteam/chata/static", StaticFiles(directory=str(STATIC_DIR)), name="chata_static")
 
 orchestrator = MultiTargetGraphOrchestrator()
 
@@ -126,7 +126,7 @@ async def verify_auth_and_rate_limit(
     return principal_id
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def read_index():
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
@@ -134,7 +134,7 @@ async def read_index():
     return HTMLResponse("<h1>Oliview ChatA Concierge</h1>")
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "ok", "app": "Oliview ChatA Concierge", "service": "chat_a", "version": "2.0.0"}
 

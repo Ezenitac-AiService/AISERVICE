@@ -55,6 +55,8 @@ except ImportError:
 # ==============================================================================
 config = load_sample_config()
 SERVER_HOST = os.getenv("SERVER_HOST", config["server_host"])
+if "vllm-serv-gateway" in SERVER_HOST:
+    SERVER_HOST = SERVER_HOST.replace("vllm-serv-gateway", "model-gateway")
 MAIN_PORT = os.getenv("MAIN_PORT", str(config.get("main_port", 8081)))
 EMBED_PORT = os.getenv("EMBEDDING_PORT", os.getenv("EMBED_PORT", str(config.get("embed_port", 8090))))
 RERANK_PORT = os.getenv("RERANK_PORT", str(config.get("rerank_port", 8091)))
@@ -82,7 +84,7 @@ DB_CONFIG = {
 }
 
 class PureASGIPrefixStripMiddleware:
-    """Pure ASGI middleware that strips subpath prefix and dynamically injects root_path into ASGI scope."""
+    """Pure ASGI middleware that strips subpath prefix and preserves route compatibility."""
 
     def __init__(self, app, prefix: str = "/bteam/chatb"):
         self.app = app
@@ -95,13 +97,11 @@ class PureASGIPrefixStripMiddleware:
                 scope = dict(scope)
                 scope["path"] = "/"
                 scope["raw_path"] = b"/"
-                scope["root_path"] = self.prefix
             elif path.startswith(self.prefix + "/"):
                 scope = dict(scope)
                 new_path = path[len(self.prefix):]
                 scope["path"] = new_path
                 scope["raw_path"] = new_path.encode("latin-1")
-                scope["root_path"] = self.prefix
 
         await self.app(scope, receive, send)
 
@@ -166,59 +166,66 @@ class RagSearchResponse(BaseModel):
 # 3. 🔬 수학 및 벡터/AI 인퍼런스 보조 함수
 # ==============================================================================
 def get_query_embedding(query_text: str):
-    try:
-        with httpx.Client(timeout=120.0) as client:
-            resp = client.post(
-                EMBEDDING_SERVER_URL,
-                json={"model": config.get("embedding_model", "bge-m3"), "input": [query_text]},
-                headers={"Connection": "close"}
-            )
-            resp.raise_for_status()
-            res_json = resp.json()
-            return res_json["data"][0]["embedding"]
-    except Exception as e:
-        print(f"⚠️ 1단계 질문 텍스트 임베딩 실패: {e}")
-        return None
+    candidate_urls = [
+        f"{BASE_URL}:{MAIN_PORT}/v1/embeddings",
+        EMBEDDING_SERVER_URL,
+    ]
+    for url in candidate_urls:
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.post(
+                    url,
+                    json={"model": config.get("embedding_model", "bge-m3"), "input": [query_text]},
+                    headers={"Connection": "close"}
+                )
+                if resp.status_code == 200:
+                    res_json = resp.json()
+                    return res_json["data"][0]["embedding"]
+        except Exception as e:
+            continue
+    print(f"⚠️ 1단계 질문 텍스트 임베딩 실패: candidate endpoints exhausted")
+    return None
 
 def get_rerank_scores(query_text: str, documents: List[str]):
-    try:
-        with httpx.Client(timeout=5.0) as client:
-            # 질문 벡터 획득
-            r_q = client.post(
-                RERANK_SERVER_URL,
-                json={"input": query_text},
-                headers={"Connection": "close"}
-            ).json()
-            raw_q = np.asarray(r_q["data"][0]["embedding"], dtype=np.float32)
-            if raw_q.ndim == 2:
-                q_vec = np.mean(raw_q, axis=0)
-            else:
-                q_vec = raw_q.flatten()
-
-            # 후보 문장들 벡터 일괄 획득
-            r_docs = client.post(
-                RERANK_SERVER_URL,
-                json={"input": documents},
-                headers={"Connection": "close"}
-            ).json()
-            doc_datas = r_docs["data"]
-
-            scores = []
-            for d in doc_datas:
-                raw_d = np.asarray(d["embedding"], dtype=np.float32)
-                if raw_d.ndim == 2:
-                    d_vec = np.mean(raw_d, axis=0)
+    candidate_urls = [
+        f"{BASE_URL}:{MAIN_PORT}/v1/rerank",
+        RERANK_SERVER_URL,
+    ]
+    for url in candidate_urls:
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                if "/rerank" in url:
+                    # Native /v1/rerank endpoint
+                    resp = client.post(
+                        url,
+                        json={"query": query_text, "documents": documents},
+                        headers={"Connection": "close"}
+                    )
+                    if resp.status_code == 200:
+                        res = resp.json()
+                        results = res.get("results") or res.get("data", [])
+                        return [item.get("relevance_score", 0.0) for item in results]
                 else:
-                    d_vec = raw_d.flatten()
-                dot = np.dot(q_vec, d_vec)
-                norm1 = np.linalg.norm(q_vec)
-                norm2 = np.linalg.norm(d_vec)
-                sim = float(dot / (norm1 * norm2)) if (norm1 * norm2) > 0 else 0.0
-                scores.append(sim)
-            return scores
-    except Exception as e:
-        print(f"⚠️ 2단계 리랭커 연산 실패: {e}")
-        return None
+                    # Embeddings-based similarity endpoint
+                    r_q = client.post(url, json={"input": query_text}, headers={"Connection": "close"}).json()
+                    raw_q = np.asarray(r_q["data"][0]["embedding"], dtype=np.float32)
+                    q_vec = np.mean(raw_q, axis=0) if raw_q.ndim == 2 else raw_q.flatten()
+
+                    r_docs = client.post(url, json={"input": documents}, headers={"Connection": "close"}).json()
+                    scores = []
+                    for d in r_docs.get("data", []):
+                        raw_d = np.asarray(d["embedding"], dtype=np.float32)
+                        d_vec = np.mean(raw_d, axis=0) if raw_d.ndim == 2 else raw_d.flatten()
+                        dot = np.dot(q_vec, d_vec)
+                        norm1 = np.linalg.norm(q_vec)
+                        norm2 = np.linalg.norm(d_vec)
+                        sim = float(dot / (norm1 * norm2)) if (norm1 * norm2) > 0 else 0.0
+                        scores.append(sim)
+                    return scores
+        except Exception as e:
+            continue
+    print(f"⚠️ 2단계 리랭커 연산 실패: candidate endpoints exhausted")
+    return None
 
 
 def cosine_similarity(v1, v2):
@@ -674,54 +681,60 @@ async def search_products_with_rag_stream(request_body: SearchRequest, request: 
     Spec 030: LangGraph StateGraph 엔진 및 클라이언트 연결 단절 즉시 취소 가드 (T031, T035)
     """
     settings = get_settings()
+    use_langgraph = getattr(settings, "feature_langgraph_rag", True)
 
-    # ── Spec 030: LangGraph StateGraph Orchestrator (Hot-swap Feature Flag) ──
-    if settings.feature_langgraph_rag:
+    # ── Spec 030: LangGraph StateGraph Orchestrator (Hot-swap Feature Flag & Fallback) ──
+    if use_langgraph:
         async def langgraph_sse_generator():
-            orchestrator = MultiTargetGraphOrchestrator()
-            session_id = getattr(request_body, "session_id", "") or ""
-            phase_map = {
-                "INTENT": PipelinePhase.INTENT_ANALYSIS.value,
-                "SEARCH": PipelinePhase.HYBRID_SEARCH.value,
-                "RERANK": PipelinePhase.RERANKING.value,
-                "SYNTHESIS": PipelinePhase.LLM_SYNTHESIS.value,
-            }
-            for event in orchestrator.stream_rag(
-                query=request_body.query,
-                session_id=session_id,
-                tenant_id="chatb",
-            ):
-                if request and await request.is_disconnected():
-                    # FR-019 / T035: 클라이언트 탭 닫힘 시 GPU 연산 즉시 중단
-                    break
+            try:
+                orchestrator = MultiTargetGraphOrchestrator()
+                session_id = getattr(request_body, "session_id", "") or ""
+                phase_map = {
+                    "INTENT": PipelinePhase.INTENT_ANALYSIS.value,
+                    "SEARCH": PipelinePhase.HYBRID_SEARCH.value,
+                    "RERANK": PipelinePhase.RERANKING.value,
+                    "SYNTHESIS": PipelinePhase.LLM_SYNTHESIS.value,
+                }
+                for event in orchestrator.stream_rag(
+                    query=request_body.query,
+                    session_id=session_id,
+                    tenant_id="chatb",
+                ):
+                    if request and await request.is_disconnected():
+                        # FR-019 / T035: 클라이언트 탭 닫힘 시 GPU 연산 즉시 중단
+                        break
 
-                event_type = event.get("event_type", "step_update")
+                    event_type = event.get("event_type", "step_update")
 
-                # Web UI 4단계 타임라인 호환성 브릿지
-                if event_type == "step_update":
-                    step_id = event.get("step_id", "")
-                    phase = phase_map.get(step_id, step_id)
-                    status = event.get("status", "running")
-                    step_evt = {
-                        "phase": phase,
-                        "label": event.get("step_name", ""),
-                        "status": status,
-                    }
-                    yield f"event: step\ndata: {json.dumps(step_evt, ensure_ascii=False)}\n\n"
+                    # Web UI 4단계 타임라인 호환성 브릿지
+                    if event_type == "step_update":
+                        step_id = event.get("step_id", "")
+                        phase = phase_map.get(step_id, step_id)
+                        status = event.get("status", "running")
+                        step_evt = {
+                            "phase": phase,
+                            "label": event.get("step_name", ""),
+                            "status": status,
+                        }
+                        yield f"event: step\ndata: {json.dumps(step_evt, ensure_ascii=False)}\n\n"
 
-                # Spec 031 FR-006: GPU 큐 대기 상태 브릿지 (Web UI 대기 순번 뱃지)
-                elif event_type == "queue_waiting":
-                    queue_evt = {
-                        "queue_position": event.get("queue_position", 0),
-                        "estimated_wait_sec": event.get("estimated_wait_sec", 0),
-                        "status": event.get("status", "QUEUED"),
-                        "ticket_id": event.get("ticket_id", ""),
-                    }
-                    yield f"event: queue_status\ndata: {json.dumps(queue_evt, ensure_ascii=False)}\n\n"
-                    continue  # queue_waiting는 기본 이벤트로 중복 전송하지 않음
+                    # Spec 031 FR-006: GPU 큐 대기 상태 브릿지 (Web UI 대기 순번 뱃지)
+                    elif event_type == "queue_waiting":
+                        queue_evt = {
+                            "queue_position": event.get("queue_position", 0),
+                            "estimated_wait_sec": event.get("estimated_wait_sec", 0),
+                            "status": event.get("status", "QUEUED"),
+                            "ticket_id": event.get("ticket_id", ""),
+                        }
+                        yield f"event: queue_status\ndata: {json.dumps(queue_evt, ensure_ascii=False)}\n\n"
+                        continue  # queue_waiting는 기본 이벤트로 중복 전송하지 않음
 
-                # 기본 이벤트 전송 (token, complete, fallback_alert, step_update)
-                yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    # 기본 이벤트 전송 (token, complete, fallback_alert, step_update)
+                    yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as exc:
+                print(f"[LangGraph Fallback] Caught exception, falling back to sequential RAG: {exc}")
+                async for chunk in sse_event_generator():
+                    yield chunk
 
         return StreamingResponse(langgraph_sse_generator(), media_type="text/event-stream")
 
@@ -1148,19 +1161,19 @@ async def cancel_queue_endpoint(request: Request):
         raise HTTPException(status_code=500, detail=f"큐 취소 요청 실패: {e}")
 
 
-@app.get("/health", tags=["Health"])
-@app.get("/healthz", tags=["Health"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["Health"])
+@app.api_route("/healthz", methods=["GET", "HEAD"], tags=["Health"])
 async def health_check():
     return {"status": "ok", "app": "Oliview Production RAG Engine API", "service": "chat_b", "version": "3.0.0"}
 
 
-@app.get("/", tags=["UI"])
+@app.api_route("/", methods=["GET", "HEAD"], tags=["UI"])
 async def serve_index():
     index_path = os.path.join(os.path.dirname(__file__), "index.html")
     return FileResponse(index_path, media_type="text/html")
 
 
-@app.get("/index.html", tags=["UI"])
+@app.api_route("/index.html", methods=["GET", "HEAD"], tags=["UI"])
 async def serve_index_html():
     index_path = os.path.join(os.path.dirname(__file__), "index.html")
     return FileResponse(index_path, media_type="text/html")

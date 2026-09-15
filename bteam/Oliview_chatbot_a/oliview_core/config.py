@@ -52,22 +52,100 @@ class CoreSettings(BaseModel):
     CHAT_OUTPUT_TOKEN_CAP: int = Field(default=2048, ge=1)
     CHAT_TIMEOUT_MS: int = Field(default=20000, ge=1000)
 
+    # Hot-swap Feature Flag (Spec 030 / Feature 005)
+    feature_langgraph_rag: bool = Field(default=True)
+
+    # Model Names & Parameters
+    fast_llm_model: str = Field(default="qwen3.5-2b")
+    synthesis_llm_model: str = Field(default="qwen3.5-2b")
+    rerank_model: str = Field(default="bge-reranker-v2-m3")
+    embedding_model: str = Field(default="bge-m3")
+
+    # Database & Pool Settings
+    db_host: str = Field(default="bteam_db")
+    db_port: int = Field(default=3306)
+    db_user: str = Field(default="bteam_user")
+    db_password: str = Field(default="")
+    db_name: str = Field(default="oliview_project")
+    db_pool_size: int = Field(default=10)
+    db_max_overflow: int = Field(default=20)
+    db_pool_recycle: int = Field(default=1800)
+
+    # Redis In-Memory Settings
+    redis_host: str = Field(default="redis")
+    redis_port: int = Field(default=6379)
+    redis_socket_timeout: float = Field(default=0.5)
+    redis_ttl_session: int = Field(default=259200)
+    redis_ttl_embedding: int = Field(default=604800)
+    redis_ttl_rerank: int = Field(default=86400)
+    redis_ttl_search_pool: int = Field(default=43200)
+    redis_ttl_llm_response: int = Field(default=43200)
+    redis_ttl_llm_jitter: int = Field(default=3600)
+    enable_l5_cache: bool = Field(default=True)
+
+    # Pipeline Timeouts & Sampling Defaults
+    timeout_search_sec: float = Field(default=10.0)
+    timeout_rerank_sec: float = Field(default=20.0)
+    timeout_llm_sec: float = Field(default=180.0)
+    inactivity_timeout_s: float = Field(default=180.0)
+    max_targets: int = Field(default=3)
+    gpu_concurrency_limit: int = Field(default=3)
+    candidates_per_target: int = Field(default=15)
+    reranked_per_target: int = Field(default=6)
+    tokens_per_target: int = Field(default=3500)
+    max_single_output_tokens: int = Field(default=1024)
+    max_compare_output_tokens: int = Field(default=3072)
+    max_input_context_tokens: int = Field(default=10000)
+    default_temperature: float = Field(default=0.3)
+    default_top_p: float = Field(default=0.85)
+    default_repetition_penalty: float = Field(default=1.05)
+    # Vector Index Optimization
+    chroma_hnsw_search_ef: int = Field(default=64)
+    faiss_index_dir: Optional[str] = Field(default=None)
+    min_required_n_ctx: int = Field(default=16384)
+
+    @property
+    def llm_endpoint(self) -> str:
+        return self.LLM_BASE_URL.rstrip("/")
+
+    @property
+    def embed_endpoint(self) -> str:
+        return self.EMBEDDING_BASE_URL.rstrip("/")
+
+    @property
+    def rerank_endpoint(self) -> str:
+        return self.RERANK_BASE_URL.rstrip("/")
+
+    def get_context_harness(self, n_ctx: Optional[int] = None) -> ContextHarnessProfile:
+        target_ctx = n_ctx or self.min_required_n_ctx
+        return compute_context_harness_profile(target_ctx)
+
     @classmethod
     def from_env(cls) -> "CoreSettings":
         data = {}
         for field_name in cls.model_fields.keys():
-            if field_name in os.environ:
-                val = os.environ[field_name]
+            candidates = [field_name, field_name.upper(), field_name.lower()]
+            found_val = None
+            for cand in candidates:
+                if cand in os.environ:
+                    found_val = os.environ[cand]
+                    break
+            if found_val is not None:
                 field_type = cls.model_fields[field_name].annotation
                 if field_type is int or field_type == int:
                     try:
-                        data[field_name] = int(val)
+                        data[field_name] = int(found_val)
                     except ValueError:
-                        data[field_name] = val
+                        data[field_name] = found_val
+                elif field_type is float or field_type == float:
+                    try:
+                        data[field_name] = float(found_val)
+                    except ValueError:
+                        data[field_name] = found_val
                 elif field_type is bool or field_type == bool:
-                    data[field_name] = val.lower() in ("true", "1", "yes")
+                    data[field_name] = found_val.lower() in ("true", "1", "yes")
                 else:
-                    data[field_name] = val
+                    data[field_name] = found_val
         return cls(**data)
 
 
