@@ -50,9 +50,9 @@ class TestEngineOptimizationFlags(unittest.TestCase):
         self.assertTrue("-fa" in cmd or "--flash-attn" in cmd, "FlashAttention flag must be present")
         
         # 2. KV Cache Quantization
-        self.assertIn("--ctk", cmd, "KV Cache K type flag must be present")
+        self.assertTrue("-ctk" in cmd or "--ctk" in cmd, "KV Cache K type flag must be present")
         self.assertIn("q8_0", cmd, "KV Cache K type must be q8_0")
-        self.assertIn("--ctv", cmd, "KV Cache V type flag must be present")
+        self.assertTrue("-ctv" in cmd or "--ctv" in cmd, "KV Cache V type flag must be present")
         self.assertIn("q8_0", cmd, "KV Cache V type must be q8_0")
         
         # 3. Context & Batch / Chunked Prefill

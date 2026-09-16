@@ -181,7 +181,7 @@ def build_l5_key(
     tenant_id: str,
     rewritten_query: str,
     doc_ids: List[str],
-    model_id: str = "qwen3.5-2b",
+    model_id: str = "qwen3.5-9b",
     prompt_version: str = "v1.0",
 ) -> str:
     """

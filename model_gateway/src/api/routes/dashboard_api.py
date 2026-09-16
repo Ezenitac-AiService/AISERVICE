@@ -17,8 +17,26 @@ import asyncio
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Request, HTTPException, Depends, Header, status
 from fastapi.responses import StreamingResponse
-from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel, Field
+
+try:
+    from sse_starlette.sse import EventSourceResponse
+except ImportError:
+    class EventSourceResponse(StreamingResponse):
+        def __init__(self, content, **kwargs):
+            async def sse_wrapper():
+                async for item in content:
+                    if isinstance(item, dict):
+                        if "comment" in item:
+                            yield f": {item['comment']}\n\n".encode("utf-8")
+                        else:
+                            yield f"data: {json.dumps(item)}\n\n".encode("utf-8")
+                    elif isinstance(item, str):
+                        yield f"data: {item}\n\n".encode("utf-8")
+                    elif isinstance(item, bytes):
+                        yield item
+            super().__init__(sse_wrapper(), media_type="text/event-stream", **kwargs)
+
 
 from src.core.llama_manager import llama_manager
 from src.core.config_manager import ConfigManager
@@ -35,7 +53,7 @@ def verify_admin_secret_auth(
 ) -> bool:
     """
     Dependency verifying Admin Secret authentication for state-mutating endpoints (FR-006).
-    Checks X-Admin-Secret header, Authorization header (Bearer <secret>), or admin_secret query param.
+    Checks X-Admin-Secret header or Authorization: Bearer <secret> header. Rejects query parameters.
     """
     key_mgr = get_api_key_manager()
     secret = x_admin_secret
@@ -45,13 +63,10 @@ def verify_admin_secret_auth(
         if auth_header.startswith("Bearer "):
             secret = auth_header[7:].strip()
 
-    if not secret:
-        secret = request.query_params.get("admin_secret") or request.cookies.get("admin_secret")
-
     if not secret or not key_mgr.verify_admin_secret(secret):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized: Valid Admin Secret required for system control actions"
+            detail="Unauthorized: Valid Admin Secret required via X-Admin-Secret or Authorization: Bearer header"
         )
     return True
 
@@ -172,20 +187,36 @@ async def sse_stream(request: Request):
 
 @router.get("/audit")
 async def get_audit_logs(limit: int = 50):
-    """Public read-only: Retrieve client access audit log entries (FR-004)."""
+    """Public read-only: Retrieve client access audit log entries deserialized from access.log (FR-004, FR-066)."""
+    import re
     logger = get_client_logger()
     entries = logger.get_recent_access_logs(limit=limit)
     parsed_logs = []
     for line in entries:
-        parsed_logs.append({
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "client_ip": "10.0.0.41",
-            "subnet_allowed": True,
-            "endpoint": "/v1/chat/completions",
-            "status_code": 200,
-            "process_time_ms": 125.0,
-            "raw_entry": line
-        })
+        match = re.search(r"\[(.*?)\]\s+\[(.*?)\]\s+\[(.*?)\](?:\s+\[key:(.*?)\])?(?:\s+\[user:(.*?)\])?\s+(\w+)\s+(\S+)\s+(\d+)\s+-\s+([\d\.]+)ms", line)
+        if match:
+            parsed_logs.append({
+                "timestamp": match.group(1),
+                "client_ip": match.group(2),
+                "request_id": match.group(3),
+                "masked_key": match.group(4) or "",
+                "method": match.group(6),
+                "endpoint": match.group(7),
+                "status_code": int(match.group(8)),
+                "process_time_ms": float(match.group(9)),
+                "subnet_allowed": True,
+                "raw_entry": line
+            })
+        else:
+            parsed_logs.append({
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "client_ip": "unknown",
+                "subnet_allowed": True,
+                "endpoint": "",
+                "status_code": 200,
+                "process_time_ms": 0.0,
+                "raw_entry": line
+            })
     return {
         "status": "success",
         "logs": parsed_logs
@@ -269,7 +300,7 @@ async def run_playground_test(request: Request, body: PlaygroundRequest):
             )
         key_mgr = get_api_key_manager()
         is_valid, _ = key_mgr.verify_key(api_key)
-        if not is_valid and api_key not in ["sk-vllm-test", "sk-vllm-dev"]:
+        if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API Key provided."
@@ -398,7 +429,7 @@ async def run_playground_stream(request: Request, body: PlaygroundRequest):
             )
         key_mgr = get_api_key_manager()
         is_valid, _ = key_mgr.verify_key(api_key)
-        if not is_valid and api_key not in ["sk-vllm-test", "sk-vllm-dev"]:
+        if not is_valid:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid API Key provided."
@@ -684,8 +715,8 @@ async def export_keys_metrics_csv():
 
 
 @router.get("/audit/payload/{log_id}")
-async def get_audit_payload(log_id: int):
-    """Returns prompt_text and completion_text payload inspector details (FR-003, 044-llm-response-payload-viewer)."""
+async def get_audit_payload(log_id: int, authorized: bool = Depends(verify_admin_secret_auth)):
+    """Returns prompt_text and completion_text payload inspector details with admin auth (FR-003, 044-llm-response-payload-viewer)."""
     from src.core.metrics_db import metrics_db
     payload = metrics_db.get_payload_by_id(log_id)
     if not payload:

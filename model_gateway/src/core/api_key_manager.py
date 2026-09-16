@@ -88,7 +88,22 @@ class ApiKeyManager:
         cm = ConfigManager(config_path=self.config_path)
         cfg = cm.get_server_config()
         keys_raw = cfg.get("api_keys", [])
-        return [ApiKeyEntity(**k) for k in keys_raw]
+        entities = []
+        for k in keys_raw:
+            try:
+                entities.append(ApiKeyEntity(**k))
+            except Exception:
+                if isinstance(k, dict) and "key" in k:
+                    raw_k = k["key"]
+                    entities.append(ApiKeyEntity(
+                        key_id=k.get("key_id", f"key-{self._hash_key(raw_k)[:8]}"),
+                        name=k.get("name", "Legacy Key"),
+                        hashed_key=self._hash_key(raw_k),
+                        masked_key=self.mask_key(raw_k),
+                        created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        is_active=k.get("status") == "active" or k.get("is_active", True)
+                    ))
+        return entities
 
     def verify_key(self, raw_key: str) -> Tuple[bool, Optional[str]]:
         """
@@ -105,28 +120,34 @@ class ApiKeyManager:
         if not raw_key:
             return False, None
 
-        if raw_key in ["sk-vllm-test", "sk-vllm-dev"]:
-            return True, self.mask_key(raw_key)
-
+        import secrets
         hashed = self._hash_key(raw_key)
         keys = self.list_keys()
         for k in keys:
-            if k.is_active and k.hashed_key == hashed:
+            if k.is_active and secrets.compare_digest(k.hashed_key, hashed):
                 return True, k.masked_key
 
         return False, None
 
     def verify_admin_secret(self, provided_secret: str) -> bool:
-        """Verifies provided admin secret against configured admin_secret."""
+        """Verifies provided admin secret against configured admin_secret using constant-time comparison."""
+        import secrets
+        if not provided_secret:
+            return False
+
         from src.core.config_manager import ConfigManager
         cm = ConfigManager(config_path=self.config_path)
         cfg = cm.get_server_config()
 
-        configured_secret = cfg.get("admin_secret", "admin1234")
         env_secret = os.getenv("VLLM_ADMIN_SECRET")
-        expected = env_secret if env_secret else configured_secret
+        configured_secret = cfg.get("admin_secret")
+        expected = env_secret or configured_secret
 
-        return provided_secret == expected
+        # Ban insecure default secret
+        if not expected or expected == "admin1234":
+            return False
+
+        return secrets.compare_digest(provided_secret, expected)
 
 
 

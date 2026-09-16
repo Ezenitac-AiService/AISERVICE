@@ -88,22 +88,23 @@ services:
       - ./model_gateway/src:/app/src
       - ./model_gateway/scripts:/app/scripts
       - ./model_gateway/tests:/app/tests
+    stop_grace_period: 30s
     environment:
       - PYTHONPATH=/app:/app/.venv/lib/python3.12/site-packages
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PYTHONUNBUFFERED=1
-      - FAST_LLM_MODEL=${FAST_LLM_MODEL:-qwen3.5-2b}
-      - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
-      - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-10240}
+      - FAST_LLM_MODEL=${FAST_LLM_MODEL:-qwen3.5-4b}
+      - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
+      - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-11264}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8081/health/readiness | grep -q 'ready' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 3
+      start_period: 90s
     logging:
       driver: "json-file"
       options:
@@ -130,6 +131,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
 
   # ============================================================================
   # 2. B-Team 공통 데이터베이스 (MySQL 8.0 - bteam_db)
@@ -161,6 +168,12 @@ services:
       timeout: 5s
       retries: 30
       start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
 
   # ============================================================================
   # 3. B-Team 메인 백엔드 API (Flask/Gunicorn - oliview_backend)
@@ -188,6 +201,12 @@ services:
         condition: service_healthy
     volumes:
       - ./bteam/Oliview_Project/backend:/app
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
@@ -211,6 +230,12 @@ services:
     volumes:
       - ./bteam/Oliview_Project/frontend:/app
       - /app/node_modules
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
@@ -239,13 +264,13 @@ services:
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://model-gateway
       MAIN_PORT: 8081
-      EMBED_PORT: 8090
-      EMBEDDING_PORT: 8090
-      RERANK_PORT: 8091
+      EMBED_PORT: 8081
+      EMBEDDING_PORT: 8081
+      RERANK_PORT: 8081
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
-      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-2b}
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
       USE_LLM_METADATA_FILTER: "false"
     volumes:
       - ./bteam/Oliview_chatbot_a:/app
@@ -254,7 +279,13 @@ services:
       bteam_db:
         condition: service_healthy
       model-gateway:
-        condition: service_started
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
@@ -282,11 +313,11 @@ services:
       DB_NAME: ${BTEAM_DB_NAME:-oliview_project}
       SERVER_HOST: http://model-gateway
       MAIN_PORT: 8081
-      EMBED_PORT: 8090
-      EMBEDDING_PORT: 8090
-      RERANK_PORT: 8091
-      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
-      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-2b}
+      EMBED_PORT: 8081
+      EMBEDDING_PORT: 8081
+      RERANK_PORT: 8081
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
     volumes:
       - ./bteam/Oliview_chatbot_b:/app
       - ./bteam/oliview_core:/app/oliview_core
@@ -294,7 +325,13 @@ services:
       bteam_db:
         condition: service_healthy
       model-gateway:
-        condition: service_started
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
@@ -329,6 +366,12 @@ services:
       timeout: 10s
       retries: 30
       start_period: 300s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
 
   # ============================================================================
   # 8. A-Team 메인 웹 & 대시보드 (Flask/Gunicorn - pilos-web)
@@ -351,22 +394,22 @@ services:
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
       LLM_BASE_URL: http://model-gateway:8081/v1
-      EMBEDDING_BASE_URL: http://model-gateway:8090/v1
+      EMBEDDING_BASE_URL: http://model-gateway:8081/v1
       EMBEDDING_API_KEY: EMPTY
       EMBEDDING_MODEL: bge-m3
-      RERANK_BASE_URL: http://model-gateway:8091/v1
+      RERANK_BASE_URL: http://model-gateway:8081/v1
       RERANK_API_KEY: EMPTY
       RERANK_MODEL: bge-reranker-v2-m3
-      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
-      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
+      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
       REPORT_LLM_OUTPUT_MODE: ${REPORT_LLM_OUTPUT_MODE:-json_object}
       SERVICE_KNOWLEDGE_VERSION: "1.0"
       EMBEDDING_TIMEOUT_SECONDS: "300"
       RERANK_TIMEOUT_SECONDS: "300"
       CHAT_LLM_TIMEOUT_SECONDS: "300"
       REPORT_LLM_TIMEOUT_SECONDS: "300"
-      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
-      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
+      FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
+      SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
       KIWOOM_APP_KEY: ${KIWOOM_APP_KEY:-}
       KIWOOM_SECRET_KEY: ${KIWOOM_SECRET_KEY:-}
       KIWOOM_HOST: ${KIWOOM_HOST:-https://api.kiwoom.com}
@@ -381,7 +424,13 @@ services:
       pilos_db:
         condition: service_healthy
       model-gateway:
-        condition: service_started
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 
@@ -405,14 +454,14 @@ services:
       LLM_PROVIDER: openai
       LLM_API_KEY: EMPTY
       LLM_BASE_URL: http://model-gateway:8081/v1
-      EMBEDDING_BASE_URL: http://model-gateway:8090/v1
+      EMBEDDING_BASE_URL: http://model-gateway:8081/v1
       EMBEDDING_API_KEY: EMPTY
       EMBEDDING_MODEL: bge-m3
-      RERANK_BASE_URL: http://model-gateway:8091/v1
+      RERANK_BASE_URL: http://model-gateway:8081/v1
       RERANK_API_KEY: EMPTY
       RERANK_MODEL: bge-reranker-v2-m3
-      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-4b}
-      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-2b}
+      CHAT_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
+      REPORT_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
       REPORT_LLM_OUTPUT_MODE: ${REPORT_LLM_OUTPUT_MODE:-json_object}
       SERVICE_KNOWLEDGE_VERSION: "1.0"
       PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-600}
@@ -431,7 +480,13 @@ services:
       pilos_db:
         condition: service_healthy
       model-gateway:
-        condition: service_started
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
     networks:
       - aiservice-network
 

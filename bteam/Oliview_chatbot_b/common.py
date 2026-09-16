@@ -319,9 +319,9 @@ def load_sample_config() -> dict:
         "rerank_port": rerank_port,
         "default_model": default_model,
         "fast_model": os.getenv("FAST_LLM_MODEL", "qwen3.5-4b"),
-        "synthesis_model": os.getenv("SYNTHESIS_LLM_MODEL", "qwen3.5-4b"),
+        "synthesis_model": os.getenv("SYNTHESIS_LLM_MODEL", "qwen3.5-9b"),
         "synthesis_model_alt": os.getenv("SYNTHESIS_LLM_MODEL_ALT", "qwen3.5-9b"),
-        "max_9b_budget": int(os.getenv("MAX_9B_CONTEXT_BUDGET", "1500")),
+        "max_9b_budget": int(os.getenv("MAX_9B_CONTEXT_BUDGET", "25000")),
         "embedding_model": os.getenv("EMBEDDING_MODEL", "bge-m3"),
         "rerank_model": os.getenv("RERANK_MODEL", "bge-reranker-v2-m3"),
         "default_temperature": 0.3,
@@ -331,39 +331,41 @@ def load_sample_config() -> dict:
 
 
 def get_fast_model() -> str:
-    """일반/전처리/의도분류용 모델(qwen3.5-2b)을 반환합니다."""
-    return os.getenv("FAST_LLM_MODEL", "qwen3.5-2b")
+    """일반/전처리/의도분류용 모델(qwen3.5-4b)을 반환합니다."""
+    return os.getenv("FAST_LLM_MODEL", "qwen3.5-4b")
 
 
 def get_synthesis_model(use_alt_9b: bool = False) -> str:
-    """최종 RAG 문서 합성용 고품질 모델(qwen3.5-4b)을 반환합니다."""
-    if use_alt_9b or os.getenv("USE_9B_MODEL", "0") == "1":
-        return os.getenv("SYNTHESIS_LLM_MODEL_ALT", "qwen3.5-9b")
-    return os.getenv("SYNTHESIS_LLM_MODEL", os.getenv("DEFAULT_MODEL", "qwen3.5-4b"))
+    """최종 RAG 문서 합성용 고품질 모델(qwen3.5-9b)을 반환합니다."""
+    return os.getenv("SYNTHESIS_LLM_MODEL", "qwen3.5-9b")
 
 
 def budget_context_documents(
     products: list, 
-    model_name: str = "qwen3.5-4b", 
-    max_budget_chars: int = 1500, 
-    max_sentence_len: int = 150,
+    model_name: str = "qwen3.5-9b", 
+    max_budget_chars: Optional[int] = None, 
+    max_sentence_len: Optional[int] = None,
     max_total_chars: Optional[int] = None,
     **kwargs
 ) -> list:
     """
-    RAG 프롬프트에 주입할 검색 문서의 길이를 모델 컨텍스트 윈도우에 맞게 트리밍하는 가드레일 (FR-016).
-    - qwen3.5-4b (2K~4K n_ctx): 총 1,500자/토큰 이내로 엄격 제한하여 컨텍스트 오버플로우 방어
+    RAG 프롬프트에 주입할 검색 문서의 길이를 모델 컨텍스트 윈도우에 맞게 관리하는 가드레일 (FR-016).
+    - qwen3.5-9b (32K n_ctx): 1~15건 리뷰 전문(Full Review Text)을 보존하며 최대 25,000자 수용
+    - qwen3.5-4b (8K n_ctx): 총 7,000자 이내 수용
     """
     if "is_9b" in kwargs:
         is_9b = bool(kwargs["is_9b"])
     else:
         is_9b = "9b" in str(model_name).lower()
 
-    custom_budget = kwargs.get("budget") or max_total_chars or max_budget_chars
-    default_budget = int(os.getenv("MAX_9B_CONTEXT_BUDGET", "1500")) if is_9b else 3500
-    budget = custom_budget or default_budget
-    if max_budget_chars and max_budget_chars < budget:
-        budget = max_budget_chars
+    if is_9b:
+        default_budget = int(os.getenv("MAX_9B_CONTEXT_BUDGET", "25000"))
+    else:
+        default_budget = int(os.getenv("MAX_4B_CONTEXT_BUDGET", "7000"))
+
+    budget = kwargs.get("budget") or max_total_chars or max_budget_chars or default_budget
+    if max_budget_chars and max_budget_chars > 0 and not is_9b:
+        budget = min(budget, max_budget_chars)
 
     budgeted_products = []
     current_length = 0
@@ -395,8 +397,8 @@ def budget_context_documents(
             p_name = ""
             rank, brand, cat, disp, sent, cos, rerank = 1, "", "", "", "", 0.0, 0.0
 
-        # 9B 모델인 경우 개별 문장도 150자 이내로 간결화
-        if is_9b and len(sentence) > max_sentence_len:
+        # 4B 또는 저용량 모델인 경우에만 문장 길이 제한 (9B 32K는 전문 보존)
+        if not is_9b and max_sentence_len and len(sentence) > max_sentence_len:
             sentence = sentence[:max_sentence_len - 3] + "..."
 
         entry_len = len(sentence) + len(p_name) + 30

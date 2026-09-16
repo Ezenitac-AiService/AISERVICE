@@ -860,7 +860,7 @@ class ProcessManager:
         n_ctx: int = 16384,
         target_preset: Optional[Dict[str, Any]] = None,
         clip_file: Optional[str] = None,
-        bind_host: str = "0.0.0.0",
+        bind_host: str = "127.0.0.1",
         port: Optional[int] = None,
         model_path: Optional[str] = None,
         hardware_profile: Optional[Any] = None
@@ -916,14 +916,16 @@ class ProcessManager:
                 "--main-gpu", "0"
             ]
             if not is_aux:
+                cmd.extend(["-np", "1"])
                 if use_flash_attn:
-                    cmd.extend(["-fa", "--ctk", kv_type, "--ctv", kv_type])
+                    cmd.extend(["-fa", "-ctk", kv_type, "-ctv", kv_type])
                 else:
-                    cmd.extend(["--ctk", kv_type])
+                    cmd.extend(["-ctk", kv_type, "-ctv", kv_type])
                 cmd.extend([
                     "--cache-prompt",
+                    "--ctx-shift",
                     "-b", "512",
-                    "-ub", "256"
+                    "-ub", "512"
                 ])
             if clip_file and os.path.exists(clip_file):
                 cmd.extend(["--mmproj", clip_file])
@@ -950,7 +952,7 @@ class ProcessManager:
                             "--type_k", str(type_kv_int),
                             "--type_v", str(type_kv_int),
                         ])
-                batch_sz = 256 if n_ctx >= 32768 else 512
+                batch_sz = 512
                 cmd.extend(["--n_batch", str(batch_sz), "--n_ubatch", str(batch_sz)])
                 cmd.extend(["--interrupt_requests", "False"])
                 cmd.extend(["--cache", "False"])
@@ -1080,7 +1082,7 @@ class ProcessManager:
         else:
             env["CUDA_VISIBLE_DEVICES"] = "0"
 
-        bind_host = "0.0.0.0"
+        bind_host = "127.0.0.1"
 
         # Check if model file exists locally; if not, return clear error message per spec
         if not os.path.exists(model_file) and not os.environ.get("MOCK_LLAMA_SERVER"):
@@ -1350,14 +1352,20 @@ class ProcessManager:
         return False
 
     @staticmethod
-    def force_kill_zombie_llama_servers(target_ports: Any = (8089, 8090, 8091)) -> None:
-        """T014 / US2 / 113: Pinpoint kills zombie llama-server and llama_cpp.server processes and cleans backend ports."""
+    def force_kill_zombie_llama_servers(target_ports: Any = (8088, 8089, 8090, 8091)) -> None:
+        """T009 / US1: Pinpoint kills zombie llama-server processes across all 4 backend ports using fuser and pgrep."""
         import subprocess
         if not isinstance(target_ports, (list, tuple, set)):
-            target_ports = (8089, 8090, 8091)
+            target_ports = (8088, 8089, 8090, 8091)
         for port in target_ports:
             if port == 8081:  # Never kill main API server
                 continue
+            # 1. fuser -k -n tcp <port>
+            try:
+                subprocess.run(["fuser", "-k", "-n", "tcp", str(port)], capture_output=True, timeout=2)
+            except Exception:
+                pass
+            # 2. lsof -t -i:<port>
             try:
                 out = subprocess.check_output(["lsof", "-t", f"-i:{port}"], text=True, timeout=2)
                 for pid_str in out.strip().split():
@@ -1371,19 +1379,20 @@ class ProcessManager:
             except Exception:
                 pass
         
-        # Kill orphan python3 -m llama_cpp.server processes if present
-        try:
-            out = subprocess.check_output(["pgrep", "-f", "llama_cpp.server"], text=True, timeout=2)
-            for pid_str in out.strip().split():
-                if pid_str.isdigit():
-                    pid = int(pid_str)
-                    if pid != os.getpid() and pid != 1 and ProcessManager._is_safe_to_kill_llama(pid):
-                        try:
-                            os.kill(pid, signal.SIGKILL)
-                        except OSError:
-                            pass
-        except Exception:
-            pass
+        # 3. Kill orphan llama-server or llama_cpp.server processes
+        for pattern in ("llama-server", "llama_cpp.server"):
+            try:
+                out = subprocess.check_output(["pgrep", "-f", pattern], text=True, timeout=2)
+                for pid_str in out.strip().split():
+                    if pid_str.isdigit():
+                        pid = int(pid_str)
+                        if pid != os.getpid() and pid != 1 and ProcessManager._is_safe_to_kill_llama(pid):
+                            try:
+                                os.kill(pid, signal.SIGKILL)
+                            except OSError:
+                                pass
+            except Exception:
+                pass
 
 
 # Class alias for compatibility

@@ -239,26 +239,26 @@ def detect_gpu_architecture(compute_cap: float) -> GpuArchitectureFeatures:
 def calculate_3axis_dynamic_context(
     total_vram_mb: int,
     kv_cache_type: str = "q8_0",
-    model_name: str = "qwen3.5-2b"
+    model_name: str = "qwen3.5-9b"
 ) -> int:
     """[Axis 2] Calculates dynamic context window from VRAM budget and KV byte efficiency."""
-    # Base reservation: OS (3700MB) + BGE (1412MB) + Safety Margin (600MB)
-    v_reserved = 3700 + 1412 + 600
+    # Base reservation: OS / System (1200MB) + Auxiliary Embed/Rerank (2000MB) + Safety Margin (600MB)
+    v_reserved = 1200 + 2000 + 600
     
     # Model weight footprint
     if "2b" in model_name.lower():
         w_model = 1500
     elif "4b" in model_name.lower():
-        w_model = 2800
+        w_model = 2764
     elif "9b" in model_name.lower():
-        w_model = 5600
+        w_model = 6348
     else:
-        w_model = 1500
+        w_model = 2800
 
     v_kv_budget = max(400, total_vram_mb - v_reserved - w_model)
 
-    # Bytes per token for GQA (Qwen 3.5 28 layers, 4 KV heads, 128 dim)
-    # total_bytes = 2 * 28 * 4 * 128 * bytes_per_elem = 28,672 * bytes_per_elem
+    # Bytes per token for GQA (Qwen 3.5 3:1 Gated DeltaNet: 8 attention layers out of 32, 4 KV heads, 128 dim)
+    # total_bytes = 2 * 8 * 4 * 128 * bytes_per_elem = 8,192 * bytes_per_elem
     if kv_cache_type == "fp4":
         bytes_per_elem = 0.5
     elif kv_cache_type in ("q8_0", "fp8"):
@@ -266,7 +266,7 @@ def calculate_3axis_dynamic_context(
     else:
         bytes_per_elem = 2.0  # fp16
 
-    bytes_per_token = 28672 * bytes_per_elem
+    bytes_per_token = 8192 * bytes_per_elem
     raw_tokens = int((v_kv_budget * 1024 * 1024) / bytes_per_token)
 
     # Align to power of 2 steps (16K, 32K, 48K, 64K, 128K)
@@ -293,10 +293,10 @@ def detect_hardware_capabilities(
     cpu_feat = detect_cpu_capabilities()
     
     # Query GPU
-    device_name = "NVIDIA GPU"
-    compute_cap = 6.1
-    total_vram = 8192
-    free_vram = 6500
+    device_name = "NVIDIA GeForce RTX 3060"
+    compute_cap = 8.6
+    total_vram = 12288
+    free_vram = 11264
 
     try:
         import pynvml

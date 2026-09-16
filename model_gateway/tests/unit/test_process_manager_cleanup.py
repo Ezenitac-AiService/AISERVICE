@@ -11,19 +11,19 @@ def test_force_kill_zombie_llama_servers_pinpoint_cleanup(monkeypatch):
     """T011/US2: force_kill_zombie_llama_servers targets backend ports with fuser and pgrep llama_cpp.server."""
     called_cmds = []
 
-    def mock_run(cmd, capture_output=True, check=False):
+    def mock_run(cmd, *args, **kwargs):
         called_cmds.append(cmd)
 
     monkeypatch.setattr("subprocess.run", mock_run)
-    monkeypatch.setattr("subprocess.check_output", lambda cmd, text=True, timeout=2: "")
+    monkeypatch.setattr("subprocess.check_output", lambda cmd, *args, **kwargs: "")
 
-    ProcessManager.force_kill_zombie_llama_servers(target_ports=(8081, 8089, 8090, 8091))
+    ProcessManager.force_kill_zombie_llama_servers(target_ports=(8088, 8089, 8090, 8091))
 
     assert len(called_cmds) == 4
-    assert called_cmds[0] == ["fuser", "-k", "-9", "8081/tcp"]
-    assert called_cmds[1] == ["fuser", "-k", "-9", "8089/tcp"]
-    assert called_cmds[2] == ["fuser", "-k", "-9", "8090/tcp"]
-    assert called_cmds[3] == ["fuser", "-k", "-9", "8091/tcp"]
+    assert called_cmds[0] == ["fuser", "-k", "-n", "tcp", "8088"]
+    assert called_cmds[1] == ["fuser", "-k", "-n", "tcp", "8089"]
+    assert called_cmds[2] == ["fuser", "-k", "-n", "tcp", "8090"]
+    assert called_cmds[3] == ["fuser", "-k", "-n", "tcp", "8091"]
 
 
 @pytest.mark.asyncio

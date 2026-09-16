@@ -40,9 +40,9 @@ class AuxiliaryModelManager:
 
     def _reset_crash_counter_if_ready(self, model_type: str):
         """FR-003: Reset consecutive crash counter when model reaches READY state."""
-        if model_type == "embedding" and self.embedding_pm.is_ready():
+        if model_type == "embedding" and (self.embedding_pm.is_ready() or self.embedding_pm.state.status == ProcessStatusEnum.READY):
             self.embedding_consecutive_crashes = 0
-        elif model_type == "rerank" and self.rerank_pm.is_ready():
+        elif model_type == "rerank" and (self.rerank_pm.is_ready() or self.rerank_pm.state.status == ProcessStatusEnum.READY):
             self.rerank_consecutive_crashes = 0
 
     async def ensure_embedding_resident(self, model_id: str = "bge-m3", n_ctx: int = 2048) -> ProcessState:
@@ -57,24 +57,20 @@ class AuxiliaryModelManager:
             self.embedding_consecutive_crashes = 0
             return self.embedding_pm.state
 
-        # Download if missing
+        # Check if model is available offline; eliminate runtime download freezing
         if not self.model_downloader.is_model_available(model_id):
-            print(f"[AuxiliaryManager] Downloading embedding model {model_id}...")
-            self.model_downloader.download_model(model_id)
+            err = f"Auxiliary embedding model '{model_id}' weights missing. Please run setup scripts to provision weights offline."
+            print(f"[AuxiliaryManager] ❌ {err}")
+            self.embedding_pm.state = ProcessState(
+                status=ProcessStatusEnum.ERROR,
+                port=self.embedding_port,
+                model_id=model_id,
+                error_message=err
+            )
+            return self.embedding_pm.state
 
         print(f"[AuxiliaryManager] Spawning embedding instance ({model_id}) on port {self.embedding_port}...")
         state = await self.embedding_pm.spawn_process(model_id=model_id, n_ctx=n_ctx)
-
-        if os.environ.get("MOCK_LLAMA_SERVER"):
-            self.embedding_pm.state = ProcessState(
-                status=ProcessStatusEnum.READY,
-                model_id=model_id,
-                port=self.embedding_port,
-                vram_offloaded=True,
-                vram_offloaded_100pct=True
-            )
-            self.embedding_consecutive_crashes = 0
-            return self.embedding_pm.state
 
         if state.status == ProcessStatusEnum.READY:
             self.embedding_consecutive_crashes = 0
@@ -98,24 +94,20 @@ class AuxiliaryModelManager:
             self.rerank_consecutive_crashes = 0
             return self.rerank_pm.state
 
-        # Download if missing
+        # Check if model is available offline; eliminate runtime download freezing
         if not self.model_downloader.is_model_available(model_id):
-            print(f"[AuxiliaryManager] Downloading reranker model {model_id}...")
-            self.model_downloader.download_model(model_id)
+            err = f"Auxiliary reranker model '{model_id}' weights missing. Please run setup scripts to provision weights offline."
+            print(f"[AuxiliaryManager] ❌ {err}")
+            self.rerank_pm.state = ProcessState(
+                status=ProcessStatusEnum.ERROR,
+                port=self.rerank_port,
+                model_id=model_id,
+                error_message=err
+            )
+            return self.rerank_pm.state
 
         print(f"[AuxiliaryManager] Spawning reranker instance ({model_id}) on port {self.rerank_port}...")
         state = await self.rerank_pm.spawn_process(model_id=model_id, n_ctx=n_ctx)
-
-        if os.environ.get("MOCK_LLAMA_SERVER"):
-            self.rerank_pm.state = ProcessState(
-                status=ProcessStatusEnum.READY,
-                model_id=model_id,
-                port=self.rerank_port,
-                vram_offloaded=True,
-                vram_offloaded_100pct=True
-            )
-            self.rerank_consecutive_crashes = 0
-            return self.rerank_pm.state
 
         if state.status == ProcessStatusEnum.READY:
             self.rerank_consecutive_crashes = 0
@@ -185,7 +177,7 @@ class AuxiliaryModelManager:
     async def check_and_recover_crashes(self):
         """FR-001, FR-004 & FR-007: Check process states and trigger circuit breaker or recovery."""
         # Check Embedding instance
-        if self.embedding_enabled and not os.environ.get("MOCK_LLAMA_SERVER"):
+        if self.embedding_enabled:
             if self.embedding_pm.state.status != ProcessStatusEnum.DISABLED:
                 process_alive = self.embedding_pm.process is not None and self.embedding_pm.process.returncode is None
                 if not process_alive and self.embedding_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING, ProcessStatusEnum.ERROR, ProcessStatusEnum.UNLOADED):
@@ -208,7 +200,7 @@ class AuxiliaryModelManager:
                     self._reset_crash_counter_if_ready("embedding")
 
         # Check Rerank instance
-        if self.rerank_enabled and not os.environ.get("MOCK_LLAMA_SERVER"):
+        if self.rerank_enabled:
             if self.rerank_pm.state.status != ProcessStatusEnum.DISABLED:
                 process_alive = self.rerank_pm.process is not None and self.rerank_pm.process.returncode is None
                 if not process_alive and self.rerank_pm.state.status in (ProcessStatusEnum.READY, ProcessStatusEnum.LOADING, ProcessStatusEnum.ERROR, ProcessStatusEnum.UNLOADED):

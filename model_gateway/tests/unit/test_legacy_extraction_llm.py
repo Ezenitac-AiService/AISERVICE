@@ -14,6 +14,8 @@ if REPO_ROOT not in sys.path:
 if LEGACY_DIR not in sys.path:
     sys.path.insert(0, LEGACY_DIR)
 
+pytest.importorskip("ATEAM_ExtractionItem")
+
 from ATEAM_ExtractionItem import (
     get_local_llm_client,
     get_target_model_name,

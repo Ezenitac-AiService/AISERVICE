@@ -70,7 +70,7 @@ def load_llm_report_identity_from_env() -> tuple[str, str]:
     """API 비밀값을 요구하지 않고 보고서 생성 고유키 식별값만 읽는다."""
     load_dotenv()
     provider = os.getenv("LLM_PROVIDER", "openai").strip()
-    model = (os.getenv("REPORT_LLM_MODEL") or os.getenv("FAST_LLM_MODEL") or "qwen3.5-2b").strip()
+    model = (os.getenv("REPORT_LLM_MODEL") or os.getenv("FAST_LLM_MODEL") or "qwen3.5-9b").strip()
     return provider, model
 
 

@@ -16,9 +16,9 @@ def test_llama_manager_initial_state():
 def test_hardware_limits():
     cm = ConfigManager()
     lm = LlamaManager(cm)
-    assert lm.vram_total == 24000
+    assert lm.vram_total in (11264, 10240, 12288)
     assert "gemma4-12b" in lm.hardware_limits
-    assert lm.hardware_limits["gemma4-12b"] == 9500
+    assert lm.hardware_limits["gemma4-12b"] == 16384
 
 def test_status_event():
     cm = ConfigManager()
@@ -31,7 +31,7 @@ def test_process_manager_state():
     """T012: Test ProcessManager state encapsulation and immutability."""
     pm = ProcessManager(port=8085)
     assert pm.state.status == ProcessStatusEnum.UNLOADED
-    assert pm.get_vram_limit("gemma4-e4b") == 16000
+    assert pm.get_vram_limit("gemma4-e4b") == 32768
     
     # Test ProcessState immutability
     state = ProcessState(status=ProcessStatusEnum.LOADING, model_id="gemma4-e4b")

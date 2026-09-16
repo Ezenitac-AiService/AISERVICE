@@ -23,11 +23,11 @@ from src.core.model_downloader import ModelDownloader, DownloadStatusEnum
 
 
 # REQUIRED_MODELS export for backward compatibility
-REQUIRED_MODELS = ["qwen3.5-4b", "bge-m3", "bge-reranker-v2-m3"]
+REQUIRED_MODELS = ["qwen3.5-9b", "qwen3.5-4b", "bge-m3", "bge-reranker-v2-m3"]
 
 
 def get_dynamic_required_models(server_config: Dict[str, Any] = None, catalog: Dict[str, Any] = None) -> List[str]:
-    """FR-007: Dynamically resolve required models from server_config.json and model_catalog.json."""
+    """Dynamically resolve required models from server_config.json and model_catalog.json for Dual-LLM architecture."""
     if server_config is None or catalog is None:
         try:
             from src.core.config_manager import ConfigManager
@@ -39,20 +39,32 @@ def get_dynamic_required_models(server_config: Dict[str, Any] = None, catalog: D
             catalog = catalog or {}
 
     req_models = []
-    main_model = server_config.get("model", "qwen3.5-4b")
-    if main_model and main_model in catalog:
-        req_models.append(main_model)
+    # Primary synthesis model (9B)
+    synthesis_model = server_config.get("default_model") or server_config.get("model") or "qwen3.5-9b"
+    if synthesis_model and synthesis_model in catalog:
+        req_models.append(synthesis_model)
+    elif "qwen3.5-9b" in catalog:
+        req_models.append("qwen3.5-9b")
 
+    # Fast router model (4B)
+    router_model = server_config.get("fast_llm_model", "qwen3.5-4b")
+    if router_model and router_model in catalog:
+        req_models.append(router_model)
+    elif "qwen3.5-4b" in catalog:
+        req_models.append("qwen3.5-4b")
+
+    # Embedding model
     emb_model = server_config.get("embedding_model", "bge-m3")
     if emb_model and emb_model in catalog:
         req_models.append(emb_model)
 
+    # Reranker model
     rerank_model = server_config.get("rerank_model", "bge-reranker-v2-m3")
     if rerank_model and rerank_model in catalog:
         req_models.append(rerank_model)
 
     if not req_models:
-        req_models = [m_id for m_id in catalog.keys()] if catalog else ["qwen3.5-4b"]
+        req_models = ["qwen3.5-9b", "qwen3.5-4b", "bge-m3", "bge-reranker-v2-m3"]
 
     return list(dict.fromkeys(req_models))
 

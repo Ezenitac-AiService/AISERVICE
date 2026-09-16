@@ -142,7 +142,7 @@ if [ "$BUILD_LEGACY" -eq 1 ]; then
     NEED_REBUILD=1
 
     if [ -n "$EXISTING_WHEEL" ]; then
-        if uv run python scripts/verify_wheel_binary.py "$EXISTING_WHEEL" 2>/dev/null; then
+        if uv run --no-sync python scripts/verify_wheel_binary.py "$EXISTING_WHEEL" 2>/dev/null; then
             log_info "✓ 기존 i7-930 사전 빌드 휠 검증 성공 (AVX=0, CUDA 활성화 확인됨). 기존 휠을 재사용합니다."
             NEED_REBUILD=0
         else
@@ -164,7 +164,7 @@ if [ "$BUILD_LEGACY" -eq 1 ]; then
             NEW_WHEEL=$(ls wheels/legacy_i7_930/llama_cpp_python*.whl 2>/dev/null | head -n 1 || true)
             if [ -n "$NEW_WHEEL" ]; then
                 log_info "Post-Build 3중 실측 검증 수행 중 ($NEW_WHEEL)..."
-                if uv run python scripts/verify_wheel_binary.py "$NEW_WHEEL" 2>/dev/null; then
+                if uv run --no-sync python scripts/verify_wheel_binary.py "$NEW_WHEEL" 2>/dev/null; then
                     log_info "✓ [POST-BUILD SUCCESS] 생성된 i7-930 휠 검증 통과 (AVX=0, CUDA=1)."
                 else
                     log_err "❌ [POST-BUILD FAIL] 생성된 i7-930 휠 검증 실패 (AVX 유입 또는 CUDA 미지원). 결함 휠을 자동 삭제(rm -f)합니다."
@@ -248,7 +248,9 @@ verify_archive_entry "platform_profiles.json" "멀티 플랫폼 설정"
 verify_archive_entry "gpu_detector.py" "GQA GPU 감지기 모듈"
 verify_archive_entry "model_catalog.json" "모델 아키텍처 카탈로그"
 verify_archive_entry "sample/common.py" "API 예제 코드"
-verify_archive_entry "specs/" "기능 명세서 디렉터리"
+if [ -d "$BASE_DIR/specs" ]; then
+    verify_archive_entry "specs/" "기능 명세서 디렉터리"
+fi
 verify_archive_entry "start_server.sh" "데몬 제어 스크립트"
 verify_archive_entry "ensure_models.py" "모델 다운로드 헬퍼"
 verify_archive_entry "auxiliary_manager.py" "보조 매니저"

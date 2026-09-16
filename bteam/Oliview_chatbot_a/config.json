@@ -3,11 +3,11 @@
   "fallback_server_host": "http://127.0.0.1",
   "server_host": "http://model-gateway",
   "main_port": 8081,
-  "embedding_port": 8090,
-  "rerank_port": 8091,
-  "default_model": "qwen3.5-2b",
-  "fast_llm_model": "qwen3.5-2b",
-  "synthesis_llm_model": "qwen3.5-2b",
+  "embedding_port": 8081,
+  "rerank_port": 8081,
+  "default_model": "qwen3.5-9b",
+  "fast_llm_model": "qwen3.5-4b",
+  "synthesis_llm_model": "qwen3.5-9b",
   "embedding_model": "bge-m3",
   "rerank_model": "bge-reranker-v2-m3",
   "default_temperature": 0.3,
@@ -15,41 +15,50 @@
   "benchmark_max_tokens": 2048,
   "no_think_max_tokens": 2048,
   "model_benchmarks": {
+    "qwen3.5-9b": {
+      "model_id": "qwen3.5-9b",
+      "recommended_context_length": 32768,
+      "max_context_length": 32768,
+      "peak_vram_mb": 6348,
+      "tpot_tok_per_sec": 42.50,
+      "status": "ACTIVE_DEFAULT",
+      "description": "32K 네이티브 풀-컨텍스트 심층 합성 모델 (포트 8089)"
+    },
     "qwen3.5-4b": {
       "model_id": "qwen3.5-4b",
-      "recommended_context_length": 4096,
+      "recommended_context_length": 8192,
       "max_context_length": 8192,
-      "peak_vram_mb": 3950,
-      "tpot_tok_per_sec": 49.00,
-      "status": "AVAILABLE",
-      "description": "메인 대화 및 RAG 심층 합성 모델 (4K 추천 / 8K 최대 맥락)"
+      "peak_vram_mb": 2764,
+      "tpot_tok_per_sec": 65.00,
+      "status": "ACTIVE_ROUTER",
+      "description": "8K 에이전틱 라우터 & 고속 처리 모델 (포트 8088)"
     },
     "qwen3.5-2b": {
       "model_id": "qwen3.5-2b",
-      "recommended_context_length": 8192,
-      "max_context_length": 16384,
-      "peak_vram_mb": 2450,
-      "tpot_tok_per_sec": 70.11,
-      "status": "ACTIVE_DEFAULT",
-      "description": "초경량 하이-스피드 모델 (8K 추천 / 16K 최대 맥락)"
+      "recommended_context_length": 0,
+      "max_context_length": 0,
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0,
+      "status": "DECOMMISSIONED",
+      "description": "퇴역 모델 (Dual-LLM 9B+4B 전환으로 폐기)"
     },
     "bge-m3": {
       "model_id": "bge-m3",
       "recommended_context_length": 2048,
-      "max_context_length": 4096,
+      "max_context_length": 2048,
       "peak_vram_mb": 605,
       "tpot_tok_per_sec": 7.46,
       "status": "ACTIVE_EMBEDDING",
-      "description": "임베딩 전용 (독립 포트 8090)"
+      "description": "임베딩 전용 (게이트웨이 포트 8081 / 백엔드 8090)"
     },
     "bge-reranker-v2-m3": {
       "model_id": "bge-reranker-v2-m3",
       "recommended_context_length": 2048,
-      "max_context_length": 4096,
+      "max_context_length": 2048,
       "peak_vram_mb": 606,
       "tpot_tok_per_sec": 7.30,
       "status": "ACTIVE_RERANK",
-      "description": "리랭킹 전용 (독립 포트 8091)"
+      "description": "리랭킹 전용 (게이트웨이 포트 8081 / 백엔드 8091)"
     }
   }
 }

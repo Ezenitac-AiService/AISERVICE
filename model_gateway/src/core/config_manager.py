@@ -85,9 +85,9 @@ class ConfigManager:
     """Manages system configuration with same-directory atomic replace, chmod 0600, Pydantic v2 validation, and memory caching."""
 
     DEFAULT_CONFIG = {
-        "current_model": "qwen3.5-2b",
-        "current_n_ctx": 65536,
-        "available_presets": ["gemma4-e2b", "gemma4-e4b", "gemma4-12b", "qwen3.5-2b", "qwen3.5-4b", "qwen3.5-9b"]
+        "current_model": "qwen3.5-9b",
+        "current_n_ctx": 32768,
+        "available_presets": ["qwen3.5-9b", "qwen3.5-4b"]
     }
 
     def __init__(self, config_path: str = "config/model_config.json"):
@@ -146,7 +146,7 @@ class ConfigManager:
             os.fsync(tf.fileno())
 
         try:
-            os.chmod(temp_name, 0o600)
+            os.chmod(temp_name, 0o644)
             os.replace(temp_name, self.config_path)
         except Exception:
             if os.path.exists(temp_name):
@@ -338,7 +338,7 @@ class ConfigManager:
             temp_name = tf.name
 
         try:
-            os.chmod(temp_name, 0o600)
+            os.chmod(temp_name, 0o644)
             os.replace(temp_name, server_config_path)
             self._server_config_cache = config_dict.copy()
         except Exception:
@@ -391,7 +391,7 @@ class ConfigManager:
             os.fsync(tf.fileno())
 
         try:
-            os.chmod(temp_name, 0o600)
+            os.chmod(temp_name, 0o644)
             os.replace(temp_name, server_config_path)
         except Exception:
             if os.path.exists(temp_name):
@@ -525,7 +525,7 @@ class ConfigManager:
             os.fsync(tf.fileno())
             temp_name = tf.name
         try:
-            os.chmod(temp_name, 0o600)
+            os.chmod(temp_name, 0o644)
             os.replace(temp_name, profiles_path)
         except Exception:
             if os.path.exists(temp_name):

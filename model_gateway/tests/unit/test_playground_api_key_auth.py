@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from src.api.server import app
 from src.core.config_manager import ConfigManager
+from src.core.api_key_manager import get_api_key_manager
 
 @pytest.fixture
 def client():
@@ -25,13 +26,15 @@ def test_capabilities_includes_api_key_enabled(client):
 
 def test_playground_api_key_mode_enforcement(client):
     """FR-003, FR-004: Test 401 rejection when Security Mode is ON without valid API Key."""
+    # 1. Enable API key required mode temporarily
     cm = ConfigManager()
     server_cfg = cm.get_server_config()
-    
-    # 1. Enable API key required mode temporarily
     server_cfg["api_key_enabled"] = True
     cm.save_server_config(server_cfg)
-    
+
+    key_mgr = get_api_key_manager()
+    entity, raw_key = key_mgr.generate_key("Playground Test Key")
+
     try:
         # Request without API key -> Should fail with 401
         res_no_key = client.post("/dashboard/api/playground/stream", json={
@@ -39,16 +42,17 @@ def test_playground_api_key_mode_enforcement(client):
             "max_tokens": 10
         })
         assert res_no_key.status_code == 401
-        
+
         # Request with valid test key -> Should succeed
         res_valid_key = client.post("/dashboard/api/playground/stream", json={
-            "api_key": "sk-vllm-test",
+            "api_key": raw_key,
             "prompt": "Test authorized prompt",
             "max_tokens": 10
         })
         assert res_valid_key.status_code == 200
 
     finally:
+        key_mgr.revoke_key(entity.key_id)
         # Restore public mode
         server_cfg["api_key_enabled"] = False
         cm.save_server_config(server_cfg)

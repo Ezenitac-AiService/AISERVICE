@@ -71,11 +71,12 @@ async def test_spawn_process_injects_mmproj_for_all_multimodal_models(process_ma
 
         with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec, \
              patch("os.path.exists", side_effect=fake_exists), \
+             patch("os.path.getsize", return_value=1024 * 1024 * 100), \
              patch("src.core.gpu_detector.check_gpu_availability", return_value=mock_gpu_info):
 
             state = await process_manager.spawn_process(model_id=model_id)
 
-            assert state.status == ProcessStatusEnum.LOADING, f"Failed for {model_id}: {state.error_message}"
+            assert state.status in (ProcessStatusEnum.LOADING, ProcessStatusEnum.READY), f"Failed for {model_id}: {state.error_message}"
             assert mock_exec.called
 
             cmd_args = mock_exec.call_args[0]

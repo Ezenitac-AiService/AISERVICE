@@ -20,6 +20,13 @@ class TestRAGCache(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self.rm = RedisManager(host="127.0.0.1", port=6379, socket_timeout=1.0)
+        client = await self.rm.get_client()
+        if not client:
+            self.skipTest("Redis client not available")
+        try:
+            await client.ping()
+        except Exception:
+            self.skipTest("Live Redis server not reachable on 127.0.0.1:6379")
 
     async def asyncTearDown(self):
         if hasattr(self, "rm"):

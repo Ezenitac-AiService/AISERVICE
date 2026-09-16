@@ -4,8 +4,6 @@
     "backend_port": 8089,
     "embedding_backend_port": 8090,
     "rerank_backend_port": 8091,
-    "embedding_model": "bge-m3",
-    "rerank_model": "bge-reranker-v2-m3",
     "embedding_enabled": true,
     "rerank_enabled": true,
     "auxiliary_max_crashes": 3,
@@ -16,9 +14,7 @@
         "172.16.0.0/12"
     ],
     "firewall_auto_allow": true,
-    "vram_limit_mb": 10240,
-    "default_model": "qwen3.5-2b",
-    "current_n_ctx": 16384,
+    "vram_limit_mb": 11264,
     "vram_max_capacity_mb": null,
     "healthcheck_timeout_s": 120,
     "graceful_drain_timeout_s": 5.0,
@@ -48,9 +44,27 @@
         "enabled": true,
         "strict_json_schema": true
     },
+    "max_gpu_concurrent_slots": 1,
+    "queue_capacity": 30,
+    "heartbeat_interval_s": 15.0,
+    "coalescing_window_s": 5.0,
+    "embedding_model": "bge-m3",
+    "rerank_model": "bge-reranker-v2-m3",
+    "default_model": "qwen3.5-9b",
+    "current_n_ctx": 32768,
     "hardware_profiling": {
         "auto_detect": true,
         "enforce_all_gpu_on_no_avx": true,
         "fallback_hardware_tier": "ampere_sm86"
+    },
+    "model": "qwen3.5-9b",
+    "context_window": 20992,
+    "auto_benchmark_profile": {
+        "recommended_model": "qwen3.5-9b",
+        "recommended_context_window": 20992,
+        "recommended_context_length": 20992,
+        "benchmark_tps": 30.0,
+        "vram_used_mb": 15472,
+        "benchmark_timestamp": "2026-09-16T15:10:15Z"
     }
 }

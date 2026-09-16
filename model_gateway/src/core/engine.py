@@ -17,18 +17,37 @@ from typing import Any
 from src.core.config import get_effective_model, get_model_routing_config
 from src.core.profile import is_mock_mode_active
 
+try:
+    from fastapi import HTTPException
+except ImportError:
+    class HTTPException(Exception):
+        def __init__(self, status_code: int, detail: Any):
+            super().__init__(str(detail))
+            self.status_code = status_code
+            self.detail = detail
+
 AUTHORITATIVE_MODELS = {
+    "qwen3.5-9b",
     "qwen3.5-4b",
-    "qwen3.5-2b",
     "bge-m3",
     "bge-reranker-v2-m3",
 }
 
 
 def resolve_model_or_fail(model_name: str, single_model_mode: bool = False) -> str:
-    """Resolve model alias to registered ID, or fail-closed with 503."""
+    """Resolve model alias to registered ID, or fail with OpenAI standard 404 model_not_found."""
     if not model_name:
-        raise RuntimeError("503 Service Unavailable: Empty model requested.")
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "message": "Empty model requested.",
+                    "type": "invalid_request_error",
+                    "param": "model",
+                    "code": "model_not_found",
+                }
+            },
+        )
 
     routing = get_model_routing_config()
     model_lower = model_name.lower().strip()
@@ -38,11 +57,9 @@ def resolve_model_or_fail(model_name: str, single_model_mode: bool = False) -> s
         return model_name
 
     # Alias matching
-    if model_lower in ("fast", "fast_llm_model"):
+    if model_lower in ("fast", "fast_llm_model", "router", "router_llm"):
         return routing["FAST_LLM_MODEL"]
-    if model_lower in ("synthesis", "synthesis_llm_model"):
-        if single_model_mode:
-            return routing["FAST_LLM_MODEL"]
+    if model_lower in ("synthesis", "synthesis_llm_model", "default"):
         return routing["SYNTHESIS_LLM_MODEL"]
     if model_lower in ("embedding", "embedding_model"):
         return routing["EMBEDDING_MODEL"]
@@ -54,8 +71,15 @@ def resolve_model_or_fail(model_name: str, single_model_mode: bool = False) -> s
         if m.lower() == model_lower:
             return m
 
-    # Fail closed: reject unknown models with 503
-    raise RuntimeError(
-        f"503 Service Unavailable: Model '{model_name}' is unregistered or unavailable. "
-        f"Supported authoritative models: {sorted(AUTHORITATIVE_MODELS)}"
+    # Fail closed: reject decommissioned (e.g. qwen3.5-2b) and unknown models with OpenAI standard 404
+    raise HTTPException(
+        status_code=404,
+        detail={
+            "error": {
+                "message": f"The model `{model_name}` does not exist or you do not have access to it.",
+                "type": "invalid_request_error",
+                "param": "model",
+                "code": "model_not_found",
+            }
+        },
     )

@@ -15,6 +15,10 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
     """Enforces API Key Authentication & Rate Limiting on /v1/* inference routes."""
 
     async def dispatch(self, request: Request, call_next):
+        # FR-068: Exempt OPTIONS preflight requests from authentication
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         
         # Only enforce on /v1/ inference endpoints
@@ -44,11 +48,11 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
                 content={"error": {"message": "API key authentication required", "type": "unauthorized", "code": 401}}
             )
 
-        # Verify API key using ApiKeyManager & fallback test keys
+        # Verify API key using ApiKeyManager (no hardcoded test key bypass)
         key_mgr = get_api_key_manager()
         is_valid, _ = key_mgr.verify_key(api_key)
         
-        if not is_valid and api_key not in ["sk-vllm-test", "sk-vllm-dev"]:
+        if not is_valid:
             metrics_db.log_request(api_key, path, 401, is_error=True)
             return JSONResponse(
                 status_code=401,
@@ -58,5 +62,7 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
         # Execute request and record response status
         response = await call_next(request)
         is_err = response.status_code >= 400
-        metrics_db.log_request(api_key, path, response.status_code, prompt_tokens=10, completion_tokens=25, is_error=is_err)
+        prompt_tokens = getattr(request.state, "prompt_tokens", 0)
+        completion_tokens = getattr(request.state, "completion_tokens", 0)
+        metrics_db.log_request(api_key, path, response.status_code, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, is_error=is_err)
         return response

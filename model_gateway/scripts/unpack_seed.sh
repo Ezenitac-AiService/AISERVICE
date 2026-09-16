@@ -206,7 +206,7 @@ fi
 
 # 4. Existing Binary Preservation Check
 if [ "$FORCE_OVERWRITE" -eq 0 ]; then
-    if uv run python scripts/verify_wheel_binary.py --check-live 2>/dev/null; then
+    if uv run --no-sync python scripts/verify_wheel_binary.py --check-live 2>/dev/null; then
         log_info "ℹ️ [PRESERVED] 현재 환경의 기존 바이너리가 CUDA 가속 검증을 통과했습니다."
         log_info "   압축 해제 시 기존 유효 바이너리를 덮어쓰지 않고 최우선 보존합니다 (non-destructive flag)."
     fi

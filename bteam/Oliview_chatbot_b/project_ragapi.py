@@ -361,7 +361,7 @@ def generate_llm_rag_answer_stream(query: str, retrieved_docs: list, model_overr
     system_prompt = ANALYST_PROMPT
 
     if is_9b:
-        budgeted_docs = budget_context_documents(retrieved_docs, budget=1500, is_9b=True)
+        budgeted_docs = budget_context_documents(retrieved_docs, is_9b=True)
     else:
         budgeted_docs = retrieved_docs
 

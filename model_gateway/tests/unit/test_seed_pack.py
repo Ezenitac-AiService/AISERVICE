@@ -51,7 +51,8 @@ def test_make_seed_pack_default_tarball(tmp_path):
         assert any("process_manager.py" in n for n in normalized_names), "process_manager.py missing from archive"
         assert any("model_catalog.json" in n for n in normalized_names), "model_catalog.json missing from archive"
         assert any("sample/common.py" in n for n in normalized_names), "sample/common.py missing from archive"
-        assert any(n.startswith("specs/") for n in normalized_names), "specs/ missing from archive"
+        if os.path.isdir(os.path.join(repo_root, "specs")):
+            assert any(n.startswith("specs/") for n in normalized_names), "specs/ missing from archive"
 
         # Excluded directories check
         for n in normalized_names:

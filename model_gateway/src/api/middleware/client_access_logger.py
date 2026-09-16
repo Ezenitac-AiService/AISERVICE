@@ -68,54 +68,18 @@ class ClientAccessLogMiddleware(BaseHTTPMiddleware):
         openai_user = request.headers.get("X-Client-ID") or request.headers.get("X-User-ID")
         model_name = request.query_params.get("model") or request.headers.get("X-Model")
 
-        # Extract Bearer Token
+        # Extract Bearer Token or X-API-Key for masked logging
         auth_header = request.headers.get("Authorization", "")
         raw_api_key = None
         if auth_header.startswith("Bearer "):
             raw_api_key = auth_header[7:].strip()
+        elif "X-API-Key" in request.headers:
+            raw_api_key = request.headers.get("X-API-Key", "").strip()
 
-        # Verify API Key
+        # Mask API Key for audit logging (auth enforcement delegated to APIKeyAuthMiddleware)
         key_mgr = get_api_key_manager()
-        is_valid, masked_key = key_mgr.verify_key(raw_api_key)
-
-        # Allow unauthenticated access to health, static/dashboard, and admin endpoints
+        _, masked_key = key_mgr.verify_key(raw_api_key)
         path = request.url.path
-        is_public = path.startswith("/health") or path.startswith("/dashboard") or path == "/" or path.startswith("/v1/admin")
-
-        if not is_public and not is_valid:
-            latency_ms = (time.perf_counter() - start_time) * 1000.0
-            timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-            logger = get_client_logger()
-            logger.log_access(AccessLogEntry(
-                timestamp=timestamp,
-                client_ip=client_ip,
-                request_id=request_id,
-                method=request.method,
-                path=path,
-                status_code=401,
-                latency_ms=latency_ms,
-                masked_api_key=masked_key,
-                user_agent=user_agent
-            ))
-
-            logger.log_error(ErrorLogEntry(
-                timestamp=timestamp,
-                request_id=request_id,
-                client_ip=client_ip,
-                path=path,
-                status_code=401,
-                exception_type="Unauthorized",
-                error_detail="Invalid or missing API key",
-                masked_api_key=masked_key
-            ))
-
-            resp = JSONResponse(
-                status_code=401,
-                content={"detail": "Unauthorized: Invalid or missing API Key"}
-            )
-            resp.headers["X-Request-ID"] = request_id
-            return resp
 
         try:
             response: Response = await call_next(request)

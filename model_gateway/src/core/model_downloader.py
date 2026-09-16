@@ -454,7 +454,10 @@ class ModelDownloader:
         model_id = self.config_manager.resolve_model_id(model_id)
         catalog_entry = self.catalog.get(model_id)
         if not catalog_entry:
-            raise ValueError(f"Unknown model_id: {model_id}")
+            raise FileNotFoundError(
+                f"Missing weights: Unknown model_id '{model_id}'. "
+                "Runtime downloading fallback is disabled. Pre-provision weights using 'bash scripts/setup_9b.sh'."
+            )
 
         target_path = os.path.join(
             self.base_dir, catalog_entry["target_dir"], catalog_entry["filename"]
@@ -463,10 +466,14 @@ class ModelDownloader:
         if os.path.isfile(target_path):
             return target_path
 
-        task = self.download_model(model_id, progress_callback=progress_callback)
-        if task.status in (DownloadStatusEnum.COMPLETED, DownloadStatusEnum.SKIPPED):
-            return target_path
-        else:
-            raise FileNotFoundError(
-                f"모델 다운로드 실패 ({model_id}): {task.error_message}"
-            )
+        raise FileNotFoundError(
+            f"Missing weights for model '{model_id}' at '{target_path}'. "
+            "Runtime downloading fallback is disabled to prevent container freezes. "
+            "Pre-provision weights on host using 'bash scripts/setup_9b.sh' before running."
+        )
+
+
+def download_model_if_missing(model_id: str, base_dir: Optional[str] = None) -> str:
+    """Check if model weights exist; raise FileNotFoundError immediately if missing (runtime download disabled)."""
+    downloader = ModelDownloader(base_dir=base_dir)
+    return downloader.ensure_model_available(model_id)

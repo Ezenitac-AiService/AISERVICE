@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     pciutils \
     procps \
+    psmisc \
+    lsof \
     libgomp1 \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
@@ -54,8 +56,8 @@ COPY tests/ ./tests/
 # Make scripts executable
 RUN chmod +x ./scripts/*.sh ./scripts/*.py 2>/dev/null || true
 
-# Expose ports: 8081 (Main API & Dashboard), 8089 (llama backend), 8090 (embedding), 8091 (reranker)
-EXPOSE 8081 8089 8090 8091
+# Expose ports: 8081 (Ingress API & Dashboard only - Backend ports 8088-8091 are loopback isolated)
+EXPOSE 8081
 
 # Default entrypoint
 CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8081"]

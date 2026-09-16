@@ -42,7 +42,7 @@ class RagExecutionMetadata(BaseModel):
     search_latency_sec: float = 0.0
     rerank_latency_sec: float = 0.0
     selected_review_count: int = 0
-    model_name: str = "qwen3.5-4b"
+    model_name: str = "qwen3.5-9b"
     fallback_used: bool = False
     reference_reviews: List[ReferenceReview] = Field(default_factory=list)
 
@@ -125,13 +125,13 @@ class L5CacheKeyParams(BaseModel):
     tenant_id: str = Field(default="chata", description="서비스 테넌트 식별자 (chata, chatb)")
     rewritten_query: str = Field(..., description="대명사 해소 및 탈맥락화된 사용자 질의")
     doc_ids: List[str] = Field(default_factory=list, description="리랭킹 상위 선별 문서 ID 목록")
-    model_id: str = Field(default="qwen3.5-2b", description="LLM 모델 식별자")
+    model_id: str = Field(default="qwen3.5-9b", description="LLM 모델 식별자")
     prompt_version: str = Field(default="v1.0", description="시스템 프롬프트 템플릿 버전")
 
 
 class L5ResponseCachePayload(BaseModel):
     response_text: str = Field(..., description="완성된 전체 마크다운 답변 텍스트 (길이 >= 20)")
-    model_id: str = Field(default="qwen3.5-2b", description="생성에 사용된 모델 식별자")
+    model_id: str = Field(default="qwen3.5-9b", description="생성에 사용된 모델 식별자")
     prompt_version: str = Field(default="v1.0", description="프롬프트 템플릿 버전")
     tenant_id: str = Field(default="chata", description="서비스 테넌트 식별자")
     doc_ids_hash: str = Field(default="", description="참조된 RAG 문서 목록 해시")

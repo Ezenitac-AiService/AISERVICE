@@ -23,12 +23,22 @@ class TestRedisManager(unittest.IsolatedAsyncioTestCase):
         # Initialize RedisManager with localhost
         self.rm = RedisManager(host="127.0.0.1", port=6379, socket_timeout=1.0)
 
+    async def _require_redis(self):
+        client = await self.rm.get_client()
+        if not client:
+            self.skipTest("Redis client not available")
+        try:
+            await client.ping()
+        except Exception:
+            self.skipTest("Live Redis server not reachable on 127.0.0.1:6379")
+
     async def asyncTearDown(self):
         if hasattr(self, "rm"):
             await self.rm.aclose()
 
     async def test_embedding_cache_set_and_get(self):
         """Verify embedding vector can be cached and retrieved in < 1ms."""
+        await self._require_redis()
         model_id = "bge-m3"
         text = "테스트 화장품 토너 보습감 질의"
         vector = [0.123, -0.456, 0.789] * 341 + [0.0]  # 1024-dim test vector
@@ -44,6 +54,7 @@ class TestRedisManager(unittest.IsolatedAsyncioTestCase):
 
     async def test_rerank_cache_set_and_get(self):
         """Verify reranker score map can be cached and retrieved."""
+        await self._require_redis()
         query = "모공 케어 토너"
         doc_ids = ["doc_1", "doc_2", "doc_3"]
         scores = [{"index": 0, "score": 0.95}, {"index": 1, "score": 0.82}]
@@ -67,6 +78,7 @@ class TestRedisManager(unittest.IsolatedAsyncioTestCase):
 
     async def test_rate_limiter_token_bucket(self):
         """Verify rate limiter allows requests within limit and blocks excess."""
+        await self._require_redis()
         import uuid
         client_id = f"test_client_{uuid.uuid4().hex[:8]}"
         # 3 requests allowed in 10-second window

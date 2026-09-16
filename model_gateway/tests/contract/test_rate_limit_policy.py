@@ -10,7 +10,7 @@ import pytest
 
 def test_rate_limiter_defaults():
     """Verify rate limiter parameters match specification."""
-    from AISERVICE.model_gateway.src.api.middleware import RateLimitConfig
+    from src.api.middleware import RateLimitConfig
 
     cfg = RateLimitConfig()
     assert cfg.ip_per_minute == 10
@@ -21,7 +21,7 @@ def test_rate_limiter_defaults():
 
 def test_body_size_rejection():
     """Requests exceeding 64KB body size must be rejected."""
-    from AISERVICE.model_gateway.src.api.middleware import check_body_size
+    from src.api.middleware import check_body_size
 
     small_body = b"x" * 1024
     large_body = b"x" * 70000
@@ -31,7 +31,7 @@ def test_body_size_rejection():
 
 def test_redis_failure_fail_closed():
     """When Redis is unreachable, AI rate limiter must fail closed for AI routes."""
-    from AISERVICE.model_gateway.src.api.middleware import evaluate_rate_limit_with_redis_error
+    from src.api.middleware import evaluate_rate_limit_with_redis_error
 
     # AI route fail-closed: returns 503
     ai_status = evaluate_rate_limit_with_redis_error(is_ai_endpoint=True)

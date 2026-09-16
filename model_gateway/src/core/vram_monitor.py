@@ -17,7 +17,17 @@ from typing import Optional
 
 from src.core.profile import is_mock_mode_active
 
-DEFAULT_VRAM_LIMIT_MB = 10240
+try:
+    from fastapi import HTTPException
+except ImportError:
+    class HTTPException(Exception):
+        def __init__(self, status_code: int, detail: str, headers: dict | None = None):
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+            self.headers = headers or {}
+
+DEFAULT_VRAM_LIMIT_MB = 11264
 
 
 def get_current_vram_usage_mb() -> int:
@@ -54,8 +64,12 @@ def assert_vram_headroom(limit_mb: Optional[int] = None) -> None:
     current_vram = get_current_vram_usage_mb()
 
     if not check_vram_headroom(current_vram, effective_limit):
-        raise RuntimeError(
-            f"503 Service Unavailable: GPU VRAM safety threshold exceeded. "
-            f"Current usage: {current_vram}MB, Safety limit: {effective_limit}MB. "
-            "Inference rejected to protect system stability (silent CPU fallback forbidden)."
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"GPU VRAM safety threshold exceeded. "
+                f"Current usage: {current_vram}MB, Safety limit: {effective_limit}MB. "
+                "Inference rejected to protect system stability (silent CPU fallback forbidden)."
+            ),
+            headers={"Retry-After": "5"},
         )

@@ -159,7 +159,7 @@ def test_audit_payload_viewer_thinking_text():
         row = conn.execute("SELECT id FROM api_key_logs ORDER BY id DESC LIMIT 1").fetchone()
         log_id = row["id"]
 
-    res = client.get(f"/dashboard/api/audit/payload/{log_id}")
+    res = client.get(f"/dashboard/api/audit/payload/{log_id}", headers={"X-Admin-Secret": "aiservice"})
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "success"

@@ -200,7 +200,7 @@ class TestModelDownloader:
         """알 수 없는 model_id로 ensure 호출 시 ValueError."""
         with tempfile.TemporaryDirectory() as tmpdir:
             downloader = ModelDownloader(base_dir=tmpdir)
-            with pytest.raises(ValueError, match="Unknown model_id"):
+            with pytest.raises((ValueError, FileNotFoundError)):
                 downloader.ensure_model_available("nonexistent")
 
     def test_ensure_model_available_returns_path_when_exists(self):

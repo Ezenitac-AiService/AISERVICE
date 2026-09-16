@@ -34,17 +34,34 @@ RUNTIME_COMPATIBILITY_ERROR_MARKERS = (
     "out of memory",
     "oom",
 )
+VRAM_SAFETY_LIMIT_CEILING_MB = 11264
+MAX_9B_CONTEXT = 32768
+MAX_4B_CONTEXT = 8192
+MAX_CONCURRENT_SLOTS_PER_MODEL = 1
+MAX_TOTAL_ACTIVE_SLOTS = 2
+
+
+def verify_single_worker_guard() -> None:
+    """Ensure gateway runs in single-worker mode to preserve physical VRAM concurrency invariant."""
+    web_concurrency = os.environ.get("WEB_CONCURRENCY", "1")
+    if str(web_concurrency).strip() not in ("1", ""):
+        raise RuntimeError(
+            f"Multi-worker configuration detected (WEB_CONCURRENCY={web_concurrency}). "
+            "Model Gateway requires single-worker mode (--workers 1) to enforce physical VRAM invariants."
+        )
+
+
 def clamp_vram_safety_limit(value: Any) -> int:
-    """RTX 3060 12GB 환경에서 VRAM safety limit을 최대 12,288MB, 기본 10,240MB로 설정합니다."""
+    """RTX 3060 12GB 환경에서 VRAM safety limit을 최대 12,288MB, 기본 11,264MB로 설정합니다."""
     try:
         parsed = int(value)
     except (TypeError, ValueError):
-        parsed = 10240
+        parsed = 11264
     return max(0, min(parsed, 12288))
 
 
 VRAM_SAFETY_LIMIT_MB = clamp_vram_safety_limit(
-    os.environ.get("VRAM_SAFETY_LIMIT_MB", "10240")
+    os.environ.get("VRAM_SAFETY_LIMIT_MB", "11264")
 )
 
 

@@ -20,14 +20,20 @@ class QueueStateEnum(str, Enum):
     DISCONNECTED = "DISCONNECTED"
 
 
+TicketStatus = QueueStateEnum
+
+
 @dataclass
 class QueueTicket:
-    """큐에 진입한 개별 요청의 상태 관리 객체 (Spec 031 FR-001)."""
+    """큐에 진입한 개별 요청의 상태 관리 객체 (Spec 031 FR-001, FR-067, FR-074)."""
     ticket_id: str
-    tenant_id: str
-    session_id: str
-    prompt_hash: str
-    created_at: float
+    tenant_id: str = "default"
+    session_id: str = ""
+    prompt_hash: str = ""
+    created_at: float = 0.0
+    model_id: str = "qwen3.5-9b"
+    slot_held: bool = False
+    slot_released: bool = False
     state: QueueStateEnum = QueueStateEnum.QUEUED
     queue_position: int = 1
     estimated_wait_s: float = 0.0
@@ -35,6 +41,14 @@ class QueueTicket:
     subscriber_count: int = 1
     # 스트림 멀티플렉싱을 위한 브로드캐스트 큐 리스트
     broadcast_queues: list = field(default_factory=list)
+
+    @property
+    def status(self) -> QueueStateEnum:
+        return self.state
+
+    @status.setter
+    def status(self, value: QueueStateEnum) -> None:
+        self.state = value
 
     def to_status_dict(self, total_queued: int = 0, active_slots: int = 1, max_slots: int = 1) -> Dict[str, Any]:
         """SSE event: queue_status 페이로드 생성."""

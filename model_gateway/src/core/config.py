@@ -69,12 +69,12 @@ except ImportError:
 
     def clamp_vram_safety_limit(value) -> int:
         try:
-            return max(0, min(int(value), 5000))
+            return max(0, min(int(value), 12288))
         except (TypeError, ValueError):
-            return 5000
+            return 11264
 
     def get_runtime_fallback_chain() -> list[str]:
-        return ["vllm", "llama.cpp-cuda", "llama.cpp-cpu-openblas"]
+        return ["vllm", "llama.cpp-cuda"]
 
     def get_runtime_profile() -> dict:
         return {}
@@ -82,7 +82,7 @@ except ImportError:
 _RUNTIME_PROFILE = get_runtime_profile()
 VRAM_SAFETY_LIMIT_MB = clamp_vram_safety_limit(
     os.environ.get(
-        "VRAM_SAFETY_LIMIT_MB", _RUNTIME_PROFILE.get("vram_safety_limit_mb", "5000")
+        "VRAM_SAFETY_LIMIT_MB", _RUNTIME_PROFILE.get("vram_safety_limit_mb", "11264")
     )
 )
 MODEL_VRAM_BUDGET_MB = get_model_vram_budget()
@@ -97,9 +97,9 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 def get_model_routing_config() -> dict[str, str]:
     """Return the SSOT routing keys mapping to model IDs."""
     return {
-        "DEFAULT_MODEL": os.environ.get("DEFAULT_MODEL", "qwen3.5-4b"),
-        "FAST_LLM_MODEL": os.environ.get("FAST_LLM_MODEL", "qwen3.5-2b"),
-        "SYNTHESIS_LLM_MODEL": os.environ.get("SYNTHESIS_LLM_MODEL", "qwen3.5-4b"),
+        "DEFAULT_MODEL": os.environ.get("DEFAULT_MODEL", "qwen3.5-9b"),
+        "FAST_LLM_MODEL": os.environ.get("FAST_LLM_MODEL", "qwen3.5-4b"),
+        "SYNTHESIS_LLM_MODEL": os.environ.get("SYNTHESIS_LLM_MODEL", "qwen3.5-9b"),
         "EMBEDDING_MODEL": os.environ.get("EMBEDDING_MODEL", "bge-m3"),
         "RERANK_MODEL": os.environ.get("RERANK_MODEL", "bge-reranker-v2-m3"),
     }

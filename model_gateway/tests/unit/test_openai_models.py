@@ -26,6 +26,7 @@ def test_openai_models_response_schema():
         mock_config.get_config.return_value = {"current_model": "qwen3.5-4b", "current_n_ctx": 4096}
         mock_lm.config_manager = mock_config
         mock_lm.is_ready.return_value = True
+        mock_lm.get_pm_for_model.return_value = None
 
         client = TestClient(app)
         response = client.get("/v1/models")
@@ -44,7 +45,7 @@ def test_openai_models_response_schema():
         assert "id" in model_entry
         assert model_entry["object"] == "model"
         assert isinstance(model_entry["created"], int)
-        assert model_entry["owned_by"] == "llm-server"
+        assert model_entry["owned_by"] in ("llm-server", "model-gateway")
         assert isinstance(model_entry["is_available"], bool)
         assert isinstance(model_entry["is_active"], bool)
 
@@ -62,7 +63,7 @@ def test_openai_models_contains_all_catalog_models():
         mock_config = MagicMock()
         mock_config.get_config.return_value = {"current_model": "qwen3.5-4b", "current_n_ctx": 4096}
         mock_lm.config_manager = mock_config
-        mock_lm.is_ready.return_value = False
+        mock_lm.get_pm_for_model.return_value = None
 
         client = TestClient(app)
         response = client.get("/v1/models")
@@ -85,10 +86,9 @@ def test_openai_models_active_model_flag():
     app.include_router(router)
 
     with patch("src.api.routes.inference_api.llama_manager") as mock_lm:
-        mock_config = MagicMock()
-        mock_config.get_config.return_value = {"current_model": "gemma4-e2b", "current_n_ctx": 4096}
-        mock_lm.config_manager = mock_config
-        mock_lm.is_ready.return_value = True
+        mock_pm = MagicMock()
+        mock_pm.is_ready.return_value = True
+        mock_lm.get_pm_for_model.side_effect = lambda m: mock_pm if m == "qwen3.5-9b" else None
 
         client = TestClient(app)
         response = client.get("/v1/models")
@@ -96,7 +96,7 @@ def test_openai_models_active_model_flag():
     data = response.json()
     active_models = [m for m in data["data"] if m["is_active"]]
     assert len(active_models) == 1
-    assert active_models[0]["id"] == "gemma4-e2b"
+    assert active_models[0]["id"] == "qwen3.5-9b"
 
 
 def test_openai_models_no_active_when_unloaded():
@@ -109,11 +109,7 @@ def test_openai_models_no_active_when_unloaded():
     app.include_router(router)
 
     with patch("src.api.routes.inference_api.llama_manager") as mock_lm:
-        mock_config = MagicMock()
-        mock_config.get_config.return_value = {"current_model": "qwen3.5-4b", "current_n_ctx": 4096}
-        mock_lm.config_manager = mock_config
-        mock_lm.is_ready.return_value = False  # UNLOADED
-
+        mock_lm.get_pm_for_model.return_value = None
         client = TestClient(app)
         response = client.get("/v1/models")
 

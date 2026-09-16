@@ -203,8 +203,17 @@ class MetricsDB:
         completion_text: str = None,
         thinking_text: str = None
     ):
-        """Logs a single API request asynchronously/synchronously with connection pooling and payload text."""
+        """Logs a single API request with masked API key and truncated payload text for storage safety."""
         try:
+            # Mask API key if full key provided
+            masked_api_key = api_key
+            if api_key and len(api_key) > 11 and api_key != "anonymous" and not api_key.startswith("sk-***"):
+                masked_api_key = api_key[:7] + "..." + api_key[-4:]
+
+            # Truncate stored payload text to prevent multi-megabyte 32K SQLite bloat
+            safe_prompt = prompt_text[:1000] + "... [truncated]" if (prompt_text and len(prompt_text) > 1000) else prompt_text
+            safe_completion = completion_text[:2000] + "... [truncated]" if (completion_text and len(completion_text) > 2000) else completion_text
+
             with self._get_connection() as conn:
                 conn.execute(
                     """
@@ -213,7 +222,7 @@ class MetricsDB:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        api_key,
+                        masked_api_key,
                         endpoint,
                         status_code,
                         prompt_tokens,
@@ -221,8 +230,8 @@ class MetricsDB:
                         ttft_ms,
                         tps,
                         1 if is_error else 0,
-                        prompt_text,
-                        completion_text,
+                        safe_prompt,
+                        safe_completion,
                         thinking_text
                     )
                 )

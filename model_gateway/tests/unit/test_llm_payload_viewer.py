@@ -43,12 +43,15 @@ def test_llm_response_payload_viewer_flow():
     )
 
     # 3. Retrieve Payload via GET /dashboard/api/audit/payload/{log_id}
-    # Get recent aggregated metrics or test payload directly
-    payload_data = metrics_db.get_payload_by_id(1)
+    with metrics_db._get_connection() as conn:
+        row = conn.execute("SELECT id FROM api_key_logs ORDER BY id DESC LIMIT 1").fetchone()
+        last_id = row["id"]
+
+    payload_data = metrics_db.get_payload_by_id(last_id)
     assert payload_data is not None
 
-    # Test REST API Endpoint
-    res_payload = client.get("/dashboard/api/audit/payload/1")
+    # Test REST API Endpoint with Admin Secret
+    res_payload = client.get(f"/dashboard/api/audit/payload/{last_id}", headers={"X-Admin-Secret": "aiservice"})
     assert res_payload.status_code == 200, f"Expected 200, got {res_payload.status_code}"
     body = res_payload.json()
     assert body["status"] == "success"
@@ -57,5 +60,5 @@ def test_llm_response_payload_viewer_flow():
     assert "completion_text" in body["payload"]
 
     # 4. Test 404 for invalid log ID
-    res_404 = client.get("/dashboard/api/audit/payload/999999")
+    res_404 = client.get("/dashboard/api/audit/payload/999999", headers={"X-Admin-Secret": "aiservice"})
     assert res_404.status_code == 404

@@ -56,8 +56,8 @@ class CoreSettings(BaseModel):
     feature_langgraph_rag: bool = Field(default=True)
 
     # Model Names & Parameters
-    fast_llm_model: str = Field(default="qwen3.5-2b")
-    synthesis_llm_model: str = Field(default="qwen3.5-2b")
+    fast_llm_model: str = Field(default="qwen3.5-4b")
+    synthesis_llm_model: str = Field(default="qwen3.5-9b")
     rerank_model: str = Field(default="bge-reranker-v2-m3")
     embedding_model: str = Field(default="bge-m3")
 
@@ -89,7 +89,7 @@ class CoreSettings(BaseModel):
     timeout_llm_sec: float = Field(default=180.0)
     inactivity_timeout_s: float = Field(default=180.0)
     max_targets: int = Field(default=3)
-    gpu_concurrency_limit: int = Field(default=3)
+    gpu_concurrency_limit: int = Field(default=1)
     candidates_per_target: int = Field(default=15)
     reranked_per_target: int = Field(default=6)
     tokens_per_target: int = Field(default=3500)
@@ -102,7 +102,7 @@ class CoreSettings(BaseModel):
     # Vector Index Optimization
     chroma_hnsw_search_ef: int = Field(default=64)
     faiss_index_dir: Optional[str] = Field(default=None)
-    min_required_n_ctx: int = Field(default=16384)
+    min_required_n_ctx: int = Field(default=32768)
 
     @property
     def llm_endpoint(self) -> str:
@@ -179,15 +179,15 @@ def _detect_default_db_host() -> str:
 @dataclass
 class ModelDiscoveryCache:
     """In-memory cache for dynamic active model and context discovery."""
-    discovered_model: str = "qwen3.5-2b"
-    discovered_n_ctx: int = 16384
+    discovered_model: str = "qwen3.5-9b"
+    discovered_n_ctx: int = 32768
     last_synced_at: float = 0.0
     ttl_seconds: float = 60.0
 
     def is_valid(self) -> bool:
         return (time.time() - self.last_synced_at) < self.ttl_seconds
 
-    def update(self, model: str, n_ctx: int = 16384):
+    def update(self, model: str, n_ctx: int = 32768):
         self.discovered_model = model
         self.discovered_n_ctx = n_ctx
         self.last_synced_at = time.time()
@@ -196,7 +196,7 @@ class ModelDiscoveryCache:
 _discovery_cache = ModelDiscoveryCache()
 
 
-def compute_context_harness_profile(n_ctx: int = 16384) -> ContextHarnessProfile:
+def compute_context_harness_profile(n_ctx: int = 32768) -> ContextHarnessProfile:
     """
     3-Tier Agentic Context Harness Profile 계산기 (Spec 035).
     게이트웨이 유효 컨텍스트 윈도우 크기에 따라 토큰 예산과 선별 리뷰 수를 동적 산정합니다.

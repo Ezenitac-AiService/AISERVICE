@@ -26,8 +26,8 @@ class HardwareProfile:
     gpu: str = "NVIDIA GeForce RTX 3060 12GB"
     cuda_arch: str = "86"
     total_vram_mb: int = 12288
-    vram_safety_limit_mb: int = 10240
-    max_gpu_concurrent_slots: int = 4
+    vram_safety_limit_mb: int = 11264
+    max_gpu_concurrent_slots: int = 1
     queue_timeout_seconds: int = 60
     llama_cpp_n_gpu_layers: int = 99
 
@@ -39,8 +39,8 @@ def is_mock_mode_active() -> bool:
 
 def get_current_profile() -> HardwareProfile:
     """Return the active HardwareProfile based on environment overrides."""
-    vram_limit = int(os.environ.get("VRAM_SAFETY_LIMIT_MB", 10240))
-    slots = int(os.environ.get("MAX_GPU_CONCURRENT_SLOTS", 4))
+    vram_limit = int(os.environ.get("VRAM_SAFETY_LIMIT_MB", 11264))
+    slots = int(os.environ.get("MAX_GPU_CONCURRENT_SLOTS", 1))
     arch = os.environ.get("CUDA_ARCH", "86")
 
     return HardwareProfile(
