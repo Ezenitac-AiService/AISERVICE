@@ -954,8 +954,10 @@ class ProcessManager:
                         ])
                 batch_sz = 512
                 cmd.extend(["--n_batch", str(batch_sz), "--n_ubatch", str(batch_sz)])
+                cmd.extend(["--n_threads", "4", "--n_threads_batch", "4"])
                 cmd.extend(["--interrupt_requests", "False"])
                 cmd.extend(["--cache", "False"])
+                cmd.extend(["--logits_all", "False"])
 
             if clip_file and os.path.exists(clip_file):
                 cmd.extend(["--clip_model_path", clip_file])
