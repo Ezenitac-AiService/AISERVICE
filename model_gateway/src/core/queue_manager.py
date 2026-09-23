@@ -20,13 +20,35 @@ from fastapi import HTTPException
 from .queue_models import QueueTicket, QueueStateEnum, TenantProfile, compute_prompt_hash, TicketStatus
 
 
-def validate_pre_queue_prompt_limits(model_id: str, prompt: str) -> None:
-    """Pre-queue fast DoS rejection (FR-059). 4B: 65,536 chars, 9B: 262,144 chars."""
+class PreQueuePromptLimitError(HTTPException, ValueError):
+    """Exception combining HTTPException and ValueError for prompt length limits."""
+    def __init__(self, message: str, status_code: int = 400):
+        HTTPException.__init__(
+            self,
+            status_code=status_code,
+            detail={
+                "error": {
+                    "message": message,
+                    "type": "invalid_request_error",
+                    "param": "prompt",
+                    "code": "prompt_length_exceeded",
+                }
+            }
+        )
+        ValueError.__init__(self, message)
+
+
+def validate_pre_queue_prompt_limits(model_id: str = "", prompt: str = "") -> bool:
+    """Pre-queue fast DoS rejection (FR-059). 4B: 65,536 chars, 9B: 262,144 chars, BGE: 6,000 chars."""
     if not prompt:
-        return
+        return True
     model_lower = (model_id or "").lower()
     char_len = len(prompt)
-    if "4b" in model_lower or "fast" in model_lower or "router" in model_lower:
+
+    if "bge" in model_lower or "rerank" in model_lower or "embedding" in model_lower:
+        max_chars = 6000
+        max_tokens = 2048
+    elif "4b" in model_lower or "fast" in model_lower or "router" in model_lower:
         max_chars = 65536
         max_tokens = 8192
     else:  # 9B or default
@@ -34,17 +56,39 @@ def validate_pre_queue_prompt_limits(model_id: str, prompt: str) -> None:
         max_tokens = 32768
 
     if char_len > max_chars:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": {
-                    "message": f"Prompt character length ({char_len}) exceeds maximum pre-queue limit ({max_chars} chars, ~{max_tokens} tokens) for model '{model_id}'.",
-                    "type": "invalid_request_error",
-                    "param": "prompt",
-                    "code": "prompt_length_exceeded",
-                }
-            },
+        raise PreQueuePromptLimitError(
+            f"Prompt character length ({char_len}) exceeds maximum pre-queue limit of {max_chars:,} characters (~{max_tokens} tokens) for model '{model_id}'."
         )
+    return True
+
+
+async def try_acquire_slot_nonblocking(sem: asyncio.BoundedSemaphore) -> bool:
+    """FR-008: Atomic non-blocking slot acquisition strictly avoiding asyncio.wait_for timeout=0."""
+    if not sem.locked():
+        await sem.acquire()
+        return True
+    return False
+
+
+def format_queue_status_event(
+    position: int = 0,
+    wait_sec: float = 0.0,
+    custom_event: bool = False,
+    data: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Format queue progress event adhering to OpenAI SDK SSE compatibility or custom event."""
+    if data is None:
+        data = {"position": position, "estimated_wait_seconds": round(float(wait_sec), 2)}
+    elif "position" not in data or "estimated_wait_seconds" not in data:
+        data = dict(data)
+        if "position" not in data:
+            data["position"] = position
+        if "estimated_wait_seconds" not in data:
+            data["estimated_wait_seconds"] = round(float(wait_sec), 2)
+    payload = json.dumps(data, ensure_ascii=False)
+    if custom_event:
+        return f"event: queue_status\ndata: {payload}\n\n"
+    return f": queue_status {payload}\n\n"
 
 
 class AsyncFairQueue:
@@ -151,6 +195,34 @@ class AsyncFairQueue:
 
             self._recalculate_positions()
 
+        return ticket
+
+    async def create_fast_path_ticket(
+        self,
+        model_id: str = "qwen3.5-9b",
+        tenant_id: str = "default",
+        session_id: str = "",
+        prompt_hash: str = "",
+    ) -> QueueTicket:
+        """T018: Create an active ticket for Zero-Wait Fast-Path when slot was already acquired non-blocking."""
+        ticket_id = f"fast_{uuid.uuid4().hex[:8]}"
+        ticket = QueueTicket(
+            ticket_id=ticket_id,
+            tenant_id=tenant_id,
+            session_id=session_id,
+            prompt_hash=prompt_hash,
+            created_at=time.time(),
+            model_id=model_id,
+            slot_held=True,
+            slot_released=False,
+            state=QueueStateEnum.ACTIVE,
+            queue_position=0,
+        )
+        async with self._lock:
+            self._tickets[ticket_id] = ticket
+            self._active_count += 1
+            tenant = self._get_or_create_tenant(tenant_id)
+            tenant.active_requests += 1
         return ticket
 
     def _recalculate_positions(self):
@@ -288,8 +360,9 @@ class AsyncFairQueue:
     async def stream_queue_events(
         self,
         ticket: QueueTicket,
+        custom_event: bool = False,
     ) -> AsyncGenerator[str, None]:
-        """SSE queue event stream."""
+        """SSE queue event stream adhering to OpenAI SDK SSE format or custom event."""
         last_position = ticket.queue_position
         last_heartbeat = time.time()
         last_status_time = time.time()
@@ -300,7 +373,12 @@ class AsyncFairQueue:
             active_slots=self._active_count,
             max_slots=self.max_slots,
         )
-        yield f"event: queue_status\ndata: {json.dumps(status_data, ensure_ascii=False)}\n\n"
+        yield format_queue_status_event(
+            position=ticket.queue_position,
+            wait_sec=ticket.estimated_wait_sec,
+            custom_event=custom_event,
+            data=status_data,
+        )
 
         while ticket.state == QueueStateEnum.QUEUED:
             now = time.time()
@@ -312,7 +390,12 @@ class AsyncFairQueue:
                     active_slots=self._active_count,
                     max_slots=self.max_slots,
                 )
-                yield f"event: queue_status\ndata: {json.dumps(status_data, ensure_ascii=False)}\n\n"
+                yield format_queue_status_event(
+                    position=ticket.queue_position,
+                    wait_sec=ticket.estimated_wait_sec,
+                    custom_event=custom_event,
+                    data=status_data,
+                )
                 last_status_time = now
             elif now - last_status_time >= status_interval:
                 status_data = ticket.to_status_dict(
@@ -320,7 +403,12 @@ class AsyncFairQueue:
                     active_slots=self._active_count,
                     max_slots=self.max_slots,
                 )
-                yield f"event: queue_status\ndata: {json.dumps(status_data, ensure_ascii=False)}\n\n"
+                yield format_queue_status_event(
+                    position=ticket.queue_position,
+                    wait_sec=ticket.estimated_wait_sec,
+                    custom_event=custom_event,
+                    data=status_data,
+                )
                 last_status_time = now
 
             if now - last_heartbeat >= self._heartbeat_interval:
@@ -338,7 +426,12 @@ class AsyncFairQueue:
                 active_slots=self._active_count,
                 max_slots=self.max_slots,
             )
-            yield f"event: queue_status\ndata: {json.dumps(status_data, ensure_ascii=False)}\n\n"
+            yield format_queue_status_event(
+                position=ticket.queue_position,
+                wait_sec=ticket.estimated_wait_sec,
+                custom_event=custom_event,
+                data=status_data,
+            )
 
     def get_stats(self) -> Dict[str, Any]:
         """큐 전체 통계 조회."""

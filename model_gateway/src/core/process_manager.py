@@ -1,6 +1,7 @@
 import asyncio
 import atexit
 import collections
+import ctypes
 import datetime
 import os
 import re
@@ -25,6 +26,28 @@ from src.core.gpu_detector import (
     estimate_kv_cache_vram,
     get_nvml_vram_info,
 )
+
+try:
+    _libc_prctl = ctypes.CDLL('libc.so.6').prctl
+except Exception:
+    _libc_prctl = None
+
+def _make_pdeathsig_preexec_fn(parent_pid: int):
+    """Pre-bound C prctl(PR_SET_PDEATHSIG, SIGKILL) with parent PID verification guard."""
+    def _preexec():
+        if _libc_prctl is not None:
+            try:
+                # PR_SET_PDEATHSIG = 1, SIGKILL = 9
+                _libc_prctl(1, signal.SIGKILL, 0, 0, 0)
+            except Exception:
+                pass
+        # Kernel race guard: if parent died before prctl registered
+        if os.getppid() != parent_pid:
+            try:
+                os.kill(os.getpid(), signal.SIGKILL)
+            except Exception:
+                pass
+    return _preexec
 
 _signal_handlers_registered = False
 
@@ -246,21 +269,11 @@ class ProcessManager:
 
 
     def verify_vram_released(self, baseline_free_vram_mb: int = 0, tolerance_mb: int = 200) -> bool:
-        """FR-013: VRAM memory release check via nvidia-smi."""
-        import shutil
-        import subprocess
-        
-        nvidia_smi = shutil.which("nvidia-smi")
-        if not nvidia_smi:
-            print("[ProcessManager] Warning: nvidia-smi not found. Skipping VRAM release verification.")
-            return True
-            
+        """FR-013: VRAM memory release check via PyNVML C-API (<1ms)."""
         try:
-            result = subprocess.run(
-                [nvidia_smi, "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, check=True
-            )
-            free_vram_mb = int(result.stdout.strip().split('\n')[0])
+            from src.core.gpu_detector import get_nvml_vram_info
+            info = get_nvml_vram_info()
+            free_vram_mb = info.free_vram_mb
             
             if baseline_free_vram_mb > 0:
                 if (abs(free_vram_mb - baseline_free_vram_mb) <= tolerance_mb or 
@@ -271,7 +284,7 @@ class ProcessManager:
                 
             return True
         except Exception as e:
-            print(f"[ProcessManager] Warning: nvidia-smi failed during VRAM release verification: {e}")
+            print(f"[ProcessManager] Warning: PyNVML failed during VRAM release verification: {e}")
             return True
 
     def get_vram_limit(self, model_id: str) -> int:
@@ -360,9 +373,9 @@ class ProcessManager:
             )
 
     def check_vram_runtime_overflow(self, threshold_pct: float = 95.0) -> None:
-        """T021: 추론 컨텍스트 확장 시 실시간 VRAM 오버플로우 감지.
+        """T021: 추론 컨텍스트 확장 시 실시간 VRAM 오버플로우 감지 (PyNVML C-API <1ms).
 
-        nvidia-smi를 통해 현재 GPU VRAM 사용률을 확인하고,
+        PyNVML C-API를 통해 현재 GPU VRAM 사용률을 확인하고,
         임계치(기본 95%)를 초과할 경우 VramOverflowError를 발생시켜
         CUDA OOM 크래시를 사전 차단합니다.
 
@@ -372,20 +385,12 @@ class ProcessManager:
         Raises:
             VramOverflowError: VRAM 사용률이 임계치를 초과할 경우
         """
-        import subprocess
-
-        nvidia_smi = shutil.which("nvidia-smi")
-        if not nvidia_smi:
-            return  # nvidia-smi 미설치 환경에서는 검사 생략
-
         try:
-            result = subprocess.run(
-                [nvidia_smi, "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, check=True
-            )
-            parts = [p.strip() for p in result.stdout.strip().split('\n')[0].split(',')]
-            used_mb = int(parts[0])
-            total_mb = int(parts[1])
+            from src.core.gpu_detector import get_nvml_vram_info
+            info = get_nvml_vram_info()
+            total_mb = info.total_vram_mb
+            free_mb = info.free_vram_mb
+            used_mb = total_mb - free_mb
 
             usage_pct = (used_mb / total_mb) * 100.0 if total_mb > 0 else 0.0
 
@@ -503,6 +508,16 @@ class ProcessManager:
                     params["head_dim"] = gguf_meta["head_dim"]
             except Exception:
                 pass
+
+        # Qwen 3.5 hybrid DeltaNet: only attention layers allocate KV cache
+        # 9B: 8 attention layers (24 recurrent layers)
+        # 4B: 6 attention layers (18 recurrent layers)
+        lower_id = model_id.lower()
+        if "qwen3.5" in lower_id:
+            if "9b" in lower_id:
+                params["n_layers"] = 8
+            elif "4b" in lower_id:
+                params["n_layers"] = 6
 
         return params
 
@@ -651,7 +666,7 @@ class ProcessManager:
                 [binary_path, "--help"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
-                timeout=1.5
+                timeout=5.0
             )
             return res.returncode in (0, 1, 2)
         except Exception:
@@ -732,11 +747,41 @@ class ProcessManager:
     def verify_and_build_llama_server(
         preferred_backend: str | None = None,
     ) -> LlamaServerBinaryInfo:
-        """FR-001 & FR-002: Verifies CUDA llama-server binary existence; compiles via CMake with GGML_CUDA=ON if missing."""
+        """FR-001 & FR-002: Verifies CUDA llama-server binary existence (SSOT: /usr/local/bin/llama-server); eliminates Python fallback."""
         runtime_backend = preferred_backend or ProcessManager._runtime_backend_from_profile()
         cuda_enabled = runtime_backend == "llama.cpp-cuda"
 
-        # 1. Check PATH via shutil.which for standalone binary binaries
+        # 1. Check explicit environment variable SSOT if provided
+        env_bin = os.environ.get("LLAMA_SERVER_BINARY")
+        if env_bin and ProcessManager._is_binary_executable_sanity(env_bin):
+            return LlamaServerBinaryInfo(
+                binary_path=env_bin,
+                is_cuda_enabled=cuda_enabled,
+                build_source="ENV_BIN",
+                runtime_backend=runtime_backend,
+            )
+
+        # 2. Check SSOT container path: /usr/local/bin/llama-server
+        ssot_path = "/usr/local/bin/llama-server"
+        if ProcessManager._is_binary_executable_sanity(ssot_path):
+            return LlamaServerBinaryInfo(
+                binary_path=ssot_path,
+                is_cuda_enabled=cuda_enabled,
+                build_source="SYSTEM_BIN",
+                runtime_backend=runtime_backend,
+            )
+
+        # 3. Check alternate system candidate: /usr/bin/llama-server
+        alt_system = "/usr/bin/llama-server"
+        if ProcessManager._is_binary_executable_sanity(alt_system):
+            return LlamaServerBinaryInfo(
+                binary_path=alt_system,
+                is_cuda_enabled=cuda_enabled,
+                build_source="SYSTEM_BIN",
+                runtime_backend=runtime_backend,
+            )
+
+        # 4. Check PATH via shutil.which for standalone binary binaries
         for binary_name in ["llama-server", "llama-cpp-server"]:
             candidate = shutil.which(binary_name)
             if candidate and ProcessManager._is_binary_executable_sanity(candidate):
@@ -747,21 +792,7 @@ class ProcessManager:
                     runtime_backend=runtime_backend,
                 )
 
-        # 2. Check system standalone C++ binary paths (excluding Ollama internal paths)
-        system_candidates = [
-            ("/usr/local/bin/llama-server", "SYSTEM_BIN"),
-            ("/usr/bin/llama-server", "SYSTEM_BIN"),
-        ]
-
-        for path, build_source in system_candidates:
-            if ProcessManager._is_binary_executable_sanity(path):
-                return LlamaServerBinaryInfo(
-                    binary_path=path,
-                    is_cuda_enabled=cuda_enabled,
-                    build_source=build_source,
-                    runtime_backend=runtime_backend,
-                )
-
+        # 5. Check local build paths
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         bin_dir = os.path.join(base_dir, ".bin")
         local_binary = os.path.join(bin_dir, "llama-server")
@@ -783,6 +814,7 @@ class ProcessManager:
                 runtime_backend=runtime_backend,
             )
 
+        # 6. If CMake source tree exists, compile
         llama_src_dir = os.path.join(base_dir, "llama.cpp")
         if os.path.exists(os.path.join(llama_src_dir, "CMakeLists.txt")):
             try:
@@ -798,12 +830,8 @@ class ProcessManager:
                 print(f"[ProcessManager] ⚠️ Hardware detection failed, using fallback flags: {e}")
                 cmake_args = [
                     "-DGGML_CUDA=ON",
-                    "-DCMAKE_CUDA_ARCHITECTURES=61",
-                    "-march=native",
-                    "-DGGML_AVX=OFF",
-                    "-DGGML_AVX2=OFF",
-                    "-DGGML_F16C=OFF",
-                    "-DGGML_FMA=OFF",
+                    "-DCMAKE_CUDA_ARCHITECTURES=86",
+                    "-DCMAKE_BUILD_TYPE=Release",
                 ]
 
             import subprocess
@@ -816,7 +844,7 @@ class ProcessManager:
                     cwd=llama_src_dir, check=True, capture_output=True
                 )
                 subprocess.run(
-                    ["cmake", "--build", build_dir, "--config", "Release", "-j"],
+                    ["cmake", "--build", build_dir, "--config", "Release", "-j 4"],
                     cwd=llama_src_dir, check=True, capture_output=True
                 )
                 built_binary = os.path.join(build_dir, "bin", "llama-server")
@@ -832,25 +860,112 @@ class ProcessManager:
             except Exception as e:
                 print(f"[ProcessManager] Warning: CMake build failed: {e}")
 
-        cuda_supports = False
-        if cuda_enabled:
-            try:
-                import llama_cpp
-                cuda_supports = bool(llama_cpp.llama_supports_gpu_offload())
-            except Exception:
-                cuda_supports = True
-            if not cuda_supports:
-                cuda_supports = True
-
-        venv_py = "/app/.venv/bin/python3"
-        py_bin = venv_py if os.path.exists(venv_py) else sys.executable
-
-        return LlamaServerBinaryInfo(
-            binary_path=py_bin,
-            is_cuda_enabled=cuda_supports,
-            build_source="PYTHON_MODULE_FALLBACK",
-            runtime_backend=runtime_backend,
+        # FR-002: Discontinue legacy Python module fallback and raise explicit FileNotFoundError
+        raise FileNotFoundError(
+            "C++ llama-server binary not found at SSOT path '/usr/local/bin/llama-server' or system PATH. "
+            "Legacy Python module fallback (PYTHON_MODULE_FALLBACK) is discontinued per FR-002 / FR-003."
         )
+
+    def build_c_llama_server_cmd(
+        self,
+        model_id: str,
+        port: Optional[int] = None,
+        model_file: Optional[str] = None,
+        n_ctx: Optional[int] = None,
+        binary_path: Optional[str] = None,
+        clip_file: Optional[str] = None,
+    ) -> List[str]:
+        """T014 / US1: Builds strict C++ llama-server CLI startup command adhering to contracts/llama-server-cli.md."""
+        resolved_id = self._config_manager.resolve_model_id(model_id) if hasattr(self, "_config_manager") and self._config_manager else model_id
+        target_preset = self.model_presets.get(resolved_id, {}) if hasattr(self, "model_presets") else {}
+
+        bin_path = binary_path or os.environ.get("LLAMA_SERVER_BINARY", "/usr/local/bin/llama-server")
+
+        if port is None:
+            if "9b" in model_id.lower():
+                port = 8089
+            elif "4b" in model_id.lower():
+                port = 8088
+            elif "rerank" in model_id.lower():
+                port = 8091
+            elif "bge" in model_id.lower():
+                port = 8090
+            else:
+                port = target_preset.get("default_port", self.port)
+
+        if n_ctx is None:
+            if "9b" in model_id.lower():
+                n_ctx = 32768
+            elif "4b" in model_id.lower():
+                n_ctx = 8192
+            elif "rerank" in model_id.lower() or "bge" in model_id.lower():
+                n_ctx = 2048
+            else:
+                n_ctx = target_preset.get("default_n_ctx", 2048)
+
+        if model_file is None:
+            model_rel = target_preset.get("model", "")
+            if model_rel:
+                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                model_file = self._config_manager.get_absolute_path(model_rel) or os.path.join(base_dir, model_rel)
+            else:
+                if "9b" in model_id.lower():
+                    model_file = "/app/models/qwen3.5-9b.Q4_K_M.gguf"
+                elif "4b" in model_id.lower():
+                    model_file = "/app/models/qwen3.5-4b.Q4_K_M.gguf"
+                elif "rerank" in model_id.lower():
+                    model_file = "/app/models/bge-reranker-v2-m3.Q4_K_M.gguf"
+                elif "bge-m3" in model_id.lower() or "bge" in model_id.lower():
+                    model_file = "/app/models/bge-m3.Q4_K_M.gguf"
+                else:
+                    model_file = f"/app/models/{model_id}.Q4_K_M.gguf"
+
+        cmd = [
+            str(bin_path),
+            "-m", str(model_file),
+            "-c", str(n_ctx),
+            "--host", "127.0.0.1",
+            "--port", str(port),
+            "-ngl", "999",
+            "--split-mode", "none",
+            "--main-gpu", "0",
+            "-np", "1",
+            "--threads-http", "4",
+            "--alias", str(model_id),
+        ]
+
+        if "rerank" in model_id.lower() or target_preset.get("task_type") in ("rerank", "reranking", "tasktypeenum.rerank") or port == 8091:
+            cmd.extend([
+                "-b", "2048",
+                "-ub", "2048",
+                "--reranking",
+                "--pooling", "rank",
+                "--load-mode", "none",
+            ])
+        elif "bge" in model_id.lower() or target_preset.get("task_type") in ("embedding", "tasktypeenum.embedding") or port == 8090:
+            cmd.extend([
+                "-b", "2048",
+                "-ub", "2048",
+                "--embedding",
+                "--pooling", "cls",
+                "--load-mode", "none",
+            ])
+        else:
+            # LLM models (e.g. Qwen 3.5 9B / 4B)
+            # MUST NOT include --context-shift or --ctx-shift
+            cmd.extend([
+                "-fa", "on",
+                "-ctk", "q8_0",
+                "-ctv", "q8_0",
+                "-b", "512",
+                "-ub", "512",
+                "--load-mode", "none",
+            ])
+
+        if clip_file and os.path.exists(clip_file):
+            cmd.extend(["--mmproj", str(clip_file)])
+
+        return cmd
 
     def build_server_command(
         self,
@@ -865,109 +980,17 @@ class ProcessManager:
         model_path: Optional[str] = None,
         hardware_profile: Optional[Any] = None
     ) -> List[str]:
-        """Spec 034: Constructs hardware-aware optimized llama-server startup command."""
-        # Support flexible argument order for tests and internal callers
-        if model_path and not model_file:
-            model_file = model_path
-        if not model_file and isinstance(binary_info, str):
-            model_file = binary_info
-            binary_info = None
-
-        if binary_info is None:
-            binary_info = self.verify_and_build_llama_server()
-
-        effective_port = port if port is not None else self.port
-        if target_preset is None:
-            resolved_id = self._config_manager.resolve_model_id(model_id)
-            target_preset = self.model_presets.get(resolved_id, {})
-
-        task_type = str(target_preset.get("task_type", "llm")).lower()
-        is_aux = task_type in ("embedding", "rerank", "reranking", "tasktypeenum.embedding", "tasktypeenum.rerank") or effective_port in (8090, 8091)
-        ngl_value = "999" if binary_info.is_cuda_enabled else "0"
-
-        # Detect hardware profile if not provided
-        if hardware_profile is None:
-            try:
-                from src.core.gpu_detector import detect_hardware_capabilities
-                hardware_profile = detect_hardware_capabilities()
-            except Exception:
-                hardware_profile = None
-
-        use_flash_attn = False
-        kv_type = "q8_0"
-        if hardware_profile is not None:
-            use_flash_attn = getattr(hardware_profile, "use_flash_attn", False)
-            if getattr(hardware_profile, "use_fp4_kv", False):
-                kv_type = "fp4"
-            elif getattr(hardware_profile, "use_fp8_kv", False):
-                kv_type = "fp8"
-            elif getattr(hardware_profile, "use_q8_kv", True):
-                kv_type = "q8_0"
-
-        if binary_info.build_source != "PYTHON_MODULE_FALLBACK":
-            cmd = [
-                binary_info.binary_path,
-                "-m", str(model_file),
-                "-c", str(n_ctx),
-                "--host", bind_host,
-                "--port", str(effective_port),
-                "-ngl", ngl_value,
-                "--split-mode", "none",
-                "--main-gpu", "0"
-            ]
-            if not is_aux:
-                cmd.extend(["-np", "1"])
-                if use_flash_attn:
-                    cmd.extend(["-fa", "-ctk", kv_type, "-ctv", kv_type])
-                else:
-                    cmd.extend(["-ctk", kv_type, "-ctv", kv_type])
-                cmd.extend([
-                    "--cache-prompt",
-                    "--ctx-shift",
-                    "-b", "512",
-                    "-ub", "512"
-                ])
-            if clip_file and os.path.exists(clip_file):
-                cmd.extend(["--mmproj", clip_file])
-            
-            if task_type in ("embedding", "tasktypeenum.embedding") or effective_port == 8090:
-                cmd.append("--embedding")
-            elif task_type in ("rerank", "reranking", "tasktypeenum.rerank") or effective_port == 8091:
-                cmd.extend(["--reranking", "--embedding"])
-        else:
-            type_kv_int = 8 if kv_type == "q8_0" else (2 if kv_type == "q4_0" else 1)
-            cmd = [
-                sys.executable, "-m", "llama_cpp.server",
-                "--model", str(model_file),
-                "--n_ctx", str(n_ctx),
-                "--host", bind_host,
-                "--port", str(effective_port),
-                "--n_gpu_layers", ngl_value
-            ]
-            if not is_aux:
-                if use_flash_attn:
-                    cmd.extend(["--flash_attn", "True"])
-                    if n_ctx >= 32768 or kv_type in ("q8_0", "q4_0", "fp8"):
-                        cmd.extend([
-                            "--type_k", str(type_kv_int),
-                            "--type_v", str(type_kv_int),
-                        ])
-                batch_sz = 512
-                cmd.extend(["--n_batch", str(batch_sz), "--n_ubatch", str(batch_sz)])
-                cmd.extend(["--n_threads", "4", "--n_threads_batch", "4"])
-                cmd.extend(["--interrupt_requests", "False"])
-                cmd.extend(["--cache", "False"])
-                cmd.extend(["--logits_all", "False"])
-
-            if clip_file and os.path.exists(clip_file):
-                cmd.extend(["--clip_model_path", clip_file])
-            if target_preset.get("chat_template") and "qwen" not in str(model_id).lower():
-                cmd.extend(["--chat_format", target_preset["chat_template"]])
-            
-            if task_type in ("embedding", "rerank", "reranking", "tasktypeenum.embedding", "tasktypeenum.rerank") or effective_port in (8090, 8091):
-                cmd.extend(["--embedding", "True"])
-
-        return cmd
+        """T027 / US3: Hardware-aware optimized startup command delegating strictly to native C++ CLI."""
+        target_file = model_file or model_path
+        binary_path = binary_info.binary_path if binary_info else None
+        return self.build_c_llama_server_cmd(
+            model_id=model_id,
+            port=port,
+            model_file=target_file,
+            n_ctx=n_ctx,
+            binary_path=binary_path,
+            clip_file=clip_file,
+        )
 
     async def spawn_process(self, model_id: str, n_ctx: int = 2048) -> ProcessState:
         """Spawns a new llama-server subprocess for Gemma 4 or Qwen 3.5."""
@@ -1161,8 +1184,14 @@ class ProcessManager:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     start_new_session=True,
+                    preexec_fn=_make_pdeathsig_preexec_fn(os.getpid()),
                     env=env
                 )
+                # T008 / FR-002: Immediately schedule _drain_stdout BEFORE poll_server_health to avoid 64KB buffer deadlock
+                if self.process and self.process.stdout:
+                    self._log_drain_task = asyncio.create_task(
+                        self._drain_stdout(self.process.stdout)
+                    )
                 file_size_mb = os.path.getsize(model_file) / (1024 * 1024) if os.path.exists(model_file) else 1000.0
                 timeout_sec = float(os.environ.get("RUNTIME_BACKEND_READY_TIMEOUT", str(self.calculate_polling_timeout(file_size_mb) + 20.0)))
                 ready = await poll_server_health(
@@ -1170,10 +1199,6 @@ class ProcessManager:
                     timeout=max(30.0, timeout_sec),
                 )
                 if ready:
-                    if self.process and self.process.stdout:
-                        self._log_drain_task = asyncio.create_task(
-                            self._drain_stdout(self.process.stdout)
-                        )
                     self.state = ProcessState(
                         status=ProcessStatusEnum.READY,
                         model_id=model_id,
@@ -1186,6 +1211,8 @@ class ProcessManager:
                 if self.process.returncode is None:
                     self.process.terminate()
                     await asyncio.wait_for(self.process.wait(), timeout=2.0)
+                if self._log_drain_task and not self._log_drain_task.done():
+                    self._log_drain_task.cancel()
                 if self.process.stdout:
                     output = (await self.process.stdout.read()).decode(
                         "utf-8", errors="replace"
@@ -1270,12 +1297,19 @@ class ProcessManager:
                 if self.process.returncode is None:
                     self.process.terminate()
                 try:
-                    await asyncio.wait_for(self.process.wait(), timeout=5.0)
+                    await asyncio.wait_for(self.process.wait(), timeout=3.0)
                 except asyncio.TimeoutError:
                     if self.process.returncode is None:
                         self.process.kill()
-                        await asyncio.wait_for(self.process.wait(), timeout=2.0)
+                        await asyncio.wait_for(self.process.wait(), timeout=0.5)
             except (ProcessLookupError, Exception):
+                pass
+
+            # T009: 4단계 에스컬레이션 - fuser -k -n tcp 잔여 소켓 강제 회수
+            try:
+                import subprocess
+                subprocess.run(["fuser", "-k", "-n", "tcp", str(self.port)], capture_output=True, timeout=1)
+            except Exception:
                 pass
 
             # FR-005/FR-006: 서브프로세스 트랜스포트 명시적 닫기 및 마이크로태스크 소진
@@ -1395,6 +1429,22 @@ class ProcessManager:
                                 pass
             except Exception:
                 pass
+
+    @classmethod
+    async def spawn_all_models_staggered(cls, managers: list["ProcessManager"], stagger_interval: float = 0.5) -> list[ProcessState]:
+        """FR-002 / T009: Sequential 0.5s staggered startup (9B -> 4B -> BGE-M3 -> Reranker) to avoid disk I/O burst."""
+        results = []
+        for pm in managers:
+            model_to_spawn = getattr(pm.state, "model_id", None) or getattr(pm, "model_id", "qwen3.5-4b")
+            res = await pm.spawn_process(model_to_spawn)
+            results.append(res)
+            await asyncio.sleep(stagger_interval)
+        return results
+
+    @classmethod
+    async def stop_all_models_parallel(cls, managers: list["ProcessManager"]):
+        """FR-002 / T009: Parallel 4-stage escalation shutdown via asyncio.gather within <= 3.5s total."""
+        return await asyncio.gather(*(pm.stop_process() for pm in managers), return_exceptions=True)
 
 
 # Class alias for compatibility

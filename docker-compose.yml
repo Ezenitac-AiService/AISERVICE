@@ -94,6 +94,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PYTHONUNBUFFERED=1
+      - LLAMA_SERVER_BINARY=/usr/local/bin/llama-server
       - FAST_LLM_MODEL=${FAST_LLM_MODEL:-qwen3.5-4b}
       - SYNTHESIS_LLM_MODEL=${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
       - VRAM_SAFETY_LIMIT_MB=${VRAM_SAFETY_LIMIT_MB:-11264}

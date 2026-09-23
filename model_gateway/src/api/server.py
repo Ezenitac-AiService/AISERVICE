@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
     server_cfg = cm.get_server_config()
     backend_port = server_cfg.get("backend_port", 8089) if server_cfg else 8089
 
-    # Initialize singleton httpx.AsyncClient with explicit timeouts & limits (FR-052)
-    limits = httpx.Limits(max_keepalive_connections=20, max_connections=100)
+    # Initialize singleton httpx.AsyncClient with explicit timeouts & limits (FR-052 & T019)
+    limits = httpx.Limits(max_keepalive_connections=20, max_connections=100, keepalive_expiry=5.0)
     timeout = httpx.Timeout(connect=5.0, read=120.0, write=10.0, pool=5.0)
     app.state.http_client = httpx.AsyncClient(
         base_url=f"http://127.0.0.1:{backend_port}",
@@ -48,6 +48,22 @@ async def lifespan(app: FastAPI):
         timeout=timeout
     )
     app.state.drain_mode = False
+
+    async def reset_http_client():
+        """T019: Invalidate and rebuild connection pool upon process restart to purge dead sockets."""
+        try:
+            if hasattr(app.state, "http_client") and app.state.http_client:
+                await app.state.http_client.aclose()
+        except Exception:
+            pass
+        fresh_limits = httpx.Limits(max_keepalive_connections=20, max_connections=100, keepalive_expiry=5.0)
+        app.state.http_client = httpx.AsyncClient(
+            base_url=f"http://127.0.0.1:{backend_port}",
+            limits=fresh_limits,
+            timeout=timeout
+        )
+
+    app.state.reset_http_client = reset_http_client
 
     # Auto-load default resident Dual-LLM models and auxiliary (Embedding/Reranker) instances
     async def safe_startup_llm():

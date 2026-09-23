@@ -20,6 +20,7 @@ dependencies = [
     "kiwipiepy>=0.23.2",
     "python-dotenv>=1.2.2",
     "pytest-playwright>=0.8.0",
+    "nvidia-ml-py>=12.0.0",
 ]
 
 [build-system]

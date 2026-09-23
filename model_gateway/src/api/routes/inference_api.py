@@ -26,7 +26,13 @@ from src.core.model_downloader import ModelDownloader
 from src.core.process_manager import ProcessStatusEnum
 from src.core.client_logger import get_client_logger
 from src.core.redis_manager import redis_manager
-from src.core.queue_manager import gpu_queue, QueueFullError, validate_pre_queue_prompt_limits
+from src.core.queue_manager import (
+    gpu_queue,
+    QueueFullError,
+    validate_pre_queue_prompt_limits,
+    try_acquire_slot_nonblocking,
+    format_queue_status_event,
+)
 from src.core.queue_models import QueueStateEnum, compute_prompt_hash
 
 logger = logging.getLogger("InferenceAPI")
@@ -44,6 +50,16 @@ VALID_CHAT_MODELS = {
 }
 
 QWEN_CHATML_STOPS = ["<|im_end|>", "<|im_start|>", "<|endoftext|>"]
+
+
+def normalize_rerank_response(res: dict) -> dict:
+    """T015 / T016: Dual mapping of rerank results (res['data'] = res['results']) for backward compatibility."""
+    if isinstance(res, dict):
+        if "results" in res and "data" not in res:
+            res["data"] = res["results"]
+        elif "data" in res and "results" not in res:
+            res["results"] = res["data"]
+    return res
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -402,6 +418,21 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
                 }
             )
 
+        # T010 / US1: Chat completions messages validation (OpenAI specification: 422 if missing or invalid)
+        if "chat" in path or clean_path in ("chat/completions", "completions"):
+            if "messages" not in body_json or not isinstance(body_json.get("messages"), list):
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "error": {
+                            "message": "Missing required field: 'messages' must be a list.",
+                            "type": "invalid_request_error",
+                            "param": "messages",
+                            "code": "missing_required_field"
+                        }
+                    }
+                )
+
         # Dynamic port and model resolution
         mid_lower = raw_model_str.lower()
         if mid_lower in ("qwen3.5-4b", "qwen3.5-4b-instruct", "fast"):
@@ -417,15 +448,9 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
         if requested_n_ctx is not None:
             llama_manager.validate_requested_context(resolved_model, int(requested_n_ctx))
 
-        # Inject Qwen ChatML stop sequences
-        if "stop" not in body_json or not body_json["stop"]:
-            body_json["stop"] = list(QWEN_CHATML_STOPS)
-        elif isinstance(body_json["stop"], str):
-            body_json["stop"] = [body_json["stop"]] + [s for s in QWEN_CHATML_STOPS if s != body_json["stop"]]
-        elif isinstance(body_json["stop"], list):
-            for s in QWEN_CHATML_STOPS:
-                if s not in body_json["stop"]:
-                    body_json["stop"].append(s)
+        # FR-007 Item 7: Jinja2 chat template delegation (no hardcoded ChatML stops injected)
+        if "stop" in body_json and isinstance(body_json["stop"], str):
+            body_json["stop"] = [body_json["stop"]]
 
         # Parse response_format (Pilos / structured JSON compatibility)
         body_json = parse_response_format(body_json)
@@ -438,7 +463,8 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
             prompt_text = str(body_json.get("prompt"))
 
         try:
-            validate_pre_queue_prompt_limits(prompt_text, resolved_model)
+            # T017: Keyword argument binding to prevent argument inversion
+            validate_pre_queue_prompt_limits(model_id=resolved_model, prompt=prompt_text)
         except ValueError as ve:
             logger.error(f"Pre-queue prompt validation failed: {ve}")
             raise HTTPException(status_code=400, detail=str(ve))
@@ -478,20 +504,31 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
         except Exception as e:
             logger.error(f"Error computing prompt hash: {e}")
 
-        try:
-            ticket = await gpu_queue.enqueue(
+        # T013 / T018: Zero-Wait Fast-Path Slot Bypass (0ms latency when slot is free)
+        sem = gpu_queue._get_semaphore(resolved_model)
+        fast_path = await try_acquire_slot_nonblocking(sem)
+        if fast_path:
+            ticket = await gpu_queue.create_fast_path_ticket(
+                model_id=resolved_model,
                 tenant_id=tenant_id,
                 session_id=session_id,
                 prompt_hash=p_hash,
-                messages=json.loads(body_content).get("messages", []) if body_content else [],
-                model_id=resolved_model,
             )
-        except QueueFullError as e:
-            raise HTTPException(
-                status_code=429,
-                detail=str(e),
-                headers={"Retry-After": "5"}
-            )
+        else:
+            try:
+                ticket = await gpu_queue.enqueue(
+                    tenant_id=tenant_id,
+                    session_id=session_id,
+                    prompt_hash=p_hash,
+                    messages=json.loads(body_content).get("messages", []) if body_content else [],
+                    model_id=resolved_model,
+                )
+            except QueueFullError as e:
+                raise HTTPException(
+                    status_code=429,
+                    detail=str(e),
+                    headers={"Retry-After": "5"}
+                )
 
         async def queued_stream_generator() -> AsyncGenerator[bytes, None]:
             """GPU 큐 통합 비동기 SSE 스트리밍 제너레이터 (Zero-Buffering Passthrough)."""
@@ -500,37 +537,40 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
             start_time = time.perf_counter()
             completion_tokens = 0
             disconnect_monitor = asyncio.create_task(_monitor_disconnect(request, ticket))
+            custom_event = request.headers.get("x-queue-progress", "").lower() in ("true", "1", "yes")
 
             try:
-                slot_acquired = asyncio.Event()
+                if not fast_path:
+                    slot_acquired = asyncio.Event()
 
-                async def _wait_for_slot():
-                    result = await gpu_queue.acquire_slot(ticket)
-                    if result:
-                        slot_acquired.set()
+                    async def _wait_for_slot():
+                        result = await gpu_queue.acquire_slot(ticket)
+                        if result:
+                            slot_acquired.set()
 
-                slot_task = asyncio.create_task(_wait_for_slot())
+                    slot_task = asyncio.create_task(_wait_for_slot())
 
-                # 1. 큐 대기 중 SSE 이벤트 스트리밍 (queue_status + keepalive)
-                async for sse_event in gpu_queue.stream_queue_events(ticket):
-                    yield sse_event.encode("utf-8")
-                    if slot_acquired.is_set():
-                        break
-                    if ticket.cancel_event.is_set():
-                        break
+                    # 1. 큐 대기 중 SSE 이벤트 스트리밍 (queue_status + keepalive)
+                    async for sse_event in gpu_queue.stream_queue_events(ticket, custom_event=custom_event):
+                        yield sse_event.encode("utf-8")
+                        if slot_acquired.is_set():
+                            break
+                        if ticket.cancel_event.is_set():
+                            break
 
-                if not slot_acquired.is_set():
-                    try:
-                        await asyncio.wait_for(slot_task, timeout=1.0)
-                    except asyncio.TimeoutError:
-                        pass
+                    if not slot_acquired.is_set():
+                        try:
+                            await asyncio.wait_for(slot_task, timeout=1.0)
+                        except asyncio.TimeoutError:
+                            pass
 
-                if not slot_acquired.is_set() or ticket.state != QueueStateEnum.ACTIVE:
-                    return
+                    if not slot_acquired.is_set() or ticket.state != QueueStateEnum.ACTIVE:
+                        return
 
                 # 2. 슬롯 획득 후 백엔드 LLM 엔진으로 HTTP 요청 전송
                 client = _get_http_client(request)
-                headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length")]
+                headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length", b"connection")]
+                headers.append((b"connection", b"close"))
                 backend_url = f"http://127.0.0.1:{target_port}{candidate_paths[0]}"
                 if request.url.query:
                     backend_url += f"?{request.url.query}"
@@ -562,6 +602,7 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
                             ttft_ms = (time.perf_counter() - start_time) * 1000.0
                             first_chunk_received = True
                         if await request.is_disconnected():
+                            await r_backend.aclose()
                             break
                         completion_tokens += 1
                         yield chunk
@@ -631,34 +672,46 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
         except Exception as e:
             logger.error(f"Error computing prompt hash for non-streaming: {e}")
 
-        try:
-            ticket = await gpu_queue.enqueue(
+        # T013 / T018: Zero-Wait Fast-Path Slot Bypass
+        sem = gpu_queue._get_semaphore(resolved_model)
+        fast_path = await try_acquire_slot_nonblocking(sem)
+        if fast_path:
+            ticket = await gpu_queue.create_fast_path_ticket(
+                model_id=resolved_model,
                 tenant_id=tenant_id,
                 session_id=session_id,
                 prompt_hash=p_hash,
-                messages=json.loads(body_content).get("messages", []) if body_content else [],
-                model_id=resolved_model,
             )
-        except QueueFullError as e:
-            raise HTTPException(
-                status_code=429,
-                detail=str(e),
-                headers={"Retry-After": "5"}
-            )
+        else:
+            try:
+                ticket = await gpu_queue.enqueue(
+                    tenant_id=tenant_id,
+                    session_id=session_id,
+                    prompt_hash=p_hash,
+                    messages=json.loads(body_content).get("messages", []) if body_content else [],
+                    model_id=resolved_model,
+                )
+            except QueueFullError as e:
+                raise HTTPException(
+                    status_code=429,
+                    detail=str(e),
+                    headers={"Retry-After": "5"}
+                )
 
-        # Acquire slot BEFORE dispatching backend HTTP request (FR-070, Eliminates 17.7GB CUDA OOM)
-        slot_acquired = await gpu_queue.acquire_slot(ticket)
-        if not slot_acquired or ticket.state != QueueStateEnum.ACTIVE:
-            await gpu_queue.release_slot(ticket)
-            raise HTTPException(
-                status_code=503,
-                detail="Failed to acquire GPU inference slot. The queue may be full or ticket was cancelled.",
-                headers={"Retry-After": "5"}
-            )
+            # Acquire slot BEFORE dispatching backend HTTP request (FR-070, Eliminates 17.7GB CUDA OOM)
+            slot_acquired = await gpu_queue.acquire_slot(ticket)
+            if not slot_acquired or ticket.state != QueueStateEnum.ACTIVE:
+                await gpu_queue.release_slot(ticket)
+                raise HTTPException(
+                    status_code=503,
+                    detail="Failed to acquire GPU inference slot. The queue may be full or ticket was cancelled.",
+                    headers={"Retry-After": "5"}
+                )
 
         start_time = time.perf_counter()
         client = _get_http_client(request)
-        headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length")]
+        headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length", b"connection")]
+        headers.append((b"connection", b"close"))
         backend_url = f"http://127.0.0.1:{target_port}{candidate_paths[0]}"
         if request.url.query:
             backend_url += f"?{request.url.query}"
@@ -749,8 +802,43 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
     # ═══════════════════════════════════════════════════════════════════════════
     # Case 3: Non-LLM Request (Embedding, Reranker, etc.)
     # ═══════════════════════════════════════════════════════════════════════════
+    # FR-007 Item 1: Pilos model auto-injection for /v1/embeddings and /v1/rerank
+    if clean_path in ("embeddings", "embedding"):
+        target_port = 8090
+        try:
+            if body_content:
+                b_json = json.loads(body_content)
+                if not b_json.get("model"):
+                    b_json["model"] = "bge-m3"
+                    body_content = json.dumps(b_json).encode("utf-8")
+                inp = b_json.get("input", "")
+                inp_str = " ".join(inp) if isinstance(inp, list) else str(inp)
+                validate_pre_queue_prompt_limits(model_id="bge-m3", prompt=inp_str)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Embedding pre-check warning: {e}")
+    elif clean_path in ("rerank", "reranking"):
+        target_port = 8091
+        try:
+            if body_content:
+                b_json = json.loads(body_content)
+                if not b_json.get("model"):
+                    b_json["model"] = "bge-reranker-v2-m3"
+                    body_content = json.dumps(b_json).encode("utf-8")
+                q = b_json.get("query", "")
+                docs = b_json.get("documents", [])
+                docs_str = " ".join([d if isinstance(d, str) else d.get("text", "") for d in docs])
+                validate_pre_queue_prompt_limits(model_id="bge-reranker-v2-m3", prompt=f"{q} {docs_str}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Reranker pre-check warning: {e}")
+
     client = _get_http_client(request)
-    headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length")]
+    # FR-007 Item 2: Ingress Connection: close header injection for backend calls
+    headers = [(k, v) for k, v in request.headers.raw if k.lower() not in (b"host", b"content-length", b"connection")]
+    headers.append((b"connection", b"close"))
 
     r = None
     for cand_path in candidate_paths:
@@ -798,57 +886,37 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
             headers={"Retry-After": "5"}
         )
 
-    # Fallback adapter for Python llama_cpp.server on port 8091 which only exposes /v1/embeddings
-    if r.status_code == 404 and clean_path in ("rerank", "reranking"):
+    # T015 / T016 / FR-007 Item 3: Direct C++ /v1/rerank relay with dual mapping (results -> data)
+    if clean_path in ("rerank", "reranking") and r.status_code == 200:
+        resp_bytes = await r.aread()
         await r.aclose()
         try:
-            body_json = json.loads(body_content) if body_content else {}
-            query = body_json.get("query") or body_json.get("prompt") or ""
-            documents = body_json.get("documents") or body_json.get("texts") or []
-
-            if query and documents:
-                emb_url = f"http://127.0.0.1:{target_port}/v1/embeddings"
-                emb_payload = {"input": [query] + documents}
-                async with httpx.AsyncClient() as adapter_client:
-                    emb_resp = await adapter_client.post(emb_url, json=emb_payload, timeout=10.0)
-                if emb_resp.status_code == 200:
-                    emb_data = emb_resp.json().get("data", [])
-                    if len(emb_data) == len(documents) + 1:
-                        def cosine_sim(a, b):
-                            if a and isinstance(a[0], list):
-                                a = a[0]
-                            if b and isinstance(b[0], list):
-                                b = b[0]
-                            dot = sum(float(x) * float(y) for x, y in zip(a, b))
-                            norm_a = math.sqrt(sum(float(x) * float(x) for x in a))
-                            norm_b = math.sqrt(sum(float(y) * float(y) for y in b))
-                            return dot / (norm_a * norm_b) if norm_a and norm_b else 0.0
-
-                        query_vec = emb_data[0]["embedding"]
-                        doc_vecs = [item["embedding"] for item in emb_data[1:]]
-
-                        results = []
-                        for idx, doc_vec in enumerate(doc_vecs):
-                            score = cosine_sim(query_vec, doc_vec)
-                            results.append({"index": idx, "relevance_score": round(score, 6)})
-
-                        results.sort(key=lambda x: x["relevance_score"], reverse=True)
-                        rerank_response = {
-                            "object": "list",
-                            "data": results,
-                            "results": results,
-                            "usage": {"prompt_tokens": len(query.split()), "total_tokens": len(query.split())}
-                        }
-                        resp_bytes = json.dumps(rerank_response, ensure_ascii=False).encode("utf-8")
-                        return StreamingResponse(content=iter([resp_bytes]), media_type="application/json")
+            res_json = json.loads(resp_bytes)
+            res_json = normalize_rerank_response(res_json)
+            resp_bytes = json.dumps(res_json, ensure_ascii=False).encode("utf-8")
         except Exception as ex:
-            logger.error(f"[RerankerProxyError] Fallback embedding adapter failed for target port {target_port}: {ex}")
+            logger.warning(f"Could not normalize rerank response: {ex}")
+
+        excluded_headers = {"content-length", "transfer-encoding", "connection", "content-encoding"}
+        response_headers = {
+            k: v for k, v in r.headers.items()
+            if k.lower() not in excluded_headers
+        }
+        response_headers["content-length"] = str(len(resp_bytes))
+        return StreamingResponse(
+            content=iter([resp_bytes]),
+            status_code=r.status_code,
+            headers=response_headers,
+            media_type="application/json"
+        )
 
     async def non_llm_stream_generator() -> AsyncGenerator[bytes, None]:
         """Non-LLM 스트리밍 제너레이터."""
         try:
             async for chunk in r.aiter_raw():
+                # FR-007 Item 4: Client disconnect triggers backend socket close immediately
                 if await request.is_disconnected():
+                    await r.aclose()
                     break
                 yield chunk
         finally:
