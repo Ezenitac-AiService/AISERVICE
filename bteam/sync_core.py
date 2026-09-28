@@ -122,7 +122,7 @@ def sync_core_directories(dry_run: bool = False, verify_only: bool = False) -> b
 
 if __name__ == "__main__":
     is_dry = "--dry-run" in sys.argv
-    is_verify = "--verify" in sys.argv
+    is_verify = "--verify" in sys.argv or "--check" in sys.argv
     res = sync_core_directories(dry_run=is_dry, verify_only=is_verify)
     if not res:
         sys.exit(1)

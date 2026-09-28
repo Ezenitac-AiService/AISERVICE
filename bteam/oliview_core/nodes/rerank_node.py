@@ -2,6 +2,7 @@
 수집된 후보군을 단일 통합 배치로 리랭킹하고, 타겟별 문서 Top-P (85% 질량) 및 점수 절벽 컷오프로 독립 선별.
 """
 
+import math
 import time
 from typing import Dict, Any, List
 
@@ -11,16 +12,73 @@ from ..graph_state import (
     FALLBACK_LABEL,
 )
 from ..client import AiGatewayClient
-from ..utils.document_top_p import DocumentTopPCalculator
 from ..logger import get_logger, get_trace_id, StepTimer
 
 logger = get_logger("oliview.node.rerank")
-_top_p_calc = DocumentTopPCalculator()
+
+
+def sigmoid(z: float) -> float:
+    """Normalize raw Cross-Encoder logit to probability in [0, 1]."""
+    if z >= 40.0:
+        return 1.0
+    if z <= -40.0:
+        return 0.0
+    return 1.0 / (1.0 + math.exp(-z))
+
+
+def apply_3guardrail_score_cliff(
+    candidates: List[Dict[str, Any]],
+    min_score_gate: float = 0.35,
+    min_k: int = 2,
+    cliff_delta: float = 0.15,
+    high_conf_threshold: float = 0.65,
+    max_k: int = 5,
+) -> List[Dict[str, Any]]:
+    """
+    3-Guardrail Dynamic Score Cliff Truncation (T011, T014):
+    1. Filter out candidate documents with score < min_score_gate (0.35).
+    2. Guardrail 1: Minimum quota min_k (default 2) preserved (no cliff cutoff before rank 2).
+    3. Guardrail 2: High-confidence preservation (s_{i+1} >= high_conf_threshold 0.65 exempted from cliff).
+    4. Guardrail 3: Max document cap max_k (default 5).
+    """
+    if not candidates:
+        return []
+
+    sorted_candidates = sorted(
+        candidates,
+        key=lambda c: c.get("rerank_score", c.get("score", 0.0)),
+        reverse=True,
+    )
+
+    valid = [
+        c for c in sorted_candidates
+        if c.get("rerank_score", c.get("score", 0.0)) >= min_score_gate
+    ]
+    if not valid:
+        return []
+
+    cutoff_idx = len(valid)
+    for i in range(len(valid) - 1):
+        s_curr = valid[i].get("rerank_score", valid[i].get("score", 0.0))
+        s_next = valid[i + 1].get("rerank_score", valid[i + 1].get("score", 0.0))
+        delta = s_curr - s_next
+        if delta >= cliff_delta:
+            # Guardrail 1: Preserve minimum quota min_k
+            if (i + 1) < min_k:
+                continue
+            # Guardrail 2: Preserve high confidence candidate
+            if s_next >= high_conf_threshold:
+                continue
+            cutoff_idx = i + 1
+            break
+
+    # Guardrail 3: Cap at max_k
+    return valid[:cutoff_idx][:max_k]
 
 
 def reranker_node(state: RagGraphState) -> Dict[str, Any]:
     """
-    단일 통합 배치 리랭킹 및 문서 동적 Top-P 선별 노드 (Spec 037).
+    단일 통합 배치 리랭킹 및 3중 가드레일 점수 절벽 동적 선별 노드 (Spec 037, T014).
     """
     trace_id = state.get("trace_id", get_trace_id())
     query = state.get("normalized_query", state.get("query", ""))
@@ -51,7 +109,7 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                 "fallback_reason": "검색 결과 0건",
             }
 
-        # 2. 리랭킹 점수 계산 (AiGatewayClient 호출)
+        # 2. 리랭킹 점수 계산 (AiGatewayClient 호출: 원시 로짓 획득)
         all_texts = [c["review_text"] for c in all_candidates]
         client = AiGatewayClient()
 
@@ -65,13 +123,15 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                 f"리랭커 폴백 발동: {fallback_reason}",
                 extra={"trace_id": trace_id, "fallback": True},
             )
-            scores = [c["first_stage_score"] for c in all_candidates]
+            scores = [c.get("first_stage_score", 0.0) for c in all_candidates]
 
-        # 점수 매핑
+        # 점수 매핑: raw_score 보존 및 Sigmoid 정규화 적용 (T014)
         for c, s in zip(all_candidates, scores):
-            c["rerank_score"] = float(s)
+            raw_val = float(s)
+            c["raw_score"] = raw_val
+            c["rerank_score"] = sigmoid(raw_val)
 
-        # 3. 타겟별 파티션 및 문서 동적 Top-P (85% 누적 질량 + Cliff 0.25 컷오프) 적용
+        # 3. 타겟별 파티션 및 3중 가드레일 점수 절벽 동적 컷오프 적용
         for target_id, (start, end) in target_offsets.items():
             subset = all_candidates[start:end]
             if not subset:
@@ -79,36 +139,24 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                 continue
 
             entity = entity_map.get(target_id, {})
-            target_name = entity.get("target_name", subset[0]["target_name"])
-            subset_by_id = {c.get("doc_id", ""): c for c in subset}
+            target_name = entity.get("target_name", subset[0].get("target_name", ""))
 
-            candidate_dicts = [
-                {
-                    "score": c.get("rerank_score", 0.0),
-                    "text": c["review_text"],
-                    "review_id": c.get("doc_id", ""),
-                    "rating": c.get("rating", 5),
-                    "option": c.get("option", "기본"),
-                    "product_name": c.get("product_name"),
-                    "clean_product_name": c.get("clean_product_name"),
-                    "brand_name": c.get("brand_name"),
-                }
-                for c in subset
-            ]
-
-            # Document Top-P 적용
-            citations = _top_p_calc.filter_documents(
-                candidate_dicts,
-                target_name=target_name,
+            # 3-Guardrail Dynamic Score Cliff Truncation
+            selected_candidates = apply_3guardrail_score_cliff(
+                subset,
+                min_score_gate=0.35,
+                min_k=2,
+                cliff_delta=0.15,
+                high_conf_threshold=0.65,
+                max_k=getattr(settings, "rerank_top_k", 5),
             )
 
             # RerankedReview 변환
             selected_reviews: List[RerankedReview] = []
-            for rank_idx, cit in enumerate(citations, start=1):
-                orig = subset_by_id.get(cit.review_id, {})
+            for rank_idx, orig in enumerate(selected_candidates, start=1):
                 selected_reviews.append(RerankedReview(
-                    doc_id=cit.review_id,
-                    review_text=cit.snippet,
+                    doc_id=orig.get("doc_id", ""),
+                    review_text=orig["review_text"],
                     target_id=target_id,
                     target_name=orig.get("target_name", target_name),
                     product_name=orig.get("product_name"),
@@ -117,34 +165,20 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
                     category=orig.get("category"),
                     attribute_name=orig.get("attribute_name"),
                     product_url=orig.get("product_url"),
-                    rerank_score=cit.rerank_score,
+                    rerank_score=orig.get("rerank_score", 0.0),
+                    raw_score=orig.get("raw_score", 0.0),
                     rank=rank_idx,
                     rating=orig.get("rating", 5.0),
                 ))
 
-            # 최소 1건 보장: 만약 Top-P에서 0건으로 모두 탈락했으나 원본 후보가 있었다면 최고점 1건 보존
-            if not selected_reviews and subset:
-                best = max(subset, key=lambda x: x.get("rerank_score", 0.0))
-                selected_reviews.append(RerankedReview(
-                    doc_id=best["doc_id"],
-                    review_text=best["review_text"],
-                    target_id=target_id,
-                    target_name=best.get("target_name", target_name),
-                    product_name=best.get("product_name"),
-                    clean_product_name=best.get("clean_product_name"),
-                    brand_name=best.get("brand_name"),
-                    category=best.get("category"),
-                    attribute_name=best.get("attribute_name"),
-                    product_url=best.get("product_url"),
-                    rerank_score=best.get("rerank_score", 0.0),
-                    rank=1,
-                    rating=best.get("rating", 5.0),
-                ))
-
             reranked_contexts[target_id] = selected_reviews
             logger.info(
-                f"[{target_id}] Document Top-P 선별 완료: {len(selected_reviews)}건 선별",
-                extra={"trace_id": trace_id, "doc_count": len(selected_reviews)},
+                f"[{target_id}] 3중 가드레일 리랭킹 선별 완료: {len(selected_reviews)}건 (후보 {len(subset)}건 중)",
+                extra={
+                    "trace_id": trace_id,
+                    "doc_count": len(selected_reviews),
+                    "target_id": target_id,
+                },
             )
 
     return {

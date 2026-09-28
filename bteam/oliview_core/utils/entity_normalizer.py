@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 # 공통 뷰티 속성 키워드 (부정 속성 사전 포함)
 BEAUTY_ASPECT_KEYWORDS = [
-    "발림성", "지속력", "수분감", "장단점", "커버력", "밀착력", "트러블", 
+    "발림성", "지속력", "수분감", "보습력", "흡수력", "장단점", "커버력", "밀착력", "트러블", 
     "붉은기", "진정", "쿨링감", "촉촉함", "유분기", "다크닝", "각질부각",
     "요철부각", "들뜸", "밀림", "뭉침", "가루날림", "건조함", "번짐",
-    "향", "자극", "가성비", "순함", "모공", "피지", "미백", "주름"
+    "향", "자극", "자극성", "가성비", "순함", "모공", "피지", "미백", "주름"
 ]
 
 # 대표적 화장품 라인/시리즈 키워드
@@ -68,6 +68,36 @@ class HybridEntityNormalizer:
         try:
             from kiwipiepy import Kiwi
             self._kiwi = Kiwi()
+            # Register brands, series, beauty aspects and categories to prevent morphological fragmentation
+            for b in set(BRAND_ALIAS_MAP.values()):
+                try:
+                    self._kiwi.add_user_word(b, tag="NNP", score=10.0)
+                except Exception:
+                    pass
+            for a in BRAND_ALIAS_MAP.keys():
+                try:
+                    self._kiwi.add_user_word(a, tag="NNP", score=10.0)
+                except Exception:
+                    pass
+            for s in BEAUTY_SERIES_KEYWORDS:
+                try:
+                    self._kiwi.add_user_word(s, tag="NNP", score=5.0)
+                except Exception:
+                    pass
+            for word in BEAUTY_ASPECT_KEYWORDS:
+                try:
+                    self._kiwi.add_user_word(word, tag="NNG", score=5.0, user_value="ASPECT")
+                except Exception:
+                    try:
+                        self._kiwi.add_user_word(word, tag="NNG", score=5.0)
+                    except Exception:
+                        pass
+            for cat_list in BEAUTY_CATEGORY_KEYWORDS.values():
+                for word in cat_list:
+                    try:
+                        self._kiwi.add_user_word(word, tag="NNG", score=5.0)
+                    except Exception:
+                        pass
         except ImportError:
             logger.warning("kiwipiepy not installed, falling back to regex tokenization")
             self._kiwi = None
@@ -97,42 +127,122 @@ class HybridEntityNormalizer:
         return fast_result
 
     def _fast_path_normalize(self, query: str) -> NormalizedQueryEntity:
-        """Stage 1: Kiwi + 정규식 기반 초고속 정규화 (<3ms)."""
-        cleaned_text = query
+        """Stage 1: Kiwi + 2-Pass 형태소/구문 기반 초고속 정규화 (<3ms)."""
         extracted_aspects: List[str] = []
         extracted_category: Optional[str] = None
         extracted_brand: Optional[str] = None
 
-        # 1) 속성 키워드 감지
+        # 1) Kiwi Morphology Tokenization (Stage 1 Fast-Path)
+        tokens = self._kiwi.tokenize(query) if self._kiwi else []
+
+        # 2) 브랜드 매핑 (BRAND_ALIAS_MAP 사전 검사 - 후방 서술어 정제보다 엄격히 선행 배치하여 복합 표기 보호)
+        for alias_key, canon_brand in BRAND_ALIAS_MAP.items():
+            pattern = rf"(?:\b|^|\s){re.escape(alias_key)}(?:\b|\$|\s)"
+            if re.search(pattern, query, re.IGNORECASE) or alias_key.lower() in query.lower():
+                extracted_brand = canon_brand
+                break
+
+        # 3) 형태소 기반 속성 키워드 감지 및 [Aspect] + JC + [Aspect] 다중 속성 구문 분석
+        has_aspect_coordination = False
+        if tokens:
+            # Multi-aspect noun phrase coordination ([Aspect] + JC + [Aspect])
+            for i in range(len(tokens) - 2):
+                t1, t2, t3 = tokens[i], tokens[i + 1], tokens[i + 2]
+                if t2.tag == "JC" and t1.form in BEAUTY_ASPECT_KEYWORDS and t3.form in BEAUTY_ASPECT_KEYWORDS:
+                    has_aspect_coordination = True
+                    if t1.form not in extracted_aspects:
+                        extracted_aspects.append(t1.form)
+                    if t3.form not in extracted_aspects:
+                        extracted_aspects.append(t3.form)
+
+            for t in tokens:
+                if t.form in BEAUTY_ASPECT_KEYWORDS and t.form not in extracted_aspects:
+                    extracted_aspects.append(t.form)
+
+        # Fallback keyword extraction for aspects
         for aspect in BEAUTY_ASPECT_KEYWORDS:
             if aspect in query and aspect not in extracted_aspects:
                 extracted_aspects.append(aspect)
 
-        # 2) 카테고리 키워드 감지
+        # 4) 카테고리 키워드 감지
         for cat_name, aliases in BEAUTY_CATEGORY_KEYWORDS.items():
             for alias in aliases:
-                if alias in query:
+                if any(t.form == alias for t in tokens) or alias in query:
                     extracted_category = cat_name
                     break
             if extracted_category:
                 break
 
-        # 3) 후방 서술형 조사/요청구 제거 (Greedy Backward Stripping)
-        target_candidate = cleaned_text
-        for pattern in TRAILING_CONVERSATIONAL_PATTERNS:
-            target_candidate = re.sub(pattern, "", target_candidate, flags=re.IGNORECASE).strip()
+        # 5) 타겟 상품명 정제 (형태소 경계 분석으로 후방 서술어/조사/속성구 제거)
+        target_candidate = query
+        if tokens:
+            all_cat_words = {w for cl in BEAUTY_CATEGORY_KEYWORDS.values() for w in cl}
+            cutoff = len(query)
+            for i, t in enumerate(tokens):
+                # '의' (JKG) or '로/에' (JKB)
+                if t.tag == "JKG" and i > 0:
+                    cutoff = min(cutoff, t.start)
+                    break
+                if t.tag == "JKB" and i > 0 and i < len(tokens) - 1:
+                    cutoff = min(cutoff, t.start)
+                    break
+                # 속성 키워드 (카테고리 수식어가 아닌 경우 분리)
+                if t.form in BEAUTY_ASPECT_KEYWORDS:
+                    is_followed_by_cat = (i + 1 < len(tokens) and tokens[i + 1].form in all_cat_words)
+                    if not is_followed_by_cat:
+                        cutoff = min(cutoff, t.start)
+                        break
+                # 서술형 동사/형용사
+                if t.tag in ("VV", "VA") and t.form in ("알리", "추천", "비교", "어떻", "분석", "평가"):
+                    cutoff = min(cutoff, t.start)
+                    break
+                # 상품 간 연결 접속조사 ('이랑', '과', '와')
+                if t.tag == "JC" and i > 0:
+                    cutoff = min(cutoff, t.start)
+                    break
 
-        # 4) 브랜드 매핑 (Alias Dictionary 우선 검사)
-        lower_target = target_candidate.lower()
-        for alias_key, canon_brand in BRAND_ALIAS_MAP.items():
-            if lower_target.startswith(alias_key.lower()) or f" {alias_key.lower()} " in f" {lower_target} ":
-                extracted_brand = canon_brand
-                # 브랜드명 정규화
-                target_candidate = re.sub(re.escape(alias_key), canon_brand, target_candidate, count=1, flags=re.IGNORECASE).strip()
-                break
+            target_candidate = query[:cutoff].strip()
+        else:
+            for pattern in TRAILING_CONVERSATIONAL_PATTERNS:
+                target_candidate = re.sub(pattern, "", target_candidate, flags=re.IGNORECASE).strip()
 
-        # 5) 비교 질문 여부 검사
-        is_comparison = bool(re.search(r"(?:랑|하고|와|과|vs|대비|비교)", query, re.IGNORECASE))
+            # Iteratively strip trailing aspects and conjunction particles until stable (T013)
+            changed = True
+            while changed:
+                changed = False
+                cleaned = re.sub(r"\s*(?:과|와|랑|하고|및|의)\s*$", "", target_candidate).strip()
+                if cleaned != target_candidate:
+                    target_candidate = cleaned
+                    changed = True
+                for aspect in BEAUTY_ASPECT_KEYWORDS:
+                    cleaned = re.sub(rf"(?:의\s*)?{re.escape(aspect)}\s*$", "", target_candidate).strip()
+                    if cleaned != target_candidate:
+                        target_candidate = cleaned
+                        changed = True
+
+        if extracted_brand:
+            for alias_key in BRAND_ALIAS_MAP.keys():
+                if BRAND_ALIAS_MAP[alias_key] == extracted_brand and alias_key.lower() in target_candidate.lower():
+                    target_candidate = re.sub(re.escape(alias_key), extracted_brand, target_candidate, count=1, flags=re.IGNORECASE).strip()
+                    break
+
+        # 6) 비교 질문 여부 검사 (Kiwi JC vs JKB 및 2-Pass 구문 분석)
+        has_comparison_predicate = bool(re.search(r"(?:비교|차이점|차이|대비|vs\b|versus|어느\s*게\s*더|어떤\s*게\s*더|뭐가\s*더)", query, re.IGNORECASE))
+
+        # Check count of distinct brands in query
+        detected_brand_count = 0
+        for alias_key in set(BRAND_ALIAS_MAP.values()):
+            if alias_key in query:
+                detected_brand_count += 1
+
+        is_comparison = False
+        if has_comparison_predicate:
+            is_comparison = True
+        elif detected_brand_count >= 2:
+            is_comparison = True
+        elif has_aspect_coordination:
+            # [Aspect] + JC + [Aspect] coordinated noun phrase: preserve SINGLE_TARGET
+            is_comparison = False
 
         # 6) 카테고리 탐색(Discovery) vs 단일 상품 분류
         is_discovery = False
@@ -274,3 +384,15 @@ class HybridEntityNormalizer:
                 catalog_confidence=0.95,
             )
         return None
+
+
+_normalizer_instance: Optional[HybridEntityNormalizer] = None
+
+
+def get_entity_normalizer(llm_client=None) -> HybridEntityNormalizer:
+    """Returns or initializes singleton HybridEntityNormalizer instance."""
+    global _normalizer_instance
+    if _normalizer_instance is None:
+        _normalizer_instance = HybridEntityNormalizer(llm_client=llm_client)
+    return _normalizer_instance
+

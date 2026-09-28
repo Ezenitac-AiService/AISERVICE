@@ -47,12 +47,25 @@ def intent_router_node(state: RagGraphState) -> Dict[str, Any]:
         norm_result = _normalizer.normalize(query)
         normalized_query, detected_brands = normalize_query_brands(query)
 
-        # 2. 패턴 분류
+        # 2. 패턴 분류 (T012: Kiwipiepy 기반 2-Pass 구문 분석 및 엔티티 가드레일)
+        # 접속조사(JC)와 부사격조사(JKB)를 구분하며, 브랜드 2개 이상 또는 실존 비교 대상 수반 시에만 EXPLICIT_COMPARE 발동
+        is_true_compare = False
+        if norm_result.is_series_query and norm_result.series_candidates:
+            is_true_compare = True
+        elif len(detected_brands) >= 2:
+            is_true_compare = True
+        elif norm_result.intent.value == "COMPARISON":
+            has_compare_pred = bool(re.search(r"(?:비교|차이점|차이|대비|vs\b|versus|어느\s*게\s*더|어떤\s*게\s*더|뭐가\s*더)", query, re.IGNORECASE))
+            if has_compare_pred and len(detected_brands) >= 2:
+                is_true_compare = True
+            elif norm_result.series_candidates and len(norm_result.series_candidates) >= 2:
+                is_true_compare = True
+
         if norm_result.is_series_query and norm_result.series_candidates:
             pattern_type = PatternType.EXPLICIT_COMPARE
         elif norm_result.is_discovery:
             pattern_type = PatternType.FEATURE_DISCOVERY
-        elif norm_result.intent.value == "COMPARISON" or len(detected_brands) >= 2:
+        elif is_true_compare:
             pattern_type = PatternType.EXPLICIT_COMPARE
         elif norm_result.extracted_aspects:
             pattern_type = PatternType.ASPECT_PROS_CONS

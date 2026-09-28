@@ -143,6 +143,7 @@ class CandidateReview(TypedDict, total=False):
     attribute_name: Optional[str]
     product_url: Optional[str]
     first_stage_score: float
+    raw_score: Optional[float]
     rating: Optional[float]
     skin_type: Optional[str]
 
@@ -160,6 +161,7 @@ class RerankedReview(TypedDict, total=False):
     attribute_name: Optional[str]
     product_url: Optional[str]
     rerank_score: float
+    raw_score: Optional[float]
     rank: int
     rating: Optional[float]
 

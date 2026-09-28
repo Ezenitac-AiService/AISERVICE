@@ -4,6 +4,9 @@ Step Callback Protocols and Adapters for Oliview Core.
 
 from typing import Protocol, Any, Optional
 from .types import StepEvent, StepCode
+from .logger import get_logger
+
+logger = get_logger("oliview.callback")
 
 
 class StepCallbackProtocol(Protocol):
@@ -28,4 +31,4 @@ class StreamlitStepCallback:
 class LoggingStepCallback:
     """Console / Logger fallback callback adapter."""
     def on_step(self, event: StepEvent) -> None:
-        print(f"[{event.step.value}] {event.label} ({event.elapsed_sec:.2f}s)")
+        logger.info(f"[{event.step.value}] {event.label} ({event.elapsed_sec:.2f}s)")

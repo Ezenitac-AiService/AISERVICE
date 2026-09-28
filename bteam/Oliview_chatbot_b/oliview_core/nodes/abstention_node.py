@@ -18,15 +18,43 @@ DEFAULT_SUGGESTED_CHIPS = ["스킨케어", "선케어", "립메이크업", "쿠�
 
 def should_abstain_zero_search(state: RagGraphState) -> str:
     """
-    LangGraph Conditional Edge Evaluator.
+    LangGraph Conditional Edge Evaluator (T010, T015).
     Determines if RAG pipeline should immediately abstain or proceed to LLM synthesis.
+    Abstains if:
+    1. Total selected reviews == 0.
+    2. Max rerank score < 0.35 (absolute confidence gate).
+    3. Low-confidence plateau: max(s) < 0.50 and (max(s) - min(s)) < 0.10 (CRAG Ambiguous band).
     """
     reranked_contexts = state.get("reranked_contexts", {})
-    total_selected = sum(len(v) for v in reranked_contexts.values()) if isinstance(reranked_contexts, dict) else 0
+    all_reviews: List[Dict[str, Any]] = []
+    if isinstance(reranked_contexts, dict):
+        for reviews in reranked_contexts.values():
+            if isinstance(reviews, list):
+                all_reviews.extend(reviews)
 
-    # Also check if target_errors or out-of-catalog was flagged
-    if total_selected == 0:
+    if not all_reviews:
         return "ABSTAIN_ZERO_SEARCH"
+
+    scores = [
+        float(r.get("rerank_score", r.get("score", 0.0)))
+        for r in all_reviews
+        if isinstance(r, dict)
+    ]
+
+    if not scores:
+        return "ABSTAIN_ZERO_SEARCH"
+
+    max_score = max(scores)
+    min_score = min(scores)
+
+    # 1) Absolute confidence gate (< 0.35)
+    if max_score < 0.35:
+        return "ABSTAIN_ZERO_SEARCH"
+
+    # 2) Low-confidence plateau (max < 0.50 and spread < 0.10)
+    if max_score < 0.50 and (max_score - min_score) < 0.10:
+        return "ABSTAIN_ZERO_SEARCH"
+
     return "PROCEED_SYNTHESIS"
 
 

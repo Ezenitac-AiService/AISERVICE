@@ -7,6 +7,9 @@ from typing import Generator, Dict, Any, List, Optional
 import pymysql
 import pymysql.cursors
 from .config import get_settings
+from .logger import get_logger
+
+logger = get_logger("oliview.db")
 
 
 def create_db_connection() -> pymysql.connections.Connection:
@@ -79,7 +82,7 @@ def fetch_review_metadata(review_ids: List[int]) -> Dict[int, Dict[str, Any]]:
             for row in cursor.fetchall():
                 results[row["review_id"]] = row
     except Exception as e:
-        print(f"[WARN] DB 리뷰 메타데이터 뷰 조회 오류: {e}")
+        logger.warning(f"DB 리뷰 메타데이터 뷰 조회 오류: {e}")
 
     if results:
         return results
@@ -107,7 +110,7 @@ def fetch_review_metadata(review_ids: List[int]) -> Dict[int, Dict[str, Any]]:
             for row in cursor.fetchall():
                 results[row["review_id"]] = row
     except Exception as e:
-        print(f"[WARN] DB 리뷰 메타데이터 폴백 조회 오류: {e}")
+        logger.warning(f"DB 리뷰 메타데이터 폴백 조회 오류: {e}")
     return results
 
 
@@ -146,7 +149,7 @@ def fetch_active_catalog_records() -> List[Dict[str, Any]]:
             cursor.execute(fallback_query)
             return cursor.fetchall()
     except Exception as e:
-        print(f"[WARN] fetch_active_catalog_records fallback error: {e}")
+        logger.warning(f"fetch_active_catalog_records fallback error: {e}")
         return []
 
 
@@ -184,5 +187,5 @@ def fetch_aspect_summaries(category_keyword: Optional[str] = None) -> List[Dict[
             cursor.execute(fallback_query)
             return cursor.fetchall()
     except Exception as e:
-        print(f"[WARN] fetch_aspect_summaries fallback error: {e}")
+        logger.warning(f"fetch_aspect_summaries fallback error: {e}")
         return []

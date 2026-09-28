@@ -4,7 +4,7 @@ Qwen 3.5 2B/4B 실시간 토큰 스트리밍, 인라인 인용 부호 강제, �
 
 import re
 import time
-from typing import Dict, Any, Iterator, List, Optional
+from typing import Dict, Any, Iterator, AsyncIterator, List, Optional
 
 from ..config import get_settings
 from ..graph_state import RagGraphState, PatternType, FALLBACK_LABEL
@@ -451,6 +451,123 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     finally:
         if is_lock_owner:
             L5SingleFlightLock.release(l5_key)
+
+
+async def aget_token_stream(
+    state: RagGraphState,
+    queue_callback=None,
+    http_client: Optional[Any] = None,
+) -> AsyncIterator[str]:
+    """
+    Non-blocking async token generator for SSE streaming adapters (Spec 048 / T006).
+    Invokes client.agenerate_stream via httpx.AsyncClient with zero event-loop blocking.
+    """
+    query = state.get("query", "")
+    context_text = state.get("context_text", "")
+    pattern_type = state.get("pattern_type", PatternType.SINGLE_TARGET)
+    canary_token = state.get("canary_token", "")
+    is_fallback = state.get("is_fallback", False)
+    max_tokens = _get_max_tokens_for_pattern(pattern_type)
+    trace_id = state.get("trace_id", get_trace_id())
+    tenant_id = state.get("tenant_id", "chata")
+    session_id = state.get("session_id", "")
+    settings = get_settings()
+
+    doc_ids = _extract_doc_ids(state)
+
+    if is_zero_review_state(state):
+        logger.info(f"[{trace_id}] Zero-Search Hard Block 발동 (Async Streaming): 리뷰 0건 -> ZERO_SEARCH_TEMPLATE")
+        for line in ZERO_SEARCH_TEMPLATE.split("\n"):
+            yield line + "\n"
+        return
+
+    rewritten_q = state.get("rewritten_query") or state.get("normalized_query") or query
+    bypass_cache = state.get("bypass_cache", False) or state.get("no_cache", False)
+    l5_key = build_l5_key(
+        tenant_id=tenant_id,
+        rewritten_query=rewritten_q,
+        doc_ids=doc_ids,
+        model_id=settings.fast_llm_model,
+        prompt_version="v1.0",
+    )
+    state["l5_cache_key"] = l5_key
+
+    if not bypass_cache and settings.enable_l5_cache:
+        cached_payload = get_l5_response(l5_key)
+        if cached_payload and cached_payload.get("response_text"):
+            state["is_cached"] = True
+            logger.info(
+                f"[L5 Cache HIT] aget_token_stream Replay: key={l5_key}",
+                extra={"trace_id": trace_id, "is_cached": True},
+            )
+            for chunk in replay_cached_stream_sync(cached_payload, chunk_delay_s=0.025):
+                yield chunk
+            return
+
+    state["is_cached"] = False
+
+    if pattern_type in (PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY,
+                         PatternType.EXPLICIT_COMPARE.value, PatternType.FEATURE_DISCOVERY.value):
+        user_prompt = COMPARE_PROMPT.format(context=context_text, query=query)
+    elif pattern_type in (PatternType.ASPECT_PROS_CONS, PatternType.ASPECT_PROS_CONS.value):
+        user_prompt = PROS_CONS_PROMPT.format(context=context_text, query=query)
+    else:
+        user_prompt = SINGLE_PROMPT.format(context=context_text, query=query)
+
+    if is_fallback:
+        user_prompt += f"\n\n참고: {FALLBACK_LABEL}"
+
+    aspect_list = []
+    for t in state.get("target_entities", []):
+        if t.get("attribute_query"):
+            aspect_list.extend(t["attribute_query"].split())
+    aspect_guard = get_aspect_guard_instruction(aspect_list or query.split())
+    system_prompt_to_use = SYSTEM_PROMPT_BASE + aspect_guard
+
+    client = AiGatewayClient(client=http_client)
+    full_tokens = []
+    canary_leaked = False
+
+    async for raw_token in client.agenerate_stream(
+        prompt=user_prompt,
+        system_prompt=system_prompt_to_use,
+        max_tokens=max_tokens,
+        trace_id=trace_id,
+        tenant_id=tenant_id,
+        session_id=session_id,
+        queue_callback=queue_callback,
+    ):
+        if canary_token and canary_token in raw_token:
+            logger.warning("카나리아 유출 감지 — 스트림 중단", extra={"trace_id": trace_id})
+            canary_leaked = True
+            break
+        cleaned = _clean_token(raw_token)
+        if cleaned:
+            full_tokens.append(cleaned)
+            yield cleaned
+
+    if not canary_leaked and full_tokens and settings.enable_l5_cache and not bypass_cache and len(doc_ids) > 0:
+        from ..guardrail import GroundednessSanitizer
+        sanitizer = GroundednessSanitizer()
+        raw_text = "".join(full_tokens)
+        sanitized_res = sanitizer.sanitize_markdown(raw_text)
+        full_text = sanitized_res.cleaned_markdown
+        if is_valid_synthesis_response(full_text):
+            payload = {
+                "response_text": full_text,
+                "model_id": settings.fast_llm_model,
+                "prompt_version": "v1.0",
+                "tenant_id": tenant_id,
+                "doc_ids_hash": compute_doc_ids_hash(doc_ids),
+                "created_at": time.time(),
+                "estimated_tokens": len(full_tokens),
+            }
+            set_l5_response(
+                key=l5_key,
+                payload=payload,
+                ttl_base=settings.redis_ttl_llm_response,
+                jitter=settings.redis_ttl_llm_jitter,
+            )
 
 
 class StreamingTokenInterceptor:

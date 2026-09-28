@@ -34,9 +34,11 @@ class CoreSettings(BaseModel):
     CHATBOT_B_UPSTREAM: str = Field(default="http://oliview_chatbot_b:8002")
     PILOS_WEB_UPSTREAM: str = Field(default="http://pilos-web:5000")
     LLM_BASE_URL: str = Field(default="http://model-gateway:8081/v1")
-    EMBEDDING_BASE_URL: str = Field(default="http://model-gateway:8090/v1")
-    RERANK_BASE_URL: str = Field(default="http://model-gateway:8091/v1")
+    EMBEDDING_BASE_URL: str = Field(default="http://model-gateway:8081/v1")
+    RERANK_BASE_URL: str = Field(default="http://model-gateway:8081/v1")
     MODEL_GATEWAY_HEALTH_URL: str = Field(default="http://model-gateway:8081/health")
+    CHROMA_SERVER_HOST: str = Field(default="127.0.0.1")
+    CHROMA_SERVER_PORT: int = Field(default=8000)
     CHATA_HEALTH_URL: str = Field(default="http://oliview_chatbot_a:8501/health")
     CHATB_HEALTH_URL: str = Field(default="http://oliview_chatbot_b:8502/health")
     REDIS_ENDPOINT: str = Field(default="redis://redis:6379/0")
@@ -116,6 +118,14 @@ class CoreSettings(BaseModel):
     def rerank_endpoint(self) -> str:
         return self.RERANK_BASE_URL.rstrip("/")
 
+    @property
+    def chroma_server_host(self) -> str:
+        return self.CHROMA_SERVER_HOST
+
+    @property
+    def chroma_server_port(self) -> int:
+        return self.CHROMA_SERVER_PORT
+
     def get_context_harness(self, n_ctx: Optional[int] = None) -> ContextHarnessProfile:
         target_ctx = n_ctx or self.min_required_n_ctx
         return compute_context_harness_profile(target_ctx)
@@ -146,6 +156,38 @@ class CoreSettings(BaseModel):
                     data[field_name] = found_val.lower() in ("true", "1", "yes")
                 else:
                     data[field_name] = found_val
+
+        # Auto-synthesize Gateway URLs from SERVER_HOST and MAIN_PORT if not explicitly provided
+        server_host = os.getenv("SERVER_HOST")
+        main_port = os.getenv("MAIN_PORT", "8081")
+        if server_host:
+            if not server_host.startswith("http://") and not server_host.startswith("https://"):
+                server_host = f"http://{server_host}"
+            if "/v1" in server_host:
+                base_v1 = server_host.rstrip("/")
+                health_url = server_host.split("/v1")[0].rstrip("/") + "/health"
+            elif any(server_host.endswith(f":{p}") for p in [8081, 8080, 8000]):
+                base_v1 = f"{server_host.rstrip('/')}/v1"
+                health_url = f"{server_host.rstrip('/')}/health"
+            else:
+                base_v1 = f"{server_host.rstrip('/')}:{main_port}/v1"
+                health_url = f"{server_host.rstrip('/')}:{main_port}/health"
+
+            if "LLM_BASE_URL" not in data and "llm_base_url" not in os.environ and "LLM_BASE_URL" not in os.environ:
+                data["LLM_BASE_URL"] = base_v1
+            if "EMBEDDING_BASE_URL" not in data and "embedding_base_url" not in os.environ and "EMBEDDING_BASE_URL" not in os.environ:
+                data["EMBEDDING_BASE_URL"] = base_v1
+            if "RERANK_BASE_URL" not in data and "rerank_base_url" not in os.environ and "RERANK_BASE_URL" not in os.environ:
+                data["RERANK_BASE_URL"] = base_v1
+            if "MODEL_GATEWAY_HEALTH_URL" not in data and "model_gateway_health_url" not in os.environ and "MODEL_GATEWAY_HEALTH_URL" not in os.environ:
+                data["MODEL_GATEWAY_HEALTH_URL"] = health_url
+
+        if "CHROMA_SERVER_HOST" not in data and "chroma_server_host" not in os.environ and "CHROMA_SERVER_HOST" not in os.environ:
+            if _is_running_in_docker():
+                data["CHROMA_SERVER_HOST"] = "chromadb_server"
+            else:
+                data["CHROMA_SERVER_HOST"] = "127.0.0.1"
+
         return cls(**data)
 
 
@@ -253,9 +295,11 @@ class Settings(BaseModel):
     """Legacy Settings compatibility wrapper."""
     app_run_mode: AppRunMode = Field(default_factory=lambda: AppRunMode(os.getenv("APP_RUN_MODE", "DEMO")))
     server_host: str = Field(default_factory=_detect_default_server_host)
-    llm_endpoint: str = Field(default_factory=lambda: os.getenv("LLM_BASE_URL", f"{_detect_default_server_host()}:8001/v1"))
-    embedding_endpoint: str = Field(default_factory=lambda: os.getenv("EMBEDDING_BASE_URL", f"{_detect_default_server_host()}:8002/v1"))
-    rerank_endpoint: str = Field(default_factory=lambda: os.getenv("RERANK_BASE_URL", f"{_detect_default_server_host()}:8003/v1"))
+    llm_endpoint: str = Field(default_factory=lambda: os.getenv("LLM_BASE_URL", f"{_detect_default_server_host()}:8081/v1"))
+    embedding_endpoint: str = Field(default_factory=lambda: os.getenv("EMBEDDING_BASE_URL", f"{_detect_default_server_host()}:8081/v1"))
+    rerank_endpoint: str = Field(default_factory=lambda: os.getenv("RERANK_BASE_URL", f"{_detect_default_server_host()}:8081/v1"))
+    chroma_server_host: str = Field(default_factory=lambda: os.getenv("CHROMA_SERVER_HOST", "chromadb_server" if _is_running_in_docker() else "127.0.0.1"))
+    chroma_server_port: int = Field(default_factory=lambda: int(os.getenv("CHROMA_SERVER_PORT", "8000")))
     db_host: str = Field(default_factory=_detect_default_db_host)
     db_port: int = Field(default=3306)
     db_user: str = Field(default_factory=lambda: os.getenv("DB_USER", "bteam_user"))

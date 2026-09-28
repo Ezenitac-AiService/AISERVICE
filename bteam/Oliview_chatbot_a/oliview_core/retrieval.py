@@ -6,6 +6,7 @@ ChromaDB Dense Vector Search + BM25 Sparse Index + Redis L1 Cache.
 import os
 import sys
 import time
+import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 
@@ -51,29 +52,40 @@ class HybridRetriever:
         self._load_chroma()
 
     def _load_chroma(self):
-        """Loads ChromaDB persistent client and initializes BM25 corpus."""
+        """Loads ChromaDB client (Primary: Lock-free HttpClient, Fallback: PersistentClient)."""
         try:
             import chromadb
+            # 1. Primary: Lock-Free Chroma Server (Spec 048 / T001, T008)
+            try:
+                server_host = self.settings.chroma_server_host
+                server_port = self.settings.chroma_server_port
+                client = chromadb.HttpClient(host=server_host, port=server_port)
+                cols = [c.name for c in client.list_collections()]
+                target_col = "oliview_review_sentences" if "oliview_review_sentences" in cols else (cols[0] if cols else None)
+                if target_col:
+                    self.collection = client.get_collection(target_col)
+                    logger.info(
+                        f"ChromaDB Server 연결 성공: {server_host}:{server_port} "
+                        f"(collection: {target_col}, count: {self.collection.count()})",
+                        extra={"trace_id": get_trace_id()}
+                    )
+                    return
+            except Exception as e_server:
+                logger.warning(
+                    f"Chroma Server 연결 실패 ({e_server}), 로컬 디렉터리 폴백 시도: {self.chroma_dir}",
+                    extra={"trace_id": get_trace_id()}
+                )
+
+            # 2. Secondary fallback: Local persistent client if directory exists
             if os.path.exists(self.chroma_dir):
                 client = chromadb.PersistentClient(path=self.chroma_dir)
                 cols = [c.name for c in client.list_collections()]
                 target_col = "oliview_review_sentences" if "oliview_review_sentences" in cols else (cols[0] if cols else None)
                 if target_col:
                     self.collection = client.get_collection(target_col)
-                    # Load metadata for BM25
-                    data = self.collection.get(include=["documents", "metadatas"], limit=5000)
-                    self.all_documents = data.get("documents") or []
-                    self.all_metadatas = data.get("metadatas") or []
-                    
-                    try:
-                        from rank_bm25 import BM25Okapi
-                        corpus = [doc.split() for doc in self.all_documents]
-                        if corpus:
-                            self.bm25 = BM25Okapi(corpus)
-                    except Exception:
-                        self.bm25 = None
+                    logger.info(f"ChromaDB 로컬 디렉터리 오픈: {self.chroma_dir}", extra={"trace_id": get_trace_id()})
         except Exception as e:
-            logger.warning(f"ChromaDB 로드 실패: {e}", extra={"trace_id": get_trace_id()})
+            logger.warning(f"ChromaDB 초기화 실패 (MySQL 폴백 대기): {e}", extra={"trace_id": get_trace_id()})
 
     def search(
         self,
@@ -187,6 +199,26 @@ class HybridRetriever:
             cache_set(cache_key, final_results, self.settings.redis_ttl_search_pool)
 
         return final_results
+
+    async def asearch(
+        self,
+        query: str,
+        top_k: int = 25,
+        brand_filter: Optional[str] = None,
+        category_filter: Optional[str] = None,
+        auto_detect_filter: bool = True,
+        use_cache: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Non-blocking async search wrapper for FastAPI/ASGI handlers."""
+        return await asyncio.to_thread(
+            self.search,
+            query=query,
+            top_k=top_k,
+            brand_filter=brand_filter,
+            category_filter=category_filter,
+            auto_detect_filter=auto_detect_filter,
+            use_cache=use_cache,
+        )
 
     def _search_mysql(
         self,

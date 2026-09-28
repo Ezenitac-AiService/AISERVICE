@@ -241,6 +241,33 @@ services:
       - aiservice-network
 
   # ============================================================================
+  # 5.4 B-Team ChromaDB 전용 서빙 컨테이너 (Chroma Client-Server - chromadb_server)
+  # ============================================================================
+  chromadb_server:
+    image: chromadb/chroma:latest
+    container_name: chromadb_server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./bteam/Oliview_chatbot_a/chroma_db_oliview:/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/data
+      - PERSISTENCE_DIRECTORY=/data
+      - PERSIST_PATH=/data
+      - ANONYMIZED_TELEMETRY=FALSE
+      - ALLOW_RESET=FALSE
+    networks:
+      - aiservice-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # ============================================================================
   # 5. B-Team 올리챗 (FastAPI - oliview_chatbot_a)
   # ============================================================================
   oliview_chatbot_a:
@@ -268,6 +295,11 @@ services:
       EMBED_PORT: 8081
       EMBEDDING_PORT: 8081
       RERANK_PORT: 8081
+      EMBEDDING_BASE_URL: http://model-gateway:8081/v1
+      RERANK_BASE_URL: http://model-gateway:8081/v1
+      LLM_BASE_URL: http://model-gateway:8081/v1
+      CHROMA_SERVER_HOST: chromadb_server
+      CHROMA_SERVER_PORT: 8000
       REDIS_HOST: redis
       REDIS_PORT: 6379
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
@@ -281,6 +313,8 @@ services:
         condition: service_healthy
       model-gateway:
         condition: service_healthy
+      chromadb_server:
+        condition: service_started
     logging:
       driver: "json-file"
       options:
@@ -317,6 +351,11 @@ services:
       EMBED_PORT: 8081
       EMBEDDING_PORT: 8081
       RERANK_PORT: 8081
+      EMBEDDING_BASE_URL: http://model-gateway:8081/v1
+      RERANK_BASE_URL: http://model-gateway:8081/v1
+      LLM_BASE_URL: http://model-gateway:8081/v1
+      CHROMA_SERVER_HOST: chromadb_server
+      CHROMA_SERVER_PORT: 8000
       FAST_LLM_MODEL: ${FAST_LLM_MODEL:-qwen3.5-4b}
       SYNTHESIS_LLM_MODEL: ${SYNTHESIS_LLM_MODEL:-qwen3.5-9b}
     volumes:
@@ -327,6 +366,8 @@ services:
         condition: service_healthy
       model-gateway:
         condition: service_healthy
+      chromadb_server:
+        condition: service_started
     logging:
       driver: "json-file"
       options:

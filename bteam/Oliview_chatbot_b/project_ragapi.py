@@ -6,6 +6,7 @@ import pymysql
 import numpy as np
 from datetime import datetime
 from typing import List, Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -106,10 +107,26 @@ class PureASGIPrefixStripMiddleware:
         await self.app(scope, receive, send)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI Lifespan Context Manager (Spec 048 / T006)."""
+    limits = httpx.Limits(max_connections=100, max_keepalive_connections=30, keepalive_expiry=60.0)
+    app.state.http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(10.0, connect=5.0))
+    try:
+        from oliview_core.utils.entity_normalizer import get_entity_normalizer
+        get_entity_normalizer()
+    except Exception as e:
+        print(f"Normalizer warmup: {e}")
+    yield
+    if hasattr(app.state, "http_client") and not app.state.http_client.is_closed:
+        await app.state.http_client.aclose()
+
+
 app = FastAPI(
     title="Oliview Production RAG Engine API",
     description="하이브리드 리랭킹 검색 결과와 8081 생성 LLM을 결합한 완결형 검색 증강 생성 API",
     version="3.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(PureASGIPrefixStripMiddleware, prefix="/bteam/chatb")
@@ -695,10 +712,12 @@ async def search_products_with_rag_stream(request_body: SearchRequest, request: 
                     "RERANK": PipelinePhase.RERANKING.value,
                     "SYNTHESIS": PipelinePhase.LLM_SYNTHESIS.value,
                 }
-                for event in orchestrator.stream_rag(
+                http_client = getattr(request.app.state, "http_client", None) if request else None
+                async for event in orchestrator.astream_rag(
                     query=request_body.query,
                     session_id=session_id,
                     tenant_id="chatb",
+                    http_client=http_client,
                 ):
                     if request and await request.is_disconnected():
                         # FR-019 / T035: 클라이언트 탭 닫힘 시 GPU 연산 즉시 중단
@@ -732,9 +751,9 @@ async def search_products_with_rag_stream(request_body: SearchRequest, request: 
                     # 기본 이벤트 전송 (token, complete, fallback_alert, step_update)
                     yield f"event: {event_type}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as exc:
-                print(f"[LangGraph Fallback] Caught exception, falling back to sequential RAG: {exc}")
-                async for chunk in sse_event_generator():
-                    yield chunk
+                print(f"[LangGraph Stream Error] Caught exception: {exc}")
+                err_payload = {"error": str(exc), "status": "failed"}
+                yield f"event: error\ndata: {json.dumps(err_payload, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(langgraph_sse_generator(), media_type="text/event-stream")
 

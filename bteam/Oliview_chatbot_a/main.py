@@ -8,7 +8,9 @@ import uuid
 import time
 from pathlib import Path
 from typing import AsyncGenerator, Dict, Any, Optional
+from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, Header, Cookie
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
@@ -60,10 +62,26 @@ class PureASGIPrefixStripMiddleware:
         await self.app(scope, receive, send)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """FastAPI Lifespan Context Manager (Spec 048 / T006)."""
+    limits = httpx.Limits(max_connections=100, max_keepalive_connections=30, keepalive_expiry=60.0)
+    app.state.http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(10.0, connect=5.0))
+    try:
+        from oliview_core.utils.entity_normalizer import get_entity_normalizer
+        get_entity_normalizer()
+    except Exception as e:
+        logger.warning(f"Entity normalizer warmup error: {e}")
+    yield
+    if hasattr(app.state, "http_client") and not app.state.http_client.is_closed:
+        await app.state.http_client.aclose()
+
+
 app = FastAPI(
     title="Oliview ChatA Concierge Service",
     description="Olive Young Beauty Review Concierge Agent with SSE Streaming (Spec 048)",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 # Prefix strip middleware (Pure ASGI, zero-buffering for SSE streaming)
@@ -209,14 +227,16 @@ async def sse_event_generator(
         sequence += 1
         yield f"event: pipeline_stage\ndata: {json.dumps(stage_evt, ensure_ascii=False)}\n\n"
 
-        # Stream orchestrator RAG
+        # Stream orchestrator RAG asynchronously (T006)
         k_bound = 0
         collected_tokens = []
-        for event in orchestrator.stream_rag(
+        http_client = getattr(app.state, "http_client", None)
+        async for event in orchestrator.astream_rag(
             query=query,
             session_id=session_id,
             trace_id=request_id,
             tenant_id="chata",
+            http_client=http_client,
         ):
             evt_type = event.get("event_type", "")
             if evt_type == "token":
@@ -233,14 +253,15 @@ async def sse_event_generator(
                     }
                     sequence += 1
                     yield f"event: token\ndata: {json.dumps(tok_evt, ensure_ascii=False)}\n\n"
-            elif evt_type == "search_result":
-                reviews = event.get("reviews", [])
-                k_bound = len(reviews)
-                for rev in reviews[:k_bound]:
-                    pname = rev.get("clean_product_name", "올리브영 추천 상품")
-                    pid = rev.get("product_id", "prod_01")
-                    purl = f"https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo={pid}"
-                    card = ProductLinkCard(product_id=pid, product_name=pname, product_url=purl)
+            elif evt_type in ("complete", "search_result"):
+                reviews = event.get("reference_reviews") or event.get("reviews", [])
+                if reviews:
+                    k_bound = max(k_bound, len(reviews))
+                for rev in reviews:
+                    pname = rev.get("clean_product_name") or rev.get("product_name") or "올리브영 추천 상품"
+                    pid = rev.get("doc_id") or rev.get("product_id", "prod_01")
+                    purl = rev.get("product_url") or f"https://www.oliveyoung.co.kr/store/goods/getGoodsDetail.do?goodsNo={pid}"
+                    card = ProductLinkCard(product_id=str(pid), product_name=pname, product_url=purl)
                     prod_evt = {
                         "request_id": request_id,
                         "event_id": f"evt_{uuid.uuid4().hex[:8]}",
@@ -277,9 +298,9 @@ async def sse_event_generator(
             "sequence": sequence,
             "event": "done",
             "data": {
-                "status": "answered" if k_bound > 0 else "abstained",
+                "status": "answered" if (k_bound > 0 or len(collected_tokens) > 5) else "abstained",
                 "k_bound": k_bound,
-                "model_invoked": bool(k_bound > 0),
+                "model_invoked": bool(k_bound > 0 or len(collected_tokens) > 5),
             },
         }
         yield f"event: done\ndata: {json.dumps(done_evt, ensure_ascii=False)}\n\n"

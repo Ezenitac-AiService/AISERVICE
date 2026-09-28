@@ -12,6 +12,11 @@ dependencies = [
     "pytest-asyncio>=1.4.0",
     "pytest-mock>=3.15.1",
     "redis>=8.1.0",
+    "kiwipiepy>=0.18.0",
+    "chromadb>=0.5.0",
+    "aiomysql>=0.2.0",
+    "rank-bm25>=0.2.2",
+    "pymysql>=1.1.0",
 ]
 
 [tool.uv.workspace]
@@ -44,7 +49,20 @@ build-backend = "setuptools.build_meta"
 packages = []
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = [
+    "oliview_core/tests",
+    "tests/unit/test_abstention_node.py",
+    "tests/unit/test_graph_orchestrator.py",
+    "tests/unit/test_intent_router.py",
+    "tests/unit/test_reranker_node.py",
+    "tests/unit/test_sync_core.py",
+    "tests/integration/test_retrieval.py",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "performance: controlled performance fixture or benchmark",
     "security: PII and secret handling checks",
 ]
+
