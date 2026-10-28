@@ -140,3 +140,31 @@ async def test_aigateway_client_async_methods(http_client: httpx.AsyncClient, lo
     async for token in client.agenerate_stream(prompt="1+1은? 숫자만 답해줘", max_tokens=10):
         stream_tokens.append(token)
     assert len(stream_tokens) > 0
+
+
+@pytest.mark.asyncio
+async def test_structured_json_completion_contract(http_client: httpx.AsyncClient, local_settings: CoreSettings):
+    """Verify Model Gateway structured JSON completion contract returns finish_reason == 'stop' and valid JSON (T029)."""
+    url = f"{local_settings.llm_endpoint}/chat/completions"
+    payload = {
+        "model": local_settings.fast_llm_model,
+        "messages": [
+            {"role": "user", "content": 'Return a JSON object with key "status" and value "ready".'}
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 100,
+        "stream": False,
+    }
+    resp = await http_client.post(url, json=payload, timeout=15.0)
+    assert resp.status_code == 200
+    res_data = resp.json()
+    assert "choices" in res_data
+    assert len(res_data["choices"]) > 0
+    choice = res_data["choices"][0]
+    assert choice.get("finish_reason") == "stop"
+    content = choice.get("message", {}).get("content", "")
+    assert content
+    parsed = json.loads(content)
+    assert isinstance(parsed, dict)
+    assert parsed.get("status") == "ready"
+

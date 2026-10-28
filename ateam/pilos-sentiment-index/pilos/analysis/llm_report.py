@@ -1,6 +1,7 @@
 import hashlib
 import json
 import math
+import os
 import re
 
 from decimal import Decimal
@@ -25,7 +26,7 @@ from pilos.dto.llm_report_dto import (
 )
 
 
-MAX_LLM_MESSAGE_BYTES = 12_000
+MAX_LLM_MESSAGE_BYTES = int(os.getenv("PILOS_LLM_MESSAGE_MAX_BYTES", "48000"))
 
 REPORT_NOTICE = (
     "현재 수급은 실제 개인투자자 체결량으로 계산한 관측값입니다. "
@@ -788,7 +789,7 @@ def build_report_messages(
     )
 
     if _message_bytes(messages) > MAX_LLM_MESSAGE_BYTES:
-        raise ValueError("LLM 고정 메시지가 12,000바이트를 초과합니다.")
+        raise ValueError(f"LLM 고정 메시지가 {MAX_LLM_MESSAGE_BYTES:,}바이트를 초과합니다.")
 
     return messages
 

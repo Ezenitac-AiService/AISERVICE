@@ -131,7 +131,9 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
             c["raw_score"] = raw_val
             c["rerank_score"] = sigmoid(raw_val)
 
-        # 3. 타겟별 파티션 및 3중 가드레일 점수 절벽 동적 컷오프 적용
+        # 3. 타겟별 파티션 및 3중 가드레일 점수 절벽 동적 컷오프 적용 (T031-B)
+        target_max_k = 12 if len(target_offsets) <= 1 else max(4, 16 // len(target_offsets))
+
         for target_id, (start, end) in target_offsets.items():
             subset = all_candidates[start:end]
             if not subset:
@@ -141,14 +143,14 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
             entity = entity_map.get(target_id, {})
             target_name = entity.get("target_name", subset[0].get("target_name", ""))
 
-            # 3-Guardrail Dynamic Score Cliff Truncation
+            # 3-Guardrail Dynamic Score Cliff Truncation with Dynamic Target Partitioning
             selected_candidates = apply_3guardrail_score_cliff(
                 subset,
                 min_score_gate=0.35,
                 min_k=2,
                 cliff_delta=0.15,
                 high_conf_threshold=0.65,
-                max_k=getattr(settings, "rerank_top_k", 5),
+                max_k=target_max_k,
             )
 
             # RerankedReview 변환
@@ -156,6 +158,7 @@ def reranker_node(state: RagGraphState) -> Dict[str, Any]:
             for rank_idx, orig in enumerate(selected_candidates, start=1):
                 selected_reviews.append(RerankedReview(
                     doc_id=orig.get("doc_id", ""),
+                    review_id=orig.get("review_id"),
                     review_text=orig["review_text"],
                     target_id=target_id,
                     target_name=orig.get("target_name", target_name),

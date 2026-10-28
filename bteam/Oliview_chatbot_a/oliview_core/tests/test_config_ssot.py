@@ -42,8 +42,8 @@ def get_valid_sample_env() -> dict:
         "CHAT_RATE_LIMIT_WINDOW_SECONDS": 60,
         "CHAT_SERVICE_CONCURRENCY": 10,
         "CHAT_QUERY_MAX_CHARS": 4000,
-        "CHAT_OUTPUT_TOKEN_CAP": 2048,
-        "CHAT_TIMEOUT_MS": 20000,
+        "CHAT_OUTPUT_TOKEN_CAP": 4096,
+        "CHAT_TIMEOUT_MS": 60000,
     }
 
 
@@ -79,6 +79,10 @@ def test_config_py_and_renderer_red_gate():
         from oliview_core.config import CoreSettings  # type: ignore
         settings = CoreSettings()
         assert settings is not None
+        assert settings.CHAT_OUTPUT_TOKEN_CAP == 4096, f"Expected 4096, got {settings.CHAT_OUTPUT_TOKEN_CAP}"
+        assert settings.CHAT_TIMEOUT_MS == 60000, f"Expected 60000, got {settings.CHAT_TIMEOUT_MS}"
+        assert settings.max_single_output_tokens == 4096, f"Expected 4096, got {settings.max_single_output_tokens}"
+        assert settings.max_compare_output_tokens == 4096, f"Expected 4096, got {settings.max_compare_output_tokens}"
     except (ImportError, AttributeError) as exc:
         pytest.fail(f"RED GATE: CoreSettings not implemented in oliview_core.config: {exc}")
 

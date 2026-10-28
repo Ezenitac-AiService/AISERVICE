@@ -70,7 +70,7 @@ class OpenAICompatibleLlmReportClientTest(unittest.TestCase):
         self.assertEqual(result.input_tokens, 120)
         arguments = sdk_client.chat.completions.create.call_args.kwargs
         self.assertEqual(arguments["response_format"], {"type": "json_object"})
-        self.assertEqual(arguments["max_tokens"], 1400)
+        self.assertEqual(arguments["max_tokens"], 4096)
 
     def test_quality_failure_is_regenerated_once_with_reason(self):
         invalid = valid_commentary().model_dump(mode="json")

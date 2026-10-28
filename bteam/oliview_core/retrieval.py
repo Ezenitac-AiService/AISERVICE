@@ -38,6 +38,44 @@ def resolve_chroma_dir() -> str:
     return candidates[0]
 
 
+def ensure_mysql_indexes(conn) -> None:
+    """
+    Ensure idx_aspect_brand and idx_aspect_product composite B-Tree indexes exist on review_aspect_sentences.
+    Uses information_schema.statistics pre-check to ensure idempotent lock-free behavior (FR-005, T031-B).
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT INDEX_NAME 
+                FROM information_schema.statistics 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'review_aspect_sentences'
+            """)
+            rows = cur.fetchall()
+            existing = {row["INDEX_NAME"] if isinstance(row, dict) else row[0] for row in rows}
+
+            if "idx_aspect_brand" not in existing:
+                try:
+                    cur.execute("""
+                        CREATE INDEX idx_aspect_brand 
+                        ON review_aspect_sentences (brand_name, model_attribute_name)
+                    """)
+                    logger.info("Created MySQL index idx_aspect_brand on review_aspect_sentences")
+                except Exception as e:
+                    logger.debug(f"Index idx_aspect_brand creation notice: {e}")
+
+            if "idx_aspect_product" not in existing:
+                try:
+                    cur.execute("""
+                        CREATE INDEX idx_aspect_product 
+                        ON review_aspect_sentences (product_name, model_attribute_name)
+                    """)
+                    logger.info("Created MySQL index idx_aspect_product on review_aspect_sentences")
+                except Exception as e:
+                    logger.debug(f"Index idx_aspect_product creation notice: {e}")
+    except Exception as e:
+        logger.debug(f"Index check skipped: {e}")
+
+
 class HybridRetriever:
     """Combines ChromaDB Dense Vector Search with BM25 Sparse Keyword Search & Redis L1 Cache."""
 
@@ -52,40 +90,33 @@ class HybridRetriever:
         self._load_chroma()
 
     def _load_chroma(self):
-        """Loads ChromaDB client (Primary: Lock-free HttpClient, Fallback: PersistentClient)."""
+        """Loads ChromaDB client (Lock-free HttpClient per FR-004, no local SQLite client)."""
         try:
+            import socket
             import chromadb
             # 1. Primary: Lock-Free Chroma Server (Spec 048 / T001, T008)
-            try:
-                server_host = self.settings.chroma_server_host
-                server_port = self.settings.chroma_server_port
-                client = chromadb.HttpClient(host=server_host, port=server_port)
-                cols = [c.name for c in client.list_collections()]
-                target_col = "oliview_review_sentences" if "oliview_review_sentences" in cols else (cols[0] if cols else None)
-                if target_col:
-                    self.collection = client.get_collection(target_col)
-                    logger.info(
-                        f"ChromaDB Server 연결 성공: {server_host}:{server_port} "
-                        f"(collection: {target_col}, count: {self.collection.count()})",
-                        extra={"trace_id": get_trace_id()}
-                    )
-                    return
-            except Exception as e_server:
-                logger.warning(
-                    f"Chroma Server 연결 실패 ({e_server}), 로컬 디렉터리 폴백 시도: {self.chroma_dir}",
+            server_host = self.settings.chroma_server_host
+            server_port = int(self.settings.chroma_server_port)
+            # Fail-fast socket probe with 0.5s connection timeout per FR-004
+            with socket.create_connection((server_host, server_port), timeout=0.5):
+                pass
+
+            client = chromadb.HttpClient(host=server_host, port=server_port)
+            cols = [c.name for c in client.list_collections()]
+            target_col = "oliview_review_sentences" if "oliview_review_sentences" in cols else (cols[0] if cols else None)
+            if target_col:
+                self.collection = client.get_collection(target_col)
+                logger.info(
+                    f"ChromaDB Server 연결 성공: {server_host}:{server_port} "
+                    f"(collection: {target_col}, count: {self.collection.count()})",
                     extra={"trace_id": get_trace_id()}
                 )
-
-            # 2. Secondary fallback: Local persistent client if directory exists
-            if os.path.exists(self.chroma_dir):
-                client = chromadb.PersistentClient(path=self.chroma_dir)
-                cols = [c.name for c in client.list_collections()]
-                target_col = "oliview_review_sentences" if "oliview_review_sentences" in cols else (cols[0] if cols else None)
-                if target_col:
-                    self.collection = client.get_collection(target_col)
-                    logger.info(f"ChromaDB 로컬 디렉터리 오픈: {self.chroma_dir}", extra={"trace_id": get_trace_id()})
+                return
         except Exception as e:
-            logger.warning(f"ChromaDB 초기화 실패 (MySQL 폴백 대기): {e}", extra={"trace_id": get_trace_id()})
+            logger.warning(
+                f"Chroma Server 연결 실패 ({e}) -> MySQL 무락 폴백 대기 (로컬 SQLite 클라이언트 완전 영구 삭제됨 per FR-004)",
+                extra={"trace_id": get_trace_id()}
+            )
 
     def search(
         self,
@@ -254,6 +285,7 @@ class HybridRetriever:
         candidates = []
         try:
             conn = pymysql.connect(**db_config)
+            ensure_mysql_indexes(conn)
             with conn.cursor() as cur:
                 sql = """
                     SELECT
@@ -322,8 +354,10 @@ class HybridRetriever:
         results = []
         for sim_idx, cand_idx in enumerate(valid_indices):
             row = candidates[cand_idx]
+            aspect_id = row.get("aspect_sentence_id", 0)
             results.append({
-                "review_id": row.get("aspect_sentence_id", 0),
+                "doc_id": f"rev_{aspect_id}",
+                "review_id": aspect_id,
                 "product_name": row.get("product_name", "올리브영 화장품"),
                 "brand": row.get("brand_name", brand_filter or ""),
                 "category": row.get("category", category_filter or ""),

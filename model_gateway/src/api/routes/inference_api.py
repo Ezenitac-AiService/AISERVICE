@@ -455,6 +455,19 @@ async def reverse_proxy(request: Request, path: str = "") -> StreamingResponse:
         # Parse response_format (Pilos / structured JSON compatibility)
         body_json = parse_response_format(body_json)
 
+        # T028: Auto-bind reasoning: False and reasoning_budget: 0 for non-streaming or structured JSON requests
+        is_client_streaming = bool(body_json.get("stream", False)) or (request.headers.get("accept") == "text/event-stream")
+        is_structured_json = (
+            (isinstance(body_json.get("response_format"), dict) and body_json["response_format"].get("type") in ("json_object", "json_schema"))
+            or "grammar" in body_json
+            or "json_schema" in body_json
+        )
+        if not is_client_streaming or is_structured_json:
+            if not isinstance(body_json.get("chat_template_kwargs"), dict):
+                body_json["chat_template_kwargs"] = {}
+            body_json["chat_template_kwargs"].setdefault("reasoning", False)
+            body_json.setdefault("reasoning_budget", 0)
+
         # Extract prompt text for pre-queue DoS limit validation
         if "messages" in body_json and isinstance(body_json["messages"], list):
             user_msgs = [m.get("content", "") for m in body_json["messages"] if isinstance(m, dict) and m.get("role") == "user"]

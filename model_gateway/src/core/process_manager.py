@@ -960,6 +960,8 @@ class ProcessManager:
                 "-b", "512",
                 "-ub", "512",
                 "--load-mode", "none",
+                "--reasoning", "off",
+                "--reasoning-budget", "0",
             ])
 
         if clip_file and os.path.exists(clip_file):

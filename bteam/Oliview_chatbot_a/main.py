@@ -64,7 +64,7 @@ class PureASGIPrefixStripMiddleware:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI Lifespan Context Manager (Spec 048 / T006)."""
+    """FastAPI Lifespan Context Manager (Spec 048 / T006, T031-B)."""
     limits = httpx.Limits(max_connections=100, max_keepalive_connections=30, keepalive_expiry=60.0)
     app.state.http_client = httpx.AsyncClient(limits=limits, timeout=httpx.Timeout(10.0, connect=5.0))
     try:
@@ -72,9 +72,11 @@ async def lifespan(app: FastAPI):
         get_entity_normalizer()
     except Exception as e:
         logger.warning(f"Entity normalizer warmup error: {e}")
-    yield
-    if hasattr(app.state, "http_client") and not app.state.http_client.is_closed:
-        await app.state.http_client.aclose()
+    try:
+        yield
+    finally:
+        if hasattr(app.state, "http_client") and not app.state.http_client.is_closed:
+            await app.state.http_client.aclose()
 
 
 app = FastAPI(

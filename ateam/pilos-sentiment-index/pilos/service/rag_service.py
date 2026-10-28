@@ -31,7 +31,7 @@ from pilos.storage.vector_storage import (
 BM25_TOP_K = 10
 VECTOR_TOP_K = 10
 RRF_TOP_K = 10
-RERANK_TOP_K = 5
+RERANK_TOP_K = 10
 
 SERVICE_KNOWLEDGE_SYSTEM_PROMPT = """
 당신은 PILOS 서비스 사용 방법과 분석 결과의 의미를 설명하는 챗봇입니다.
@@ -288,7 +288,7 @@ def generate_service_knowledge_answer(
                 },
             ],
             temperature=0.1,
-            max_tokens=512,
+            max_tokens=4096,
             skip_thinking=True
         )
     except (LlmClientError, ValueError) as error:

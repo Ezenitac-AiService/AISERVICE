@@ -725,43 +725,37 @@ class EarlyIntentGuardrail:
 
 def escape_review_xml(text: str) -> str:
     """
-    리뷰 원문에서 XML/HTML 특수문자를 안전한 엔티티로 이스케이핑합니다.
-    간접 프롬프트 인젝션(Indirect Prompt Injection) 방어를 위해
-    LLM 컨텍스트 주입 직전에 반드시 적용해야 합니다.
+    리뷰 원문에서 XML/HTML 구조 태그(<, >)를 안전한 엔티티로 선택적 무력화합니다 (Spec 008 Phase 9).
+    한글 인용 부호 왜곡 방지 및 토큰 팽창을 방지하기 위해 따옴표(", ')는 보존합니다.
 
     Escaping Rules:
-        & → &amp;  (반드시 첫 번째로 처리)
         < → &lt;
         > → &gt;
-        " → &quot;
-        ' → &#x27;
 
     Examples:
         >>> escape_review_xml('<script>alert("XSS")</script>')
-        '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;'
+        '&lt;script&gt;alert("XSS")&lt;/script&gt;'
 
-        >>> escape_review_xml('이 제품 정말 좋아요 & 추천합니다')
-        '이 제품 정말 좋아요 &amp; 추천합니다'
+        >>> escape_review_xml('이 제품 "수분감" 최고 & 추천합니다')
+        '이 제품 "수분감" 최고 & 추천합니다'
     """
     if not text:
         return text
-    # & 치환을 반드시 가장 먼저 수행 (이중 이스케이프 방지)
-    text = text.replace("&", "&amp;")
     text = text.replace("<", "&lt;")
     text = text.replace(">", "&gt;")
-    text = text.replace("'", "&#x27;")
     return text
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# PreFlightContextGuard (Spec 035 FR-008)
-# 85% safe margin context validator and graceful degradation
+# PreFlightContextGuard (Spec 035 FR-008, Spec 008 Phase 9 T031-B)
+# 85% safe margin context validator and 24,000 hard ceiling guard
 # ──────────────────────────────────────────────────────────────────────────────
 
 class PreFlightContextGuard:
-    """프롬프트 전송 전 유효 컨텍스트 크기의 85% 안전 마진을 검증하고 초과 시 단계적 축소를 적용하는 가드."""
+    """프롬프트 전송 전 유효 컨텍스트 크기(32K)의 24,000 하드 실링 가드를 검증하고 초과 시 단계적 축소를 적용하는 가드."""
 
     SAFE_MARGIN_RATIO: float = 0.85
+    HARD_CEILING_TOKENS: int = 24000
 
     @classmethod
     def estimate_tokens(cls, text: str) -> int:
@@ -771,17 +765,23 @@ class PreFlightContextGuard:
         return max(1, int(len(text) * 1.45))
 
     @classmethod
+    def get_safe_input_budget(cls, total_n_ctx: int = 32768, max_output_tokens: int = 4096) -> int:
+        """안전 입력 토큰 버짓 산출 (최대 24,000 토큰 하드 실링 적용)."""
+        calculated = total_n_ctx - max_output_tokens
+        return min(cls.HARD_CEILING_TOKENS, max(0, calculated))
+
+    @classmethod
     def validate_and_truncate(
         cls,
         context_text: str,
-        total_n_ctx: int = 16384,
-        max_output_tokens: int = 2048,
+        total_n_ctx: int = 32768,
+        max_output_tokens: int = 4096,
     ) -> Tuple[str, bool]:
         """
-        입력 프롬프트의 토큰 크기를 검증하고, (total_n_ctx * 0.85 - max_output_tokens) 예산 초과 시
+        입력 프롬프트의 토큰 크기를 검증하고, safe_input_budget(최대 24,000) 예산 초과 시
         하위 리뷰 섹션을 안전하게 잘라냅니다.
         """
-        safe_input_budget = int(total_n_ctx * cls.SAFE_MARGIN_RATIO) - max_output_tokens
+        safe_input_budget = cls.get_safe_input_budget(total_n_ctx, max_output_tokens)
         current_tokens = cls.estimate_tokens(context_text)
 
         if current_tokens <= safe_input_budget:

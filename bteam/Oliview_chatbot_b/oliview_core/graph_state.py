@@ -3,7 +3,7 @@ LangGraph RAG State & Event Data Models (Spec 035 - Agentic AI & Harness Enginee
 RagGraphState, ContextHarnessProfile, QualityGradeVerdict, LivingInspectorEvent, DeepRecallTurnPayload 데이터 모델 정의.
 """
 
-from typing import TypedDict, Optional, List, Dict, Any
+from typing import TypedDict, Optional, List, Dict, Any, Union
 from enum import Enum
 from pydantic import BaseModel, Field
 
@@ -47,13 +47,13 @@ class SubStepAction(str, Enum):
 
 class ContextHarnessProfile(BaseModel):
     """실시간 게이트웨이 하드웨어 프로파일에 기반한 3-Tier 컨텍스트 예산."""
-    total_n_ctx: int = Field(default=16384, description="게이트웨이 유효 컨텍스트 윈도우")
-    tier_name: str = Field(default="16K_BASELINE", description="16K_BASELINE | 32K_STANDARD | ULTRA")
-    max_input_tokens: int = Field(default=10000, description="입력 컨텍스트 최대 할당 토큰 (85% 안전 마진)")
-    max_output_tokens: int = Field(default=2048, description="최대 생성 토큰 상한")
-    max_compare_output_tokens: int = Field(default=3072, description="다중 비교 시 최대 생성 토큰")
-    tokens_per_target: int = Field(default=3500, description="타겟 제품당 할당 토큰 예산")
-    reranked_per_target: int = Field(default=6, description="타겟당 최종 선별 리뷰 개수 (5~8개 in 16K, 10~15개 in 32K)")
+    total_n_ctx: int = Field(default=32768, description="게이트웨이 유효 컨텍스트 윈도우")
+    tier_name: str = Field(default="32K_STANDARD", description="16K_BASELINE | 32K_STANDARD | ULTRA")
+    max_input_tokens: int = Field(default=24000, description="입력 컨텍스트 최대 할당 토큰 (85% 안전 마진)")
+    max_output_tokens: int = Field(default=4096, description="최대 생성 토큰 상한")
+    max_compare_output_tokens: int = Field(default=4096, description="다중 비교 시 최대 생성 토큰")
+    tokens_per_target: int = Field(default=8000, description="타겟 제품당 할당 토큰 예산")
+    reranked_per_target: int = Field(default=12, description="타겟당 최종 선별 리뷰 개수 (5~8개 in 16K, 10~15개 in 32K)")
     candidates_per_target: int = Field(default=15, description="타겟당 1차 후보 검색 풀 크기")
     max_history_turns: int = Field(default=15, description="대화 세션 히스토리 보존 턴 수")
     raw_history_turns: int = Field(default=5, description="원문 유지 턴 수 (최근 N턴)")
@@ -133,6 +133,7 @@ class TargetEntity(TypedDict):
 class CandidateReview(TypedDict, total=False):
     """1차 검색된 후보 리뷰 (타겟당 최대 15건)."""
     doc_id: str
+    review_id: Optional[Union[int, str]]
     review_text: str
     target_id: str
     target_name: str
@@ -151,6 +152,7 @@ class CandidateReview(TypedDict, total=False):
 class RerankedReview(TypedDict, total=False):
     """리랭킹 후 쿼터 선별된 최종 리뷰 (타겟당 5~15건)."""
     doc_id: str
+    review_id: Optional[Union[int, str]]
     review_text: str
     target_id: str
     target_name: str

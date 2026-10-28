@@ -40,7 +40,7 @@ SUPPORTED_OUTPUT_MODES: tuple[ReportOutputMode, ...] = (
 # 생성 설정이다. 프롬프트 실험이 production과 같은 조건에서 이뤄지도록
 # 상수로 노출한다.
 REPORT_TEMPERATURE = 0.25
-REPORT_MAX_TOKENS = 2048  # Spec 035: 16K/32K 대용량 컨텍스트 확장에 따라 1400 -> 2048 기본 상향
+REPORT_MAX_TOKENS = 4096  # Spec 008 Phase 9: 32K 단일 모델 고도화에 맞춘 넉넉한 출력 버짓 상향 (T032-B)
 
 
 class PilosExecutionHarness:
@@ -322,7 +322,10 @@ class OpenAICompatibleLlmReportClient:
         if response_format is not None:
             arguments["response_format"] = response_format
 
-        arguments["extra_body"] = {"priority": "low"}
+        arguments["extra_body"] = {
+            "priority": "low",
+            "chat_template_kwargs": {"reasoning": False},
+        }
 
         completion = self._create_completion(arguments)
         choices = getattr(completion, "choices", None)

@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-16T15:10:15Z",
+  "generated_at": "2026-10-28T07:34:08Z",
   "system_hardware": {
-    "gpu_name": "NVIDIA GeForce RTX 3060",
-    "total_vram_mb": 12288,
+    "gpu_name": "NVIDIA GeForce GPU",
+    "total_vram_mb": 8192,
     "is_cuda_available": true
   },
   "profiles": {
@@ -112,7 +112,7 @@
       "scaling_tested": true,
       "is_supported": true,
       "failure_reason": "SUCCESS",
-      "last_tested_at": "2026-09-16T15:08:39Z"
+      "last_tested_at": "2026-10-28T07:32:39Z"
     },
     "test-dummy-model": {
       "max_context_length": 4096,
@@ -188,8 +188,8 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (9500MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:09:59Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (9500MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:07Z"
     },
     "qwen3.5-9b-vision": {
       "max_context_length": 2048,
@@ -199,8 +199,8 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (9800MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:10:15Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (9800MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:07Z"
     },
     "gemma4-12b-text": {
       "max_context_length": 2048,
@@ -210,8 +210,8 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (9200MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:10:15Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (9200MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
     },
     "gemma4-26b-a4b": {
       "max_context_length": 2048,
@@ -221,8 +221,8 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (18800MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:10:15Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (18800MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
     },
     "qwen3.6-27b": {
       "max_context_length": 2048,
@@ -232,8 +232,8 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (19500MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:10:15Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (19500MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
     },
     "qwen3.6-35b-a3b": {
       "max_context_length": 2048,
@@ -243,8 +243,78 @@
       "tpot_tok_per_sec": 0.0,
       "scaling_tested": false,
       "is_supported": false,
-      "failure_reason": "CUDA OOM Risk: Base VRAM (24500MB) exceeds Real-time Usable VRAM (8545MB)",
-      "last_tested_at": "2026-09-16T15:10:15Z"
+      "failure_reason": "CUDA OOM Risk: Base VRAM (24500MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
+    },
+    "non_existent_invalid_model": {
+      "max_context_length": 2048,
+      "recommended_context_length": 2048,
+      "binary_search_steps": [
+        {
+          "step": 1,
+          "tested_n_ctx": 3584,
+          "real_vram_mb": 0,
+          "status": "OOM/FAIL",
+          "reason": "Unknown model_id: non_existent_invalid_model"
+        },
+        {
+          "step": 2,
+          "tested_n_ctx": 2560,
+          "real_vram_mb": 0,
+          "status": "OOM/FAIL",
+          "reason": "Unknown model_id: non_existent_invalid_model"
+        }
+      ],
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0.0,
+      "scaling_tested": true,
+      "is_supported": false,
+      "failure_reason": "Unknown model_id: non_existent_invalid_model",
+      "last_tested_at": "2026-10-28T07:28:00Z"
+    },
+    "gemma4-e4b": {
+      "max_context_length": 2048,
+      "recommended_context_length": 2048,
+      "binary_search_steps": [],
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0.0,
+      "scaling_tested": false,
+      "is_supported": false,
+      "failure_reason": "CUDA OOM Risk: Base VRAM (6500MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:07Z"
+    },
+    "qwen3.5-9b": {
+      "max_context_length": 2048,
+      "recommended_context_length": 2048,
+      "binary_search_steps": [],
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0.0,
+      "scaling_tested": false,
+      "is_supported": false,
+      "failure_reason": "CUDA OOM Risk: Base VRAM (6348MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:07Z"
+    },
+    "gemma4-2b-text": {
+      "max_context_length": 2048,
+      "recommended_context_length": 2048,
+      "binary_search_steps": [],
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0.0,
+      "scaling_tested": false,
+      "is_supported": false,
+      "failure_reason": "CUDA OOM Risk: Base VRAM (2800MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
+    },
+    "gemma4-4b-text": {
+      "max_context_length": 2048,
+      "recommended_context_length": 2048,
+      "binary_search_steps": [],
+      "peak_vram_mb": 0,
+      "tpot_tok_per_sec": 0.0,
+      "scaling_tested": false,
+      "is_supported": false,
+      "failure_reason": "CUDA OOM Risk: Base VRAM (5200MB) exceeds Real-time Usable VRAM (1563MB)",
+      "last_tested_at": "2026-10-28T07:34:08Z"
     }
   }
 }

@@ -4,7 +4,7 @@ Qwen 3.5 2B/4B 실시간 토큰 스트리밍, 인라인 인용 부호 강제, �
 
 import re
 import time
-from typing import Dict, Any, Iterator, AsyncIterator, List, Optional
+from typing import Dict, Any, Iterator, AsyncIterator, List, Optional, Iterable
 
 from ..config import get_settings
 from ..graph_state import RagGraphState, PatternType, FALLBACK_LABEL
@@ -99,16 +99,16 @@ def is_zero_review_state(state: RagGraphState) -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _get_max_tokens_for_pattern(pattern_type: Any, harness: Optional[Any] = None) -> int:
-    """질의 패턴 및 ContextHarnessProfile에 따라 최적화된 생성 토큰 예산을 동적으로 결정합니다."""
+    """질의 패턴 및 ContextHarnessProfile에 따라 최적화된 생성 토큰 예산을 동적으로 결정합니다 (기본 4096 토큰)."""
     if harness:
         pt = str(pattern_type)
         if pt in (PatternType.EXPLICIT_COMPARE.value, PatternType.FEATURE_DISCOVERY.value,
                   PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY):
-            return getattr(harness, "max_compare_output_tokens", 3072)
+            return getattr(harness, "max_compare_output_tokens", 4096)
         elif pt in (PatternType.ASPECT_PROS_CONS.value, PatternType.ASPECT_PROS_CONS):
-            return max(1536, int(getattr(harness, "max_output_tokens", 2048) * 0.75))
+            return getattr(harness, "max_output_tokens", 4096)
         else:
-            return getattr(harness, "max_output_tokens", 2048)
+            return getattr(harness, "max_output_tokens", 4096)
 
     settings = get_settings()
     pt = str(pattern_type)
@@ -116,7 +116,7 @@ def _get_max_tokens_for_pattern(pattern_type: Any, harness: Optional[Any] = None
               PatternType.EXPLICIT_COMPARE, PatternType.FEATURE_DISCOVERY):
         return settings.max_compare_output_tokens
     elif pt in (PatternType.ASPECT_PROS_CONS.value, PatternType.ASPECT_PROS_CONS):
-        return settings.max_single_output_tokens + 256
+        return settings.max_single_output_tokens
     else:
         return settings.max_single_output_tokens
 
@@ -127,6 +127,95 @@ def _clean_token(token: str) -> str:
         return ""
     cleaned = _CJK_PATTERN.sub("", token)
     return cleaned
+
+
+def filter_canary_stream_optimistic(
+    stream: Iterable[str],
+    canary_token: str,
+    window_size: int = 32,
+) -> Iterator[str]:
+    """
+    32자 에페머럴 카나리 토큰(uuid.uuid4().hex)의 청크 분할 유출을 방어하되
+    TTFT <= 150ms를 보존하는 낙관적 접두사 매칭 슬라이딩 윈도우 필터 (Spec 008 Phase 9).
+    비일치 토큰은 0ms 즉시 통과하며, 카나리 토큰과 일치하는 접두사만 최대 window_size(32자) 버퍼링합니다.
+    """
+    if not canary_token:
+        yield from stream
+        return
+
+    buf = ""
+    for chunk in stream:
+        buf += chunk
+        if canary_token in buf:
+            buf = buf.replace(canary_token, "")
+
+        if not buf:
+            continue
+
+        match_len = 0
+        max_check = min(len(buf), len(canary_token), window_size)
+        for k in range(max_check, 0, -1):
+            if canary_token.startswith(buf[-k:]):
+                match_len = k
+                break
+
+        if match_len > 0:
+            flush_part = buf[:-match_len]
+            buf = buf[-match_len:]
+            if flush_part:
+                yield flush_part
+        else:
+            yield buf
+            buf = ""
+
+    if buf:
+        if canary_token in buf:
+            buf = buf.replace(canary_token, "")
+        if buf:
+            yield buf
+
+
+async def afilter_canary_stream_optimistic(
+    stream: AsyncIterator[str],
+    canary_token: str,
+    window_size: int = 32,
+) -> AsyncIterator[str]:
+    """비동기 스트림용 32자 낙관적 접두사 매칭 슬라이딩 윈도우 카나리 필터."""
+    if not canary_token:
+        async for chunk in stream:
+            yield chunk
+        return
+
+    buf = ""
+    async for chunk in stream:
+        buf += chunk
+        if canary_token in buf:
+            buf = buf.replace(canary_token, "")
+
+        if not buf:
+            continue
+
+        match_len = 0
+        max_check = min(len(buf), len(canary_token), window_size)
+        for k in range(max_check, 0, -1):
+            if canary_token.startswith(buf[-k:]):
+                match_len = k
+                break
+
+        if match_len > 0:
+            flush_part = buf[:-match_len]
+            buf = buf[-match_len:]
+            if flush_part:
+                yield flush_part
+        else:
+            yield buf
+            buf = ""
+
+    if buf:
+        if canary_token in buf:
+            buf = buf.replace(canary_token, "")
+        if buf:
+            yield buf
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -144,18 +233,48 @@ from ..redis_pool import (
 
 
 def _extract_doc_ids(state: RagGraphState) -> List[str]:
-    """RAG 선별 문서 ID 목록을 추출합니다."""
+    """RAG 선별 문서 ID 목록을 추출합니다 (doc_id 및 review_id 스키마 상호 호환)."""
     doc_ids = []
     reranked = state.get("reranked_contexts", {})
     if isinstance(reranked, dict):
         for target_id, docs in reranked.items():
             for d in docs:
-                doc_id = str(d.get("review_id") or d.get("product_id") or d.get("id") or "").strip()
+                doc_id = str(d.get("doc_id") or d.get("review_id") or d.get("product_id") or d.get("id") or "").strip()
                 if doc_id:
                     doc_ids.append(doc_id)
                 elif d.get("clean_text") or d.get("review_text"):
                     doc_ids.append(str(d.get("clean_text") or d.get("review_text"))[:40])
     return doc_ids
+
+
+def is_valid_synthesis_response(response_text: Optional[str]) -> bool:
+    """
+    L5 응답 캐시 저장 전 유효성 검증 게이트 (OWASP LLM08 Cache Poisoning 방어).
+    에러 키워드, 타임아웃, 예외 트레이스백, 유출 감지 또는 미완결 답변을 엄격히 차단합니다.
+    """
+    if not response_text:
+        return False
+
+    cleaned = response_text.strip()
+    if len(cleaned) < 50:
+        return False
+
+    error_markers = [
+        "[답변 생성 오류:",
+        "timed out",
+        "Error:",
+        "Exception",
+        "Traceback (most recent call last):",
+        "504 Gateway Timeout",
+        "Connection closed unexpectedly",
+        "보안 검사에서 이상이 감지되었습니다",
+        "카나리아",
+    ]
+    for marker in error_markers:
+        if marker.lower() in cleaned.lower():
+            return False
+
+    return True
 
 
 def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
@@ -182,7 +301,7 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
         tenant_id=tenant_id,
         rewritten_query=rewritten_q,
         doc_ids=doc_ids,
-        model_id=settings.fast_llm_model,
+        model_id=settings.synthesis_llm_model,
         prompt_version="v1.0",
     )
     state["l5_cache_key"] = l5_key
@@ -234,64 +353,38 @@ def synthesis_stream_node(state: RagGraphState) -> Dict[str, Any]:
     canary_leaked = False
 
     with StepTimer("SYNTHESIS", trace_id=trace_id) as timer:
-        for raw_token in client.generate_stream(
+        raw_stream = client.generate_stream(
             prompt=user_prompt,
             system_prompt=system_prompt_to_use,
             max_tokens=max_tokens,
             trace_id=trace_id,
-        ):
-            if canary_token and canary_token in raw_token:
+        )
+        cleaned_stream = (_clean_token(t) for t in raw_stream)
+        filtered_stream = filter_canary_stream_optimistic(cleaned_stream, canary_token=canary_token)
+
+        for cleaned in filtered_stream:
+            if canary_token and canary_token in cleaned:
                 canary_leaked = True
                 logger.warning("Tier 4 카나리아 토큰 유출 감지! 스트림 중단.", extra={"trace_id": trace_id})
                 break
-            cleaned = _clean_token(raw_token)
             if cleaned:
                 full_response.append(cleaned)
 
     response_text = "".join(full_response)
+    if canary_token:
+        response_text = response_text.replace(canary_token, "")
     # Python 인용 태그 정규화 및 부정 속성 왜곡 방지 후처리
     response_text = re.sub(r"\[(\d+)\]", r"[리뷰 \1]", response_text)
     response_text = sanitize_negative_aspect_distortions(response_text)
-
-def is_valid_synthesis_response(response_text: Optional[str]) -> bool:
-    """
-    L5 응답 캐시 저장 전 유효성 검증 게이트 (OWASP LLM08 Cache Poisoning 방어).
-    에러 키워드, 타임아웃, 예외 트레이스백, 유출 감지 또는 미완결 답변을 엄격히 차단합니다.
-    """
-    if not response_text:
-        return False
-
-    cleaned = response_text.strip()
-    if len(cleaned) < 50:
-        return False
-
-    error_markers = [
-        "[답변 생성 오류:",
-        "timed out",
-        "Error:",
-        "Exception",
-        "Traceback (most recent call last):",
-        "504 Gateway Timeout",
-        "Connection closed unexpectedly",
-        "보안 검사에서 이상이 감지되었습니다",
-        "카나리아",
-    ]
-    for marker in error_markers:
-        if marker.lower() in cleaned.lower():
-            return False
-
-    return True
-
 
     if canary_leaked:
         response_text = (
             "죄송합니다. 답변 생성 중 보안 검사에서 이상이 감지되었습니다. 다시 질문해 주세요."
         )
     elif settings.enable_l5_cache and is_valid_synthesis_response(response_text) and len(doc_ids) > 0:
-        active_model_name = client.discover_active_model()
         payload = {
             "response_text": response_text,
-            "model_id": active_model_name,
+            "model_id": settings.synthesis_llm_model,
             "prompt_version": "v1.0",
             "tenant_id": tenant_id,
             "doc_ids_hash": compute_doc_ids_hash(doc_ids),
@@ -349,7 +442,7 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
         tenant_id=tenant_id,
         rewritten_query=rewritten_q,
         doc_ids=doc_ids,
-        model_id=settings.fast_llm_model,
+        model_id=settings.synthesis_llm_model,
         prompt_version="v1.0",
     )
     state["l5_cache_key"] = l5_key
@@ -407,7 +500,7 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
     canary_leaked = False
 
     try:
-        for raw_token in client.generate_stream(
+        raw_stream = client.generate_stream(
             prompt=user_prompt,
             system_prompt=system_prompt_to_use,
             max_tokens=max_tokens,
@@ -415,27 +508,33 @@ def get_token_stream(state: RagGraphState, queue_callback=None) -> Iterator[str]
             tenant_id=tenant_id,
             session_id=session_id,
             queue_callback=queue_callback,
-        ):
-            if canary_token and canary_token in raw_token:
+        )
+        cleaned_stream = (_clean_token(t) for t in raw_stream)
+        filtered_stream = filter_canary_stream_optimistic(cleaned_stream, canary_token=canary_token)
+
+        for cleaned in filtered_stream:
+            if canary_token and canary_token in cleaned:
                 logger.warning("카나리아 유출 감지 — 스트림 중단", extra={"trace_id": trace_id})
                 canary_leaked = True
                 break
-            cleaned = _clean_token(raw_token)
             if cleaned:
                 full_tokens.append(cleaned)
                 yield cleaned
-
 
         if not canary_leaked and full_tokens and settings.enable_l5_cache and not bypass_cache and len(doc_ids) > 0:
             from ..guardrail import GroundednessSanitizer
             sanitizer = GroundednessSanitizer()
             raw_text = "".join(full_tokens)
+            if canary_token:
+                raw_text = raw_text.replace(canary_token, "")
             sanitized_res = sanitizer.sanitize_markdown(raw_text)
             full_text = sanitized_res.cleaned_markdown
+            if canary_token:
+                full_text = full_text.replace(canary_token, "")
             if is_valid_synthesis_response(full_text):
                 payload = {
                     "response_text": full_text,
-                    "model_id": settings.fast_llm_model,
+                    "model_id": settings.synthesis_llm_model,
                     "prompt_version": "v1.0",
                     "tenant_id": tenant_id,
                     "doc_ids_hash": compute_doc_ids_hash(doc_ids),
@@ -487,7 +586,7 @@ async def aget_token_stream(
         tenant_id=tenant_id,
         rewritten_query=rewritten_q,
         doc_ids=doc_ids,
-        model_id=settings.fast_llm_model,
+        model_id=settings.synthesis_llm_model,
         prompt_version="v1.0",
     )
     state["l5_cache_key"] = l5_key
@@ -528,7 +627,7 @@ async def aget_token_stream(
     full_tokens = []
     canary_leaked = False
 
-    async for raw_token in client.agenerate_stream(
+    raw_stream = client.agenerate_stream(
         prompt=user_prompt,
         system_prompt=system_prompt_to_use,
         max_tokens=max_tokens,
@@ -536,12 +635,21 @@ async def aget_token_stream(
         tenant_id=tenant_id,
         session_id=session_id,
         queue_callback=queue_callback,
-    ):
-        if canary_token and canary_token in raw_token:
+    )
+
+    async def _clean_gen():
+        async for t in raw_stream:
+            c = _clean_token(t)
+            if c:
+                yield c
+
+    filtered_stream = afilter_canary_stream_optimistic(_clean_gen(), canary_token=canary_token)
+
+    async for cleaned in filtered_stream:
+        if canary_token and canary_token in cleaned:
             logger.warning("카나리아 유출 감지 — 스트림 중단", extra={"trace_id": trace_id})
             canary_leaked = True
             break
-        cleaned = _clean_token(raw_token)
         if cleaned:
             full_tokens.append(cleaned)
             yield cleaned
@@ -550,12 +658,16 @@ async def aget_token_stream(
         from ..guardrail import GroundednessSanitizer
         sanitizer = GroundednessSanitizer()
         raw_text = "".join(full_tokens)
+        if canary_token:
+            raw_text = raw_text.replace(canary_token, "")
         sanitized_res = sanitizer.sanitize_markdown(raw_text)
         full_text = sanitized_res.cleaned_markdown
+        if canary_token:
+            full_text = full_text.replace(canary_token, "")
         if is_valid_synthesis_response(full_text):
             payload = {
                 "response_text": full_text,
-                "model_id": settings.fast_llm_model,
+                "model_id": settings.synthesis_llm_model,
                 "prompt_version": "v1.0",
                 "tenant_id": tenant_id,
                 "doc_ids_hash": compute_doc_ids_hash(doc_ids),

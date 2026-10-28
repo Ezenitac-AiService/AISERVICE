@@ -25,6 +25,8 @@ def test_cli_assembly_qwen_9b():
     assert "-fa" in cmd
     assert "-ctk" in cmd and cmd[cmd.index("-ctk") + 1] == "q8_0"
     assert "-ctv" in cmd and cmd[cmd.index("-ctv") + 1] == "q8_0"
+    assert "--reasoning" in cmd and cmd[cmd.index("--reasoning") + 1] == "off"
+    assert "--reasoning-budget" in cmd and cmd[cmd.index("--reasoning-budget") + 1] == "0"
     assert "--context-shift" not in cmd_str
     assert "--ctx-shift" not in cmd_str
 
@@ -42,6 +44,8 @@ def test_cli_assembly_qwen_4b():
     assert "-fa" in cmd
     assert "-ctk" in cmd and cmd[cmd.index("-ctk") + 1] == "q8_0"
     assert "-ctv" in cmd and cmd[cmd.index("-ctv") + 1] == "q8_0"
+    assert "--reasoning" in cmd and cmd[cmd.index("--reasoning") + 1] == "off"
+    assert "--reasoning-budget" in cmd and cmd[cmd.index("--reasoning-budget") + 1] == "0"
     assert "--context-shift" not in cmd_str
     assert "--ctx-shift" not in cmd_str
 

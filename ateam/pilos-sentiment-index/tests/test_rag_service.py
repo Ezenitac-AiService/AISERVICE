@@ -392,7 +392,7 @@ class RagServiceAnswerTest(unittest.TestCase):
         )
         self.assertEqual(
             call_arguments["max_tokens"],
-            512,
+            4096,
         )
         self.assertIn(
             "model_date는 모델 분석의 기준",

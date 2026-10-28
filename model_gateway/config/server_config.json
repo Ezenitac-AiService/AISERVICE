@@ -57,14 +57,14 @@
         "enforce_all_gpu_on_no_avx": true,
         "fallback_hardware_tier": "ampere_sm86"
     },
-    "model": "qwen3.5-9b",
-    "context_window": 20992,
+    "model": "qwen3.5-4b",
+    "context_window": 87040,
     "auto_benchmark_profile": {
-        "recommended_model": "qwen3.5-9b",
-        "recommended_context_window": 20992,
-        "recommended_context_length": 20992,
+        "recommended_model": "qwen3.5-4b",
+        "recommended_context_window": 87040,
+        "recommended_context_length": 87040,
         "benchmark_tps": 30.0,
-        "vram_used_mb": 15472,
-        "benchmark_timestamp": "2026-09-16T15:10:15Z"
+        "vram_used_mb": 45502,
+        "benchmark_timestamp": "2026-10-28T07:34:08Z"
     }
 }

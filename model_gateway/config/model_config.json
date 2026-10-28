@@ -1,6 +1,6 @@
 {
-    "current_model": "qwen3.5-9b",
-    "current_n_ctx": 32768,
+    "current_model": "qwen3.5-2b",
+    "current_n_ctx": 4096,
     "available_presets": [
         "qwen3.5-9b",
         "qwen3.5-4b"
