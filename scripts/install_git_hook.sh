@@ -26,6 +26,10 @@ cat <<'EOF' > "$HOOK_FILE"
 # ==============================================================================
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 LOG_DIR=$(git rev-parse --git-dir 2>/dev/null || echo "$REPO_ROOT/.git")
+case "$LOG_DIR" in
+    /*) ;;
+    *) LOG_DIR="$REPO_ROOT/$LOG_DIR" ;;
+esac
 
 AGENT_SCRIPT=""
 if [ -f "$REPO_ROOT/scripts/auto_changelog.py" ]; then
@@ -50,7 +54,7 @@ fi
 
 if [ -n "$AGENT_SCRIPT" ] && [ -f "$AGENT_SCRIPT" ]; then
     mkdir -p "$LOG_DIR" 2>/dev/null || true
-    python3 "$AGENT_SCRIPT" --yes --sync >> "$LOG_DIR/auto_changelog.log" 2>&1
+    python3 -u "$AGENT_SCRIPT" --yes --sync >> "$LOG_DIR/auto_changelog.log" 2>&1
 fi
 EOF
 echo "Successfully installed synchronous post-commit hook to $HOOK_FILE"
@@ -63,6 +67,10 @@ cat <<'EOF' > "$HOOK_FILE"
 # ==============================================================================
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 LOG_DIR=$(git rev-parse --git-dir 2>/dev/null || echo "$REPO_ROOT/.git")
+case "$LOG_DIR" in
+    /*) ;;
+    *) LOG_DIR="$REPO_ROOT/$LOG_DIR" ;;
+esac
 
 AGENT_SCRIPT=""
 if [ -f "$REPO_ROOT/scripts/auto_changelog.py" ]; then
@@ -88,7 +96,7 @@ fi
 if [ -n "$AGENT_SCRIPT" ] && [ -f "$AGENT_SCRIPT" ]; then
     mkdir -p "$LOG_DIR" 2>/dev/null || true
     (
-        python3 "$AGENT_SCRIPT" --yes >> "$LOG_DIR/auto_changelog.log" 2>&1
+        python3 -u "$AGENT_SCRIPT" --yes >> "$LOG_DIR/auto_changelog.log" 2>&1
     ) >/dev/null 2>&1 & disown
 fi
 EOF
