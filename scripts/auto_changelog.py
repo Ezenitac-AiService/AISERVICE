@@ -408,10 +408,11 @@ def collect_git_context(
     commit_hash = "working-tree"
     commit_message = "<Staged working tree changes>"
     commit_date: Optional[str] = None
+    target_rev = rev.split("..")[-1] if rev else "HEAD"
     if not is_staged:
         try:
             head_log = subprocess.run(
-                ["git", "log", "-1", "--format=%H%x00%cs%x00%s%n%b", "--"],
+                ["git", "log", "-1", target_rev, "--format=%H%x00%cs%x00%s%n%b", "--"],
                 cwd=str(repo_root),
                 capture_output=True,
                 text=True,
@@ -809,12 +810,13 @@ def verify_and_sanitize_spec_links(
 
 def detect_spec_ref(branch_name: str = "", commit_message: str = "") -> Optional[str]:
     """활성 Git 브랜치명 및 최근 커밋 메시지로부터 스펙 번호 자동 감지 (FR-004 / T038)"""
-    sources = [branch_name, commit_message]
+    # 단일 커밋의 구체적 의도를 반영하기 위해 커밋 메시지를 브랜치명보다 1순위로 검사
+    sources = [commit_message, branch_name]
     patterns = [
         re.compile(r"specs/(\d{3})(?:-[a-zA-Z0-9_\-]+)?"),
+        re.compile(r"(?i)\bSpec[_\-\s]*(\d+)\b"),
+        re.compile(r"(?i)\bFeature[_\-\s]*(\d+)\b"),
         re.compile(r"(?:^|[^\w])(\d{3})-[a-zA-Z0-9_\-]+"),
-        re.compile(r"(?i)\bSpec\s*(\d+)\b"),
-        re.compile(r"(?i)\bFeature\s*(\d+)\b"),
     ]
     for src in sources:
         if not src:
