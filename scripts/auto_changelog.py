@@ -244,7 +244,7 @@ SECRET_PATTERNS = [
     re.compile(r"AKIA[A-Z0-9]{16}"),
     re.compile(r"gh[pousr]_[a-zA-Z0-9]{36}"),
     re.compile(r"github_pat_[a-zA-Z0-9_]{22,}"),
-    re.compile(r"glpat-[a-zA-Z0-9\-]{20}"),
+    re.compile(r"glpat-[a-zA-Z0-9_.\-]{20,}"),
     re.compile(r"hf_[a-zA-Z0-9]{34}"),
 ]
 
@@ -303,7 +303,7 @@ def invoke_manage_changelog(args_list: List[str], repo_root: Optional[Path] = No
         }
     except subprocess.TimeoutExpired as e:
         return {
-            "exit_code": EXIT_SYSTEM_FATAL,
+            "exit_code": EXIT_FATAL_ERROR,
             "stdout": "",
             "stderr": json.dumps({
                 "error": "SUBPROCESS_TIMEOUT",
@@ -496,6 +496,8 @@ def collect_git_context(
     diff_lines: List[str] = []
     total_bytes = 0
     truncated = False
+    current_file_lines = 0
+    file_truncated = False
 
     proc = subprocess.Popen(
         diff_cmd,
@@ -510,7 +512,24 @@ def collect_git_context(
     try:
         assert proc.stdout is not None
         for line in proc.stdout:
-            # 파일당 100줄, 전체 3,000줄 트렁케이션
+            if line.startswith("diff --git "):
+                current_file_lines = 0
+                file_truncated = False
+
+            if file_truncated:
+                continue
+
+            current_file_lines += 1
+            if current_file_lines > MAX_FILE_LINES:
+                file_truncated = True
+                trunc_marker = f"... [File diff truncated at {MAX_FILE_LINES} lines] ...\n"
+                marker_bytes = len(trunc_marker.encode("utf-8"))
+                if total_bytes + marker_bytes <= MAX_DIFF_PHYSICAL_BYTES and len(diff_lines) < MAX_DIFF_LINES:
+                    diff_lines.append(trunc_marker)
+                    total_bytes += marker_bytes
+                continue
+
+            # 전체 512KB 물리 캡 및 3,000줄 트렁케이션
             line_bytes = len(line.encode("utf-8"))
             if total_bytes + line_bytes > MAX_DIFF_PHYSICAL_BYTES or len(diff_lines) >= MAX_DIFF_LINES:
                 truncated = True
@@ -829,6 +848,57 @@ def detect_spec_ref(branch_name: str = "", commit_message: str = "") -> Optional
     return None
 
 
+def fetch_latest_versions(repo_root: Path) -> Dict[str, str]:
+    """기존 체인지로그 DB에서 서브시스템별 최신 버전 목록 조회 (T052 / FR-003)"""
+    script_path = repo_root / "scripts" / "manage_changelog.py"
+    if not script_path.exists():
+        return {}
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(script_path), "list", "--limit", "50"],
+            capture_output=True,
+            text=True,
+            cwd=str(repo_root),
+            shell=False,
+            timeout=15.0,
+        )
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return {}
+        data = json.loads(proc.stdout)
+        latest: Dict[str, str] = {}
+        for item in data.get("items", []):
+            sub = item.get("subsystem")
+            ver = item.get("version")
+            if sub and ver and sub not in latest:
+                latest[sub] = ver
+        return latest
+    except Exception:
+        return {}
+
+
+def load_spec_context(repo_root: Path, spec_ref: Optional[str], max_chars: int = 400) -> str:
+    """감지된 스펙 번호에 해당하는 specs/<num>-*/spec.md 요약 문맥 로드 (T054 / FR-004)"""
+    if not spec_ref:
+        return ""
+    digits = re.findall(r"\d+", spec_ref)
+    if not digits:
+        return ""
+    prefix = f"{int(digits[0]):03d}-"
+    specs_dir = repo_root / "specs"
+    if not specs_dir.exists():
+        return ""
+    try:
+        for entry in sorted(specs_dir.iterdir()):
+            if entry.is_dir() and entry.name.startswith(prefix):
+                spec_file = entry / "spec.md"
+                if spec_file.exists():
+                    content = spec_file.read_text(encoding="utf-8", errors="ignore")[:max_chars]
+                    return sanitize_text(content.strip())
+    except Exception:
+        return ""
+    return ""
+
+
 def build_system_prompt(lang: str = "ko") -> str:
     """헌법 제I조 기반 시스템 프롬프트 조립"""
     if lang == "en":
@@ -928,7 +998,7 @@ def execute_pipeline(config: Config) -> int:
 
     # 1. 컨텍스트 수집 (자연어 모드 vs Git diff 모드)
     if args.prompt:
-        context_prompt = f"User Natural Language Request:\n{args.prompt}"
+        context_prompt = sanitize_text(f"User Natural Language Request:\n{args.prompt}")
         changed_files = []
         is_merge = False
         tag_name = None
@@ -947,29 +1017,32 @@ def execute_pipeline(config: Config) -> int:
         is_merge = bundle.is_merge
         tag_name = bundle.tag_name
 
+        sanitized_commit_msg = sanitize_text(bundle.commit_message or "")
+        sanitized_merged = sanitize_text(bundle.merged_commits or "")
+        sanitized_tag_ann = sanitize_text(bundle.tag_annotation or "") if bundle.tag_annotation else None
         sanitized_diff = sanitize_text(bundle.diff_text)
         capped_diff = apply_token_budget_cap(sanitized_diff)
 
         context_prompt = f"""Target Commit: {bundle.commit_hash}
 Commit Message:
-{bundle.commit_message}
+{sanitized_commit_msg}
 
 Changed Files Summary:
 {bundle.stat_summary}
 
 Is Merge Commit: {bundle.is_merge}
 Merged Commits:
-{bundle.merged_commits}
+{sanitized_merged}
 
 Git Tag: {bundle.tag_name}
-Tag Annotation: {bundle.tag_annotation}
+Tag Annotation: {sanitized_tag_ann}
 
 <git_diff>
 {capped_diff}
 </git_diff>
 """
 
-    # 2. 브랜치 / stage 판정
+    # 2. 브랜치 / stage 판정 및 사전 문맥(최신 버전, 스펙) 주입
     branch_proc = subprocess.run(
         ["git", "branch", "--show-current"],
         cwd=str(repo_root),
@@ -980,6 +1053,19 @@ Tag Annotation: {bundle.tag_annotation}
     branch = branch_proc.stdout.strip() if branch_proc.returncode == 0 else ""
     inferred_stage = determine_stage_from_git(branch=branch, exact_tag=tag_name)
     stage = args.stage or inferred_stage
+
+    detected_spec = detect_spec_ref(
+        branch_name="" if args.prompt else branch,
+        commit_message=args.prompt if args.prompt else (bundle.commit_message if "bundle" in locals() else ""),
+    )
+    latest_versions = fetch_latest_versions(repo_root)
+    if latest_versions:
+        context_prompt += f"\nExisting Subsystem Latest Versions (DB):\n{json.dumps(latest_versions, ensure_ascii=False)}\n"
+
+    pre_spec_ref = args.spec or detected_spec
+    spec_ctx = load_spec_context(repo_root, pre_spec_ref)
+    if spec_ctx:
+        context_prompt += f"\nRelated Specification Context ({pre_spec_ref}) [Reference only; prioritize the commit diff or user prompt]:\n{spec_ctx}\n"
 
     # 3. 모델 게이트웨이 LLM 질의 (단일 vs --multi)
     system_prompt = build_system_prompt(lang=args.lang)
@@ -1001,12 +1087,6 @@ Tag Annotation: {bundle.tag_annotation}
     if not raw_payloads:
         sys.stderr.write("Model gateway returned empty milestone payload.\n")
         return EXIT_VALIDATION_ERROR
-
-    # 커밋 메시지 또는 브랜치로부터 스펙 번호 자동 감지 (T038 / FR-004)
-    detected_spec = detect_spec_ref(
-        branch_name=branch,
-        commit_message=bundle.commit_message if (not args.prompt and "bundle" in locals()) else "",
-    )
 
     applied_milestones: List[Dict[str, Any]] = []
 
@@ -1031,18 +1111,18 @@ Tag Annotation: {bundle.tag_annotation}
         elif "stage" not in payload or not payload["stage"]:
             payload["stage"] = stage
 
-        if args.version:
+        if tag_name:
+            payload["version"] = tag_name
+        elif args.version:
             payload["version"] = args.version
         elif args.bump:
-            base_ver = tag_name or payload.get("version") or "v0.1.0"
+            base_ver = payload.get("version") or "v0.1.0"
             payload["version"] = compute_next_version(
                 base_ver,
                 commit_messages="",
                 stage=payload.get("stage", stage),
                 bump_override=args.bump,
             )
-        elif tag_name:
-            payload["version"] = tag_name
 
         # 날짜 채번
         if args.date:
